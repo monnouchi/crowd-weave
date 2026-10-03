@@ -1,3 +1,4 @@
+import { createParty, moveParty, partyArrived } from "./party.js";
 import {
   makeCrowd,
   moveCrowd,
@@ -99,6 +100,10 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     stage,
     phase: "ready",
     player: { ...START, r: 12 },
+    party: createParty(stage, { ...START }),
+    arriving: false,
+    lastContactMember: 0,
+    memberHits: Array(stage + 1).fill(0),
     scene,
     meetingPartner: {
       ...MEETING_PARTNER,
@@ -122,7 +127,7 @@ export function step(g, dt, input) {
   g.elapsed += dt;
   g.cooldown = Math.max(0, g.cooldown - dt);
   g.stun = Math.max(0, g.stun - dt);
-  if (!g.stun) {
+  if (!g.stun && !g.arriving) {
     const brake = input.left && input.right;
     if (!brake) {
       g.player.x +=
@@ -136,23 +141,59 @@ export function step(g, dt, input) {
   }
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
   g.player.y = Math.max(32, Math.min(H - 25, g.player.y));
+  if (
+    !g.arriving &&
+    g.player.x >= GOAL.x &&
+    g.player.x <= GOAL.x + GOAL.w &&
+    g.player.y <= GOAL.y + GOAL.h + 0.000001
+  )
+    g.arriving = true;
+  if (g.arriving && g.party.members.length && !g.stun) {
+    const dx = 240 - g.player.x,
+      dy = 84 - g.player.y,
+      d = Math.hypot(dx, dy),
+      ratio = d ? Math.min(1, (100 * dt) / d) : 0;
+    g.player.x += dx * ratio;
+    g.player.y += dy * ratio;
+  }
+  moveParty(g.party, g.player, dt, {
+    braking: !!(input.left && input.right),
+    stunned: g.stun > 0,
+    arriving: g.arriving,
+  });
   moveCrowd(g.crowd, dt);
   let contacted = null,
+    contactMember = null,
     nearest = Infinity;
   const touching = [];
+  const team = [{ ...g.player, id: 0 }, ...g.party.members];
   for (const p of g.crowd) {
-    const distance = Math.hypot(p.x - g.player.x, p.y - g.player.y);
-    if (visiblePerson(p) && distance < p.r + g.player.r) {
-      touching.push(p.id);
-      if (!g.cooldown && !g.touchingIds.includes(p.id) && distance < nearest) {
-        contacted = p;
-        nearest = distance;
+    if (!visiblePerson(p)) continue;
+    let overlaps = false;
+    for (const member of team) {
+      const distance = Math.hypot(p.x - member.x, p.y - member.y);
+      if (distance < p.r + member.r) {
+        overlaps = true;
+        if (
+          !g.cooldown &&
+          !g.touchingIds.includes(p.id) &&
+          distance < nearest
+        ) {
+          contacted = p;
+          contactMember = member;
+          nearest = distance;
+        }
       }
     }
+    if (overlaps) touching.push(p.id);
   }
   g.touchingIds = touching;
   if (contacted) {
-    reactToContact(contacted, g.player);
+    reactToContact(contacted, contactMember);
+    g.lastContactMember = contactMember.id;
+    g.memberHits[contactMember.id]++;
+    const hitFriend = g.party.members.find((m) => m.id === contactMember.id);
+    if (hitFriend) hitFriend.flash = 1.4;
     g.lastContactId = contacted.id;
     g.hits++;
     g.elapsed += 2;
@@ -160,9 +201,10 @@ export function step(g, dt, input) {
     g.stun = 0.35;
   }
   if (
-    g.player.x >= GOAL.x &&
-    g.player.x <= GOAL.x + GOAL.w &&
-    g.player.y <= GOAL.y + GOAL.h
+    g.arriving &&
+    partyArrived(g.party) &&
+    (!g.party.members.length ||
+      Math.hypot(g.player.x - 240, g.player.y - 84) < 0.01)
   ) {
     g.phase = "finished";
     g.meetingPartner.state = "met";

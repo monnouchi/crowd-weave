@@ -6,6 +6,7 @@ import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import { createGame, step, W, H, GOAL, STAGES, SCENES } from "./logic.js";
 import { visiblePerson } from "./crowd.js";
 import { TwoButtons, EnterLatch, primaryCommand } from "./input.js";
+const CAMERA_Y = 500;
 const canvas = document.querySelector("canvas"),
   ctx = canvas.getContext("2d"),
   overlay = document.querySelector("#overlay"),
@@ -265,7 +266,7 @@ function person(p, player = false) {
   if (p.partner) ctx.scale(p.visualScale, p.visualScale);
   if (!player) {
     ctx.globalAlpha =
-      p.partner || p.background
+      p.partner || p.background || p.friend
         ? 1
         : Math.min(
             1,
@@ -289,16 +290,21 @@ function person(p, player = false) {
       ? moving
         ? Math.sin(game.elapsed * 12) * 2
         : 0
-      : p.reaction || p.state !== "walking"
+      : p.reaction || !["walking", "following", "docking"].includes(p.state)
         ? 0
-        : Math.sin(p.walk / 7 + p.color * 1.7) * 1.6;
+        : Math.sin(p.walk / 7 + (p.color ?? p.id ?? 0) * 1.7) * 1.6;
   rounded(-8, 9 + stride, 5, 8, 2, "#3b4b49");
   rounded(3, 9 - stride, 5, 8, 2, "#3b4b49");
   ctx.fillStyle = "#173d3c20";
   ctx.beginPath();
   ctx.ellipse(2, 9, 14, 8, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (player && game.cooldown > 0 && Math.floor(game.cooldown * 9) % 2) {
+  if (
+    player &&
+    game.cooldown > 0 &&
+    !reducedMotion.matches &&
+    Math.floor(game.cooldown * 9) % 2
+  ) {
     ctx.globalAlpha = 0.45;
   }
   ctx.save();
@@ -311,7 +317,7 @@ function person(p, player = false) {
     10,
     player
       ? "#2185ae"
-      : p.partner
+      : p.partner || p.friend
         ? p.shirt
         : ["#ce866b", "#758e79", "#b1a075", "#8c87a2"][p.color],
   );
@@ -462,7 +468,7 @@ function draw() {
   ctx.fillStyle = "#d4dfcf";
   ctx.fillRect(0, 0, W, H);
   ctx.save();
-  ctx.translate(240 - game.player.x, 560 - game.player.y);
+  ctx.translate(240 - game.player.x, CAMERA_Y - game.player.y);
   ctx.fillStyle = game.scene.floor;
   ctx.fillRect(0, -800, W, H + 1000);
   ctx.fillStyle = "#d4dfcf";
@@ -620,12 +626,62 @@ function draw() {
   ctx.fillStyle = "#759081";
   ctx.font = "11px system-ui";
   ctx.fillText("START", 240, 662);
+  if (game.party.members.length) {
+    ctx.save();
+    ctx.strokeStyle = "#477f775c";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 6]);
+    ctx.beginPath();
+    const trail = game.party.trail.filter(
+      (p) => p.s >= Math.min(...game.party.members.map((m) => m.s)) - 1,
+    );
+    trail.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const p of [
     ...game.crowd.filter(visiblePerson),
+    ...game.party.members,
     game.meetingPartner,
     { ...game.player, player: true },
   ].sort((a, b) => a.y - b.y))
     person(p, p.player);
+  if (game.cooldown > 0 && game.lastContactMember === 0) {
+    ctx.strokeStyle = "#d37a46";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(game.player.x, game.player.y, 22, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (const m of game.party.members) {
+    ctx.save();
+    ctx.fillStyle = m.flash > 0 ? "#b65b39" : "#245c56";
+    ctx.beginPath();
+    ctx.arc(
+      m.x + (m.docking && m.id % 2 ? -20 : 20),
+      m.y - 7,
+      7,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "bold 10px system-ui";
+    ctx.fillText(
+      String(m.id),
+      m.x + (m.docking && m.id % 2 ? -20 : 20),
+      m.y - 3,
+    );
+    if (m.flash > 0) {
+      ctx.strokeStyle = "#d37a46";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 18, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   for (const p of game.crowd)
     if (p.reaction && visiblePerson(p)) {
       rounded(p.x - 11, p.y - 38, 22, 22, 9, "#fff3e7");
@@ -665,8 +721,23 @@ function frame(now) {
     game.stage,
   );
   const previousX = game.player.x;
+  const previousRegroup = game.party.regroup;
   const steering = input();
   step(game, dt, steering);
+  if (game.party.regroup < 0.1) game.party.chimed = false;
+  if (
+    game.party.members.length &&
+    previousRegroup < 0.95 &&
+    game.party.regroup >= 0.95 &&
+    !game.party.chimed
+  ) {
+    game.party.chimed = true;
+    if (game.hits === hits) {
+      audio.effect("regroup");
+      noticeUntil = now + 1000;
+      $("#notice").textContent = "隊列が整った！";
+    }
+  }
   const movementDt = Math.max(0, Math.min(0.05, dt));
   playerPose = updatePlayerPose(
     playerPose,
@@ -676,9 +747,12 @@ function frame(now) {
   );
   $("#left").classList.toggle("held", steering.left);
   $("#right").classList.toggle("held", steering.right);
-  $("#motion").textContent =
-    steering.left && steering.right
-      ? "ブレーキ · 停止中"
+  $("#motion").textContent = game.arriving
+    ? "合流中 · 仲間の到着を待っています"
+    : steering.left && steering.right
+      ? game.party.members.length
+        ? "ブレーキ · 仲間が隊列を整えます"
+        : "ブレーキ · 停止中"
       : steering.left
         ? "← 左へよける"
         : steering.right
@@ -687,16 +761,30 @@ function frame(now) {
   if (game.hits > hits) {
     audio.effect("contact");
     noticeUntil = now + 950;
-    $("#notice").textContent = "おっと！ +2秒";
+    $("#notice").textContent =
+      `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒`;
   }
   $("#notice").classList.toggle(
     "active",
     game.phase === "playing" && now < noticeUntil,
   );
+  $("#party-count").textContent =
+    `自分 + 仲間${game.party.members.length + (game.phase === "finished" ? 1 : 0)}人`;
+  $("#party-roster").textContent =
+    game.phase === "finished"
+      ? [
+          ...game.party.members.map((m) => `${m.id}✓`),
+          `${game.stage + 1}（新）✓`,
+        ].join(" · ")
+      : game.party.members.length
+        ? game.party.members
+            .map((m) => `${m.id}${m.docked ? "✓" : ""}`)
+            .join(" · ")
+        : "ひとりで出発";
   $("#time").innerHTML = `${game.elapsed.toFixed(1)}<span>秒</span>`;
   $("#hits").innerHTML = `${game.hits}<span>回</span>`;
   $("#distance").innerHTML =
-    `${Math.round(Math.max(0, Math.min(100, ((game.player.y - 85) / 540) * 100)))}<span>%</span>`;
+    `${Math.round(Math.max(0, Math.min(100, ((Math.max(game.player.y, ...game.party.members.map((m) => m.y)) - 84) / (541 + game.party.members.length * 30)) * 100)))}<span>%</span>`;
   if (game.phase === "finished" && overlay.hidden) {
     audio.goal(game.stage, game);
     clearInput();
@@ -709,19 +797,23 @@ function frame(now) {
     $("#next-purpose").hidden = game.stage === 4;
     panel(
       game.stage === 4 ? "全5ステージを踏破！" : game.scene.arrival,
-      `${game.stage === 4 ? `合計 ${records.reduce((s, r) => s + r.time, 0).toFixed(1)}秒 / 接触 ${records.reduce((s, r) => s + r.hits, 0)}回。最終ステージ：` : ""}${game.scene.arrival} タイム ${game.elapsed.toFixed(1)}秒（接触の加算を含む） / 接触 ${game.hits}回。${game.hits === 0 ? "見事な雑踏突破でした。" : "すきまを読むほど、早く到着できます。"}`,
+      `${game.stage === 4 ? "全員がステージ前に到着！ " : `友だち${game.stage + 1}と合流。仲間が${game.stage + 1}人になりました。 `}${game.stage === 4 ? `合計 ${records.reduce((s, r) => s + r.time, 0).toFixed(1)}秒 / 接触 ${records.reduce((s, r) => s + r.hits, 0)}回。最終ステージ：` : ""}${game.scene.arrival} タイム ${game.elapsed.toFixed(1)}秒（接触の加算を含む） / 接触 ${game.hits}回。${game.hits === 0 ? "見事な雑踏突破でした。" : "すきまを読むほど、早く到着できます。"}`,
       game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
   }
   draw();
+  $("#goal-callout").textContent =
+    game.arriving && game.phase !== "finished"
+      ? "仲間全員を待とう！"
+      : game.scene.bubble;
   const callout = $("#goal-callout"),
     rect = canvas.getBoundingClientRect();
   const scale = Math.min(rect.width / W, rect.height / H),
     ox = (rect.width - W * scale) / 2,
     oy = (rect.height - H * scale) / 2;
   const px = ox + (game.meetingPartner.x + 240 - game.player.x) * scale,
-    py = oy + (game.meetingPartner.y + 560 - game.player.y) * scale;
+    py = oy + (game.meetingPartner.y + CAMERA_Y - game.player.y) * scale;
   callout.hidden = game.phase !== "playing" || game.player.y > 500 || py < 55;
   if (!callout.hidden) {
     const width = callout.offsetWidth,

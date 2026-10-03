@@ -273,10 +273,13 @@ test("meeting partner has a clear purpose, is not a crowd obstacle and cannot pe
     g.player.x = g.meetingPartner.x;
     g.player.y = g.meetingPartner.y;
     step(g, 0.025, {});
+    if (stage > 0)
+      assert.equal(g.phase, "playing", "leader arrival alone does not finish");
+    for (let n = 0; n < 600 && g.phase === "playing"; n++) step(g, 0.025, {});
     assert.equal(g.phase, "finished");
     assert.equal(g.hits, 0);
     assert.equal(g.meetingPartner.state, "met");
-    assert.equal(g.elapsed, 0.025);
+    assert.ok(g.elapsed >= 0.025);
   }
 });
 

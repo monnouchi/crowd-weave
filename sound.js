@@ -108,6 +108,10 @@ export class GameAudio {
       this.tone(165, 0.14, 0.04, 0, "triangle");
       this.tone(125, 0.16, 0.025, 0.08, "triangle");
     }
+    if (kind === "regroup") {
+      this.tone(330, 0.16, 0.012, 0, "sine");
+      this.tone(440, 0.22, 0.014, 0.11, "sine");
+    }
     if (kind === "brake") this.tone(220, 0.08, 0.012);
     if (kind === "goal")
       [392, 494, 587, 784].forEach((n, i) =>
