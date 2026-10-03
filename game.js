@@ -1,4 +1,11 @@
-import { floorDetails, concert, rainShelters } from "./art.js";
+import {
+  floorDetails,
+  concert,
+  rainShelters,
+  venueJourney,
+  hallInterior,
+  goalBoundary,
+} from "./art.js";
 import { TiltState, tiltPermission } from "./tilt.js";
 import { shareResult, resultText, resultTotals } from "./share.js";
 import { GameAudio } from "./sound.js";
@@ -7,11 +14,17 @@ import {
   createWalkingPose,
   updateWalkingPose,
 } from "./pose.js";
-import { drawCharacter } from "./character.js";
+import { drawCharacter, placeSpeech } from "./character.js";
 import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import { createGame, step, W, H, GOAL, STAGES, SCENES } from "./logic.js";
+import { trafficViolations } from "./traffic.js";
 import { visiblePerson } from "./crowd.js";
-import { TwoButtons, EnterLatch, primaryCommand } from "./input.js";
+import {
+  TwoButtons,
+  EnterLatch,
+  primaryCommand,
+  bindPointerControls,
+} from "./input.js";
 const CAMERA_Y = 500;
 const canvas = document.querySelector("canvas"),
   ctx = canvas.getContext("2d"),
@@ -42,6 +55,7 @@ let game = createGame(),
   playerPose = { lean: 0 };
 const walkingPoses = new Map();
 let visualDt = 0;
+let companionSpeech = null;
 const tilt = new TiltState();
 let steeringMode = "buttons",
   tiltWaitingUntil = 0,
@@ -60,6 +74,7 @@ const $ = (s) => document.querySelector(s);
 document.title = PAGE_TITLE;
 document.querySelector("#game-name").textContent = GAME_NAME;
 function clearInput() {
+  pointerControls.clear();
   buttons.clear();
   tilt.reset();
   if (steeringMode === "tilt") tiltWaitingUntil = performance.now() + 3000;
@@ -93,6 +108,7 @@ function start(stage = 0) {
   $("#restart").disabled = false;
   $("#next-purpose").hidden = true;
   clearInput();
+  audio.reset();
   if (stage === 0) records = [];
   game = createGame(stage);
   $("main").classList.toggle("with-traffic", !!game.traffic);
@@ -111,15 +127,15 @@ function start(stage = 0) {
   pause.disabled = false;
   last = performance.now();
   $("#notice").textContent = "";
-  $("#notice").classList.remove("companion");
   noticeUntil = 0;
+  companionSpeech = null;
   canvas.focus({ preventScroll: true });
 }
 function setPaused() {
+  clearInput();
+  audio.suspend();
   if (game.phase !== "playing") return;
   game.phase = "paused";
-  audio.suspend();
-  clearInput();
   pause.disabled = true;
   panel(
     "ひと休み。",
@@ -200,7 +216,6 @@ window.addEventListener("blur", () => {
   enterLatch.release();
   setPaused();
 });
-window.addEventListener("touchcancel", clearInput);
 for (const surface of document.querySelectorAll(
   "#game, .steering, #brake, #goal-callout, .stats, .party-strip, #notice, #traffic-status",
 ))
@@ -212,19 +227,21 @@ document.addEventListener("visibilitychange", () => {
     setPaused();
   }
 });
-for (const side of ["left", "right"]) {
-  const button = $("#" + side);
-  button.addEventListener("pointerdown", (e) => {
-    if (game.phase !== "playing") return;
-    e.preventDefault();
-    button.setPointerCapture(e.pointerId);
-    buttons.press(e.pointerId, side);
-  });
-  for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
-    button.addEventListener(event, (e) => {
-      buttons.release(e.pointerId);
-    });
-}
+const pointerControls = bindPointerControls({
+  controls: [
+    [$("#left"), "left"],
+    [$("#right"), "right"],
+    [$("#brake"), "brake"],
+  ],
+  enabled: (side) =>
+    game.phase === "playing" && (side !== "brake" || steeringMode === "tilt"),
+  press: (id, side) =>
+    side === "brake" ? tilt.brakes.add(id) : buttons.press(id, side),
+  release: (id, side) =>
+    side === "brake" ? tilt.brakes.delete(id) : buttons.release(id),
+  interrupted: setPaused,
+});
+window.addEventListener("pagehide", setPaused);
 function input() {
   const keys = buttons.read();
   if (steeringMode !== "tilt") return keys;
@@ -288,14 +305,6 @@ $("#recenter").addEventListener("click", () => {
   tilt.recenter();
   $("#tilt-status").textContent = "今の姿勢を正面にしました";
 });
-$("#brake").addEventListener("pointerdown", (e) => {
-  if (game.phase !== "playing" || steeringMode !== "tilt") return;
-  e.preventDefault();
-  e.currentTarget.setPointerCapture(e.pointerId);
-  tilt.brakes.add(e.pointerId);
-});
-for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
-  $("#brake").addEventListener(event, (e) => tilt.brakes.delete(e.pointerId));
 
 function rounded(x, y, w, h, r, color) {
   ctx.fillStyle = color;
@@ -309,7 +318,7 @@ function person(p, player = false) {
     : p.friend
       ? `friend:${p.id}`
       : p.partner
-        ? "meeting"
+        ? p.visualKey || "meeting"
         : p.id !== undefined
           ? `crowd:${p.id}`
           : p.visualKey || `scenery:${p.x}:${p.y}`;
@@ -357,13 +366,21 @@ function person(p, player = false) {
     opacity,
     waving: p.partner,
     wave: Math.sin(game.worldTime * 3) * 2,
+    live: game.stage === 4,
+    time: game.worldTime,
   });
 }
 function destination(scene) {
   ctx.textAlign = "center";
   ctx.font = "11px system-ui";
   if (scene.landmark === "cafe") {
-    rounded(130, -150, 220, 150, 10, "#d7c6a3");
+    rounded(18, -155, 444, 170, 5, "#b7c2bc");
+    rounded(130, -150, 220, 165, 10, "#d7c6a3");
+
+    ctx.fillStyle = "#6b8579";
+    ctx.font = "bold 11px system-ui";
+    ctx.fillText("← 改札・出口 / 駅構内通路 / ホーム →", 240, 220);
+    rounded(176, -30, 128, 50, 4, "#dfe9d8");
     rounded(150, -137, 160, 18, 5, "#8b6e4e");
     ctx.fillStyle = "#fff4dc";
     ctx.fillText("COFFEE / 駅カフェ", 230, -124);
@@ -442,8 +459,7 @@ function destination(scene) {
     });
   }
 }
-function drawTraffic() {
-  const t = game.traffic;
+function drawTraffic(t) {
   if (!t) return;
   ctx.fillStyle = "#66777a";
   ctx.fillRect(0, t.top, W, t.bottom - t.top);
@@ -455,7 +471,19 @@ function drawTraffic() {
     ctx.fillRect(t.left, y, t.right - t.left, 7);
   ctx.fillStyle = "#d7c483";
   for (let x = 10; x < W; x += 40)
-    if (x < t.left - 25 || x > t.right + 5) ctx.fillRect(x, 331, 24, 2);
+    if (x < t.left - 25 || x > t.right + 5)
+      ctx.fillRect(x, (t.top + t.bottom) / 2, 24, 2);
+  for (let lane = 1; lane < t.lanes; lane++) {
+    ctx.strokeStyle = "#e5d394";
+    ctx.lineWidth = lane === 2 ? 2 : 1;
+    ctx.setLineDash([14, 12]);
+    ctx.beginPath();
+    const laneY = t.top + (lane * (t.bottom - t.top)) / t.lanes;
+    ctx.moveTo(0, laneY);
+    ctx.lineTo(W, laneY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.fillStyle = "#173f48";
   ctx.fillRect(t.left, t.bottom + 11, t.right - t.left, 6);
   ctx.fillStyle = "#fff";
@@ -562,9 +590,9 @@ function draw() {
   ctx.fillStyle = game.scene.floor;
   ctx.fillRect(0, -800, W, H + 1000);
   ctx.fillStyle = "#d4dfcf";
-  ctx.fillRect(0, 0, 18, H);
-  ctx.fillRect(W - 18, 0, 18, H);
-  for (let y = -655; y < H; y += 40) {
+  ctx.fillRect(0, 0, 18, game.worldHeight);
+  ctx.fillRect(W - 18, 0, 18, game.worldHeight);
+  for (let y = -655; y < game.worldHeight; y += 40) {
     ctx.strokeStyle = "#dce1d5";
     ctx.beginPath();
     ctx.moveTo(20, y);
@@ -572,6 +600,12 @@ function draw() {
     ctx.stroke();
   }
   floorDetails(ctx, game.scene);
+  if (game.stage === 3) venueJourney(ctx);
+  if (game.stage === 4)
+    hallInterior(ctx, {
+      time: game.worldTime,
+      reducedMotion: reducedMotion.matches,
+    });
   if (game.scene.weather === "rain")
     rainShelters(ctx, {
       time: game.worldTime,
@@ -611,6 +645,21 @@ function draw() {
     });
   }
   destination(game.scene);
+  goalBoundary(ctx, game.scene);
+  if (game.stage === 4)
+    person({
+      x: 145,
+      y: 810,
+      r: 11,
+      partner: true,
+      shirt: "#826c89",
+      targetKind: "clerk",
+      appearanceId: 8,
+      state: "waiting",
+      ux: 1,
+      uy: 0,
+      visualKey: "ticket-staff",
+    });
   if (!finale) {
     rounded(GOAL.x, GOAL.y, GOAL.w, GOAL.h, 12, "#dbe7d4");
     rounded(GOAL.x, 5, GOAL.w, 22, 8, "#285d55");
@@ -680,7 +729,7 @@ function draw() {
     0,
   );
   ctx.restore();
-  const facilityY = game.traffic ? 145 : 340,
+  const facilityY = game.stage === 3 ? 1010 : game.traffic ? 145 : 340,
     boardY = game.traffic ? 153 : 298;
   rounded(397, facilityY, 40, 16, 4, "#67836f");
   ctx.fillStyle = "#fff";
@@ -725,17 +774,17 @@ function draw() {
           ? "会場最寄り駅の改札"
           : "START",
     240,
-    650,
+    game.startY + 25,
   );
   ctx.fillStyle = "#759081";
   ctx.font = "11px system-ui";
-  ctx.fillText("START", 240, 662);
-  drawTraffic();
+  ctx.fillText("START", 240, game.startY + 37);
+  for (const t of game.crossings) drawTraffic(t);
   const displayMembers = finale
     ? game.party.members.map((m, i) => ({
         ...m,
-        x: 180 + i * 40,
-        y: -43,
+        x: [215, 250, 285, 215][i],
+        y: i === 3 ? 25 : -15,
         state: "celebrating",
         ux: 0,
         uy: -1,
@@ -746,8 +795,8 @@ function draw() {
   const displayPartner = finale
     ? {
         ...game.meetingPartner,
-        x: 340,
-        y: -43,
+        x: 285,
+        y: 25,
         ux: 0,
         uy: -1,
         state: "celebrating",
@@ -756,8 +805,8 @@ function draw() {
   const displayPlayer = finale
     ? {
         ...game.player,
-        x: 140,
-        y: -43,
+        x: 180,
+        y: -15,
         player: true,
         state: "celebrating",
         ux: 0,
@@ -853,11 +902,12 @@ function frame(now) {
     );
   }
   const hits = game.hits;
-  const violations = game.traffic?.violations || 0;
+  const violations = trafficViolations(game);
   audio.update(
     game.phase === "playing",
     input().left && input().right,
     game.stage,
+    game.stage !== 4 || game.player.y < 700,
   );
   const previousX = game.player.x;
   const previousRegroup = game.party.regroup;
@@ -888,21 +938,26 @@ function frame(now) {
   $("#left").classList.toggle("held", steering.left);
   $("#right").classList.toggle("held", steering.right);
   $("#motion").textContent =
-    game.phase === "finished"
-      ? "全員到着 · 次へ進めます"
-      : game.phase === "paused"
-        ? "一時停止 · 時計も停止中"
-        : game.arriving
-          ? "合流中 · 仲間の到着を待っています"
-          : steering.left && steering.right
-            ? game.party.members.length
-              ? "ブレーキ · 仲間が隊列を整えます"
-              : "ブレーキ · 停止中"
-            : steering.left
-              ? "← 左へよける"
-              : steering.right
-                ? "右へよける →"
-                : "自動で前進 · 両押しで停止";
+    game.stage === 4 &&
+    game.phase === "playing" &&
+    game.player.y > 740 &&
+    game.player.y < 810
+      ? "チケット確認 ✓ · ホールへ進もう"
+      : game.phase === "finished"
+        ? "全員到着 · 次へ進めます"
+        : game.phase === "paused"
+          ? "一時停止 · 時計も停止中"
+          : game.arriving
+            ? "合流中 · 仲間の到着を待っています"
+            : steering.left && steering.right
+              ? game.party.members.length
+                ? "ブレーキ · 仲間が隊列を整えます"
+                : "ブレーキ · 停止中"
+              : steering.left
+                ? "← 左へよける"
+                : steering.right
+                  ? "右へよける →"
+                  : "自動で前進 · 両押しで停止";
   const signal = $("#traffic-status");
   signal.hidden = !game.traffic;
   if (game.traffic) {
@@ -921,21 +976,26 @@ function frame(now) {
           : t.nominalGreen
             ? "■ 車の通過待ち · 両押しで待とう"
             : `■ 赤 · 両押しで停止（青まで${t.remaining.toFixed(1)}秒）`;
-    if (t.violations > violations) {
+    if (game.crossings.length > 1)
+      signal.textContent =
+        `${game.crossings.indexOf(t) + 1}/2 · ${t.lanes}車線 · ` +
+        signal.textContent;
+    if (trafficViolations(game) > violations) {
       noticeUntil = now + 1800;
-      const event = t.violationEvent;
-      $("#notice").classList.toggle("companion", !!event.memberId);
-      $("#notice").textContent = event.memberId
-        ? `友だち${event.memberId}「${event.message}」 信号無視 +2秒`
-        : "信号無視 +2秒 · 赤では両押しで待とう";
+      const event = game.violationEvent;
+      $("#notice").textContent = "信号無視 +2秒 · 赤では両押しで待とう";
+      if (game.party.members.some((m) => m.id === event.memberId)) {
+        companionSpeech = { ...event, until: game.worldTime + 1.8 };
+        $("#companion-bubble").textContent =
+          `友だち${event.memberId}「${event.message}」`;
+      }
       audio.effect("contact");
     }
   }
   if (game.hits > hits) {
     audio.effect("contact");
     noticeUntil = now + 950;
-    if (!game.traffic || game.traffic.violations === violations) {
-      $("#notice").classList.remove("companion");
+    if (!game.traffic || trafficViolations(game) === violations) {
       $("#notice").textContent =
         `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒`;
     }
@@ -960,7 +1020,7 @@ function frame(now) {
   $("#time").innerHTML = `${game.elapsed.toFixed(1)}<span>秒</span>`;
   $("#hits").innerHTML = `${game.hits}<span>回</span>`;
   $("#distance").innerHTML =
-    `${Math.round(Math.max(0, Math.min(100, ((Math.max(game.player.y, ...game.party.members.map((m) => m.y)) - 84) / (541 + game.party.members.length * 30)) * 100)))}<span>%</span>`;
+    `${Math.round(Math.max(0, Math.min(100, ((Math.max(game.player.y, ...game.party.members.map((m) => m.y)) - 84) / (game.startY - 84 + game.party.members.length * 30)) * 100)))}<span>%</span>`;
   if (game.phase === "finished" && overlay.hidden) {
     audio.goal(game.stage, game);
     clearInput();
@@ -968,10 +1028,10 @@ function frame(now) {
     records[game.stage] = {
       time: game.elapsed,
       hits: game.hits,
-      violations: game.traffic?.violations || 0,
+      violations: trafficViolations(game),
     };
     const totals = resultTotals(records);
-    const cleanStage = game.hits === 0 && !game.traffic?.violations;
+    const cleanStage = game.hits === 0 && !trafficViolations(game);
     $("#share-actions").hidden = game.stage !== 4;
     if (game.stage < 4)
       $("#next-purpose").textContent =
@@ -984,7 +1044,7 @@ function frame(now) {
       game.stage === 4 ? "仲間全員、ライブ最前列へ！" : game.scene.arrival,
       game.stage === 4
         ? `全5区間を完走。合計 ${totals.time.toFixed(1)}秒 / 接触 ${totals.hits}回 / 信号無視 ${totals.violations}回。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
-        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。タイム ${game.elapsed.toFixed(1)}秒（加算を含む） / 接触 ${game.hits}回${game.traffic ? ` / 信号無視 ${game.traffic.violations}回` : ""}。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
+        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。タイム ${game.elapsed.toFixed(1)}秒（加算を含む） / 接触 ${game.hits}回${game.traffic ? ` / 信号無視 ${trafficViolations(game)}回` : ""}。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
       game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
@@ -1012,6 +1072,55 @@ function frame(now) {
       "--tail",
       `${Math.max(10, Math.min(width - 10, px - left))}px`,
     );
+  }
+  const speech = $("#companion-bubble"),
+    link = $("#companion-link");
+  const speaker =
+    companionSpeech &&
+    game.party.members.find((m) => m.id === companionSpeech.memberId);
+  speech.hidden = link.hidden =
+    !speaker ||
+    game.phase !== "playing" ||
+    game.worldTime >= companionSpeech.until;
+  if (!speech.hidden) {
+    const x = ox + (speaker.x + 240 - game.player.x) * scale;
+    const y = oy + (speaker.y - 18 + CAMERA_Y - game.player.y) * scale;
+    const width = speech.offsetWidth,
+      height = speech.offsetHeight;
+    const obstacles = game.crossings.flatMap((t) =>
+      [
+        [100, t.bottom + 50],
+        [380, t.top - 50],
+      ].map(([sx, sy]) => ({
+        left: ox + (sx - 25 + 240 - game.player.x) * scale,
+        right: ox + (sx + 25 + 240 - game.player.x) * scale,
+        top: oy + (sy - 48 + CAMERA_Y - game.player.y) * scale,
+        bottom: oy + (sy + 48 + CAMERA_Y - game.player.y) * scale,
+      })),
+    );
+    obstacles.push({
+      left: ox + (240 - 21) * scale,
+      right: ox + (240 + 21) * scale,
+      top: oy + (CAMERA_Y - 20) * scale,
+      bottom: oy + (CAMERA_Y + 20) * scale,
+    });
+    const layout = placeSpeech({
+      x,
+      y,
+      width,
+      height,
+      viewport: rect,
+      obstacles,
+    });
+    speech.style.left = `${layout.left}px`;
+    speech.style.top = `${layout.top}px`;
+    link.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+    link
+      .querySelector("path")
+      .setAttribute(
+        "d",
+        `M ${layout.tailX} ${layout.tailY} L ${layout.anchorX} ${layout.anchorY}`,
+      );
   }
   requestAnimationFrame(frame);
 }

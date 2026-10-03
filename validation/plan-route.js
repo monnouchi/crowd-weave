@@ -10,7 +10,7 @@ const copyParty = (p) => ({
 function safeTeam(head, party, people) {
   return ![{ ...head, r: 12 }, ...party.members].some((m) =>
     people.some(
-      (p) => (p.x - m.x) ** 2 + (p.y - m.y) ** 2 < (m.r + 13 + 0.5) ** 2,
+      (p) => (p.x - m.x) ** 2 + (p.y - m.y) ** 2 < (m.r + 13 + 1.5) ** 2,
     ),
   );
 }
@@ -31,7 +31,7 @@ function gatherSafely(head, party, crowd, model) {
     moveParty(party, head, 0.025, { arriving: true });
     model.worldTime += 0.025;
     updateTraffic(model, 0.025);
-    moveCrowd(people, 0.025, model.traffic);
+    moveCrowd(people, 0.025, model.crossings);
     if (!safeTeam(head, party, people.filter(visiblePerson))) return null;
     if (partyArrived(party) && Math.hypot(head.x - 240, head.y - 84) < 0.01)
       return (tick + 1) * 0.025;
@@ -42,9 +42,15 @@ function gatherSafely(head, party, crowd, model) {
 // No crowd removal, position edits, or collision suppression is used to find routes.
 export function planRoute(stage, seed, maxSeconds = 25) {
   const model = createGame(stage, seed),
-    crowd = model.crowd;
+    crowd = model.crowd,
+    startY = model.startY,
+    maxProgress = Math.ceil((startY - 85) / 7.5),
+    rowWidth = maxProgress + 2;
   let nodes = new Map([
-    [21 * 80, { x: 240, f: 0, path: "", party: model.party, reserved: false }],
+    [
+      21 * rowWidth,
+      { x: 240, f: 0, path: "", party: model.party, reserved: 0 },
+    ],
   ]);
   const dt = 0.1,
     substeps = 4;
@@ -54,8 +60,8 @@ export function planRoute(stage, seed, maxSeconds = 25) {
     for (let k = 0; k < substeps; k++) {
       model.worldTime += dt / substeps;
       updateTraffic(model, dt / substeps);
-      moveCrowd(crowd, dt / substeps, model.traffic);
-      signals.push(model.traffic ? { ...model.traffic } : null);
+      moveCrowd(crowd, dt / substeps, model.crossings);
+      signals.push(model.crossings.map((t) => ({ ...t })));
       snapshots.push(
         crowd.filter(visiblePerson).map((p) => ({ x: p.x, y: p.y })),
       );
@@ -70,9 +76,9 @@ export function planRoute(stage, seed, maxSeconds = 25) {
       ]) {
         const x = Math.max(30, Math.min(450, node.x + dx)),
           f = node.f + (dy ? 1 : 0),
-          y = 625 - 7.5 * f,
-          key = ((x - 30) / 10) * 80 + f;
-        if (next.has(key) || f > 72) continue;
+          y = startY - 7.5 * f,
+          key = ((x - 30) / 10) * rowWidth + f;
+        if (next.has(key) || f > maxProgress) continue;
         const party = copyParty(node.party);
         let reserved = node.reserved;
         let safe = true,
@@ -81,37 +87,52 @@ export function planRoute(stage, seed, maxSeconds = 25) {
           const fraction = (k + 1) / substeps;
           head = {
             x: node.x + (x - node.x) * fraction,
-            y: 625 - 7.5 * node.f + dy * fraction,
+            y: startY - 7.5 * node.f + dy * fraction,
           };
-          const t = signals[k],
-            previousY = 625 - 7.5 * node.f + dy * (k / substeps);
-          if (
-            t &&
-            !reserved &&
-            previousY >= t.bottom + 14 &&
-            head.y < t.bottom + 14
-          ) {
-            if (
-              head.x < t.left + 12 ||
-              head.x > t.right - 12 ||
-              !t.green ||
-              t.remaining < crossingTime(party)
-            ) {
-              safe = false;
-              break;
-            }
-            reserved = true;
+          const previousY = startY - 7.5 * node.f + dy * (k / substeps);
+          if (head.y < 107 && (head.x < 174 || head.x > 306)) {
+            safe = false;
+            break;
           }
           if (
-            t &&
-            reserved &&
-            head.y + 12 >= t.top &&
-            head.y - 12 <= t.bottom &&
-            (head.x < t.left + 12 || head.x > t.right - 12)
+            stage === 4 &&
+            ((head.y < 837 && head.y > 778) ||
+              (head.y < 732 && head.y > 673)) &&
+            (head.x < 142 || head.x > 338)
           ) {
             safe = false;
             break;
           }
+          for (const [roadIndex, t] of signals[k].entries()) {
+            const bit = 1 << roadIndex;
+            if (
+              !(reserved & bit) &&
+              previousY >= t.bottom + 14 &&
+              head.y < t.bottom + 14
+            ) {
+              if (
+                head.x < t.left + 12 ||
+                head.x > t.right - 12 ||
+                !t.green ||
+                t.remaining < crossingTime(party, t) + 0.15 ||
+                t.greenEnd - t.greenStart - t.remaining < 0.15
+              ) {
+                safe = false;
+                break;
+              }
+              reserved |= bit;
+            }
+            if (
+              reserved & bit &&
+              head.y + 12 >= t.top &&
+              head.y - 12 <= t.bottom &&
+              (head.x < t.left + 12 || head.x > t.right - 12)
+            ) {
+              safe = false;
+              break;
+            }
+          }
+          if (!safe) break;
           const arriving =
             head.y <= 85 + 0.000001 && head.x >= 175 && head.x <= 305;
           if (arriving && party.members.length) {
@@ -134,6 +155,7 @@ export function planRoute(stage, seed, maxSeconds = 25) {
                 player: head,
                 party,
                 crowd,
+                crossings: structuredClone(model.crossings),
                 traffic: model.traffic ? structuredClone(model.traffic) : null,
               })
             : 0;

@@ -2,12 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, step } from "../logic.js";
 import { createParty } from "../party.js";
-import { updateTraffic, crossingTime } from "../traffic.js";
+import {
+  updateTraffic,
+  crossingTime,
+  createTraffic,
+  trafficViolations,
+} from "../traffic.js";
 import { planRoute, routeInput } from "../validation/plan-route.js";
 function fixture(stage = 3) {
   const g = createGame(stage);
   g.phase = "playing";
   g.crowd = [];
+  g.crossings = [createTraffic(1)];
+  g.traffic = g.crossings[0];
+  g.traffic.phaseOffset = 0;
   return g;
 }
 function simulate(g, seconds, input = {}) {
@@ -22,7 +30,11 @@ test("traffic belongs only to outdoor scenes and initial road is clear", () => {
   for (let stage = 0; stage < 5; stage++) {
     const g = createGame(stage);
     assert.equal(!!g.traffic, stage === 1 || stage === 3);
-    if (g.traffic) assert.ok(g.crowd.every((p) => p.y < 280 || p.y > 385));
+    if (g.traffic)
+      for (const t of g.crossings)
+        assert.ok(
+          g.crowd.every((p) => p.y < t.top - 20 || p.y > t.bottom + 20),
+        );
   }
 });
 test("paused/background clock freezes lights, cars and time penalties", () => {
@@ -43,7 +55,7 @@ test("red entry is voluntary and produces one violation for the entire crossing"
   simulate(g, 0.3);
   assert.ok(g.player.y < 379, "red does not automatically brake the player");
   assert.equal(g.traffic.violations, 1);
-  assert.equal(g.traffic.violationEvent.id, 1);
+  assert.equal(g.traffic.violationEvent.id, "road:1");
   assert.equal(g.traffic.violationEvent.memberId, 1);
   const event = g.traffic.violationEvent;
   assert.ok(Math.abs(g.elapsed - g.worldTime - 2) < 1e-8);
@@ -95,7 +107,7 @@ test("alignment and crossing width are bounded without changing body sizes", () 
   g.party = createParty(3, g.player);
   step(g, 0.025, { right: true });
   assert.equal(g.player.y, 379);
-  assert.equal(g.traffic.violations, 0);
+  assert.equal(trafficViolations(g), 0);
   assert.equal(g.player.r, 12);
   g.player.x = 310;
   g.party = createParty(3, g.player);
@@ -184,7 +196,7 @@ test("outdoor alternate seeds allow all-member zero-contact zero-violation arriv
         }
       assert.equal(g.phase, "finished");
       assert.equal(g.hits, 0);
-      assert.equal(g.traffic.violations, 0);
+      assert.equal(trafficViolations(g), 0);
     }
 });
 
@@ -194,7 +206,7 @@ test("manual signal waits, repeated stops and green restart never count as viola
   g.party = createParty(4, g.player);
   simulate(g, 2.6, { left: true, right: true });
   assert.equal(g.player.y, 395);
-  assert.equal(g.traffic.violations, 0);
+  assert.equal(trafficViolations(g), 0);
   assert.equal(g.elapsed, g.worldTime);
   simulate(g, 1);
   assert.ok(g.traffic.reserved);
@@ -203,7 +215,7 @@ test("manual signal waits, repeated stops and green restart never count as viola
     simulate(g, 0.5, { left: true, right: true });
     simulate(g, 0.3);
   }
-  assert.equal(g.traffic.violations, 0);
+  assert.equal(trafficViolations(g), 0);
   assert.equal(g.traffic.violationEvent, null);
 });
 
@@ -274,7 +286,11 @@ test("signal queues retain people and body clearance, discharge both flows, and 
           assert.deepEqual(p.route, initial.route, "destination preserved");
           assert.equal(p.group, initial.group, "group identity preserved");
           if (initial.y > 425 && p.y < 240) north.add(p.id);
-          if (initial.y < 240 && p.y > 425) south.add(p.id);
+          if (
+            initial.y < (stage === 3 ? 500 : 240) &&
+            p.y > (stage === 3 ? 970 : 425)
+          )
+            south.add(p.id);
         }
       }
       assert.ok(
@@ -291,10 +307,10 @@ test("bounded signal waiting and all-member clean routes are competitive with co
       clean.phase = "playing";
       const t = clean.traffic,
         green = t.greenEnd - t.greenStart;
-      assert.equal(green, 6.5);
+      assert.equal(green, stage === 3 ? 9 : 6.5);
       assert.equal(t.period - green, 2.5);
       assert.ok(
-        t.period - green + crossingTime(clean.party) < 6,
+        t.period - green + crossingTime(clean.party, t) < 7,
         "party entry window",
       );
       const route = planRoute(stage, seed, 32);
@@ -307,7 +323,7 @@ test("bounded signal waiting and all-member clean routes are competitive with co
         step(direct, 0.025, {});
       assert.equal(clean.phase, "finished");
       assert.equal(clean.hits, 0);
-      assert.equal(clean.traffic.violations, 0);
+      assert.equal(trafficViolations(clean), 0);
       assert.equal(direct.phase, "finished");
       assert.ok(
         clean.elapsed <= direct.elapsed + 0.001,
@@ -328,7 +344,7 @@ test("an actual passing car is cleared before entry without a red-light auto-bra
     379,
     "wait for the actual vehicle, not for signal color",
   );
-  assert.equal(g.traffic.violations, 0);
+  assert.equal(trafficViolations(g), 0);
   assert.ok(Math.abs(g.elapsed - (g.worldTime - 1)) < 1e-9);
   for (let n = 0; n < 400 && g.phase === "playing"; n++) {
     step(g, 0.025, {});

@@ -9,8 +9,62 @@ export function trafficSpec(stage) {
         period: 9,
         greenStart: 2.5,
         greenEnd: 9,
+        phaseOffset: 6.7,
+        lanes: 2,
       }
     : null;
+}
+export function trafficSpecs(stage) {
+  if (stage === 3)
+    return [
+      {
+        ...trafficSpec(stage),
+        id: "avenue",
+        top: 780,
+        bottom: 925,
+        lanes: 4,
+        period: 11.5,
+        greenEnd: 11.5,
+        phaseOffset: 10.1,
+      },
+      {
+        ...trafficSpec(stage),
+        id: "park",
+        top: 300,
+        bottom: 365,
+        phaseOffset: 8,
+      },
+    ];
+  const spec = trafficSpec(stage);
+  return spec ? [{ ...spec, id: "station" }] : [];
+}
+export function activeTraffic(g) {
+  const crossings = g.crossings || (g.traffic ? [g.traffic] : []);
+  return (
+    crossings.find((t) => t.reserved) ||
+    crossings.find((t) => g.player.y >= t.top - 30) ||
+    crossings.at(-1) ||
+    null
+  );
+}
+export function trafficViolations(g) {
+  return (g.crossings || (g.traffic ? [g.traffic] : [])).reduce(
+    (n, t) => n + t.violations,
+    0,
+  );
+}
+export function walkerTraffic(p, target, traffic) {
+  if (!Array.isArray(traffic)) return traffic;
+  const north = target.y < p.y;
+  return (
+    [...traffic]
+      .sort((a, b) => (north ? b.top - a.top : a.top - b.top))
+      .find((t) =>
+        north
+          ? p.y > t.top - 60 && target.y < t.top
+          : p.y < t.bottom + 60 && target.y > t.bottom,
+      ) || null
+  );
 }
 function vehicle(id) {
   const bicycle = id % 2 === 1;
@@ -26,8 +80,7 @@ function vehicle(id) {
     entered: false,
   };
 }
-export function createTraffic(stage) {
-  const spec = trafficSpec(stage);
+export function createTraffic(stage, spec = trafficSpec(stage)) {
   return spec
     ? {
         ...spec,
@@ -37,7 +90,10 @@ export function createTraffic(stage) {
         canEnter: false,
         reserved: false,
         redId: 0,
-        vehicle: vehicle(0),
+        vehicle: {
+          ...vehicle(0),
+          y: spec.top + (spec.bottom - spec.top) * 0.375,
+        },
         violations: 0,
         violationEvent: null,
         enteredOnGreen: false,
@@ -46,14 +102,21 @@ export function createTraffic(stage) {
       }
     : null;
 }
-export function crossingTime(party) {
+export function crossingTime(party, crossing = { top: 300, bottom: 365 }) {
   // Full crossing, head/tail body margin, maximum trail spacing and reaction margin.
-  return (65 + 24 + party.members.length * 30) / 75 + 0.65;
+  return (
+    (crossing.bottom - crossing.top + 24 + party.members.length * 30) / 75 +
+    0.65
+  );
 }
 export function updateTraffic(g, dt) {
-  const t = g.traffic;
-  if (!t) return;
-  const phase = g.worldTime % t.period;
+  for (const t of g.crossings || (g.traffic ? [g.traffic] : []))
+    updateCrossing(g, t, dt);
+  g.traffic = activeTraffic(g);
+}
+function updateCrossing(g, t, dt) {
+  const clock = g.worldTime + (t.phaseOffset || 0);
+  const phase = clock % t.period;
   t.nominalGreen = phase >= t.greenStart && phase < t.greenEnd;
   t.remaining = t.nominalGreen
     ? t.greenEnd - phase
@@ -63,10 +126,13 @@ export function updateTraffic(g, dt) {
   const team = [g.player, ...g.party.members];
   if (t.reserved && team.every((p) => p.y + p.r < t.top - 2))
     t.reserved = false;
-  const redId = Math.floor((g.worldTime + t.period - t.greenEnd) / t.period);
+  const redId = Math.floor((clock + t.period - t.greenEnd) / t.period);
   if (t.redId !== redId) {
     t.redId = redId;
     t.vehicle = vehicle(redId);
+    t.vehicle.y =
+      t.top +
+      (t.bottom - t.top) * (t.vehicle.kind === "bicycle" ? 0.875 : 0.375);
   }
   const v = t.vehicle;
   const occupied = [...g.crowd.filter((p) => p.active), ...team].some(
@@ -93,12 +159,15 @@ export function updateTraffic(g, dt) {
       : v.x < t.left - v.width / 2 - 28);
   t.vehicleClear = cleared;
   t.green = t.nominalGreen && cleared;
-  t.canEnter = t.reserved || (t.green && t.remaining >= crossingTime(g.party));
+  t.canEnter =
+    t.reserved || (t.green && t.remaining >= crossingTime(g.party, t));
   t.warning = t.green && !t.canEnter;
 }
 export function constrainTraffic(g, previous, input) {
-  const t = g.traffic;
-  if (!t) return;
+  for (const t of g.crossings || (g.traffic ? [g.traffic] : []))
+    constrainCrossing(g, t, previous, input);
+}
+function constrainCrossing(g, t, previous, input) {
   if (t.reserved) {
     if (g.player.y + g.player.r >= t.top && g.player.y - g.player.r <= t.bottom)
       g.player.x = Math.max(
@@ -119,7 +188,7 @@ export function constrainTraffic(g, previous, input) {
         g.elapsed += 2;
         const member = g.party.members[0];
         t.violationEvent = {
-          id: t.violations,
+          id: `${t.id || "road"}:${t.violations}`,
           memberId: member?.id || 0,
           message: member
             ? t.violations % 2
@@ -127,6 +196,7 @@ export function constrainTraffic(g, previous, input) {
               : "止まれよ！"
             : "",
         };
+        g.violationEvent = t.violationEvent;
       }
       t.message = "仲間全員で横断中";
       return;

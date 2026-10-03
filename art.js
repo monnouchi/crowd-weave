@@ -167,8 +167,8 @@ export function concert(
 export function rainShelters(c, { time = 0, reducedMotion = false } = {}) {
   c.save();
   for (const [x, y, w] of [
-    [30, 478, 70],
-    [380, 130, 70],
+    [30, 935, 70],
+    [380, 205, 70],
     [170, 12, 140],
   ]) {
     box(c, x, y, w, 13, 3, "#3d6474");
@@ -195,10 +195,142 @@ export function rainShelters(c, { time = 0, reducedMotion = false } = {}) {
   const drift = reducedMotion ? 0 : time * 95;
   for (let i = 0; i < 44; i++) {
     const x = i % 2 ? 386 + ((i * 17) % 63) : 26 + ((i * 19) % 62);
-    const y = -220 + ((i * 47 + drift) % 930);
+    const y = -220 + ((i * 47 + drift) % 1450);
     c.moveTo(x, y);
     c.lineTo(x - 3, y + 11);
   }
   c.stroke();
+  c.restore();
+}
+
+// Space continues beyond the destination, behind an explicit local boundary.
+export function goalBoundary(c, scene) {
+  c.save();
+  const building = ["station", "cafe", "venue", "party"].includes(
+    scene.landmark,
+  );
+  for (const [x, w] of [
+    [18, 144],
+    [318, 144],
+  ]) {
+    if (building) {
+      if (scene.landmark === "party") {
+        box(c, x, -45, w, 141, 3, "#4d435e");
+        box(c, x === 18 ? 18 : 395, -195, 67, 150, 3, "#4d435e");
+      } else box(c, x, -180, w, 276, 3, "#9ca99f");
+      box(
+        c,
+        x,
+        89,
+        w,
+        7,
+        2,
+        scene.landmark === "party" ? "#b5a6bc" : "#65766f",
+      );
+      for (const windowX of [x + 18, x + w - 46]) {
+        box(
+          c,
+          windowX,
+          -72,
+          28,
+          58,
+          3,
+          scene.landmark === "party" ? "#756884" : "#b9d6cf",
+        );
+        c.strokeStyle = "#687a75";
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(windowX + 14, -72);
+        c.lineTo(windowX + 14, -14);
+        c.stroke();
+      }
+    } else {
+      box(c, x, 82, w, 14, 3, "#7e8c68");
+      for (let tree = x + 12; tree < x + w; tree += 24) {
+        c.fillStyle = "#72976e";
+        c.beginPath();
+        c.arc(tree, 75, 17, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = "#8aab7c";
+        c.beginPath();
+        c.arc(tree - 4, 69, 11, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  c.restore();
+}
+export function venueJourney(c) {
+  c.save();
+  // Distinct station pavement, broad avenue and park approach.
+  c.fillStyle = "#d3dfde";
+  c.fillRect(18, 950, 444, 260);
+  c.fillStyle = "#d7dfcb";
+  c.fillRect(18, 390, 444, 360);
+  for (const x of [9, 471])
+    for (const y of [435, 535, 635, 715]) {
+      c.fillStyle = "#658b70";
+      c.beginPath();
+      c.arc(x, y, 26, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = "#91ac7e";
+      c.beginPath();
+      c.arc(x - 5, y - 7, 17, 0, Math.PI * 2);
+      c.fill();
+    }
+  box(c, 30, 582, 55, 12, 3, "#9b8560");
+  box(c, 390, 487, 55, 12, 3, "#9b8560");
+  box(c, 105, 1090, 270, 22, 4, "#527779");
+  c.fillStyle = "#fff9e8";
+  c.font = "bold 12px system-ui";
+  c.textAlign = "center";
+  c.fillText("会場最寄り駅 / 郊外ライブへ ↑", 240, 1105);
+  c.fillStyle = "#45654e";
+  c.font = "bold 12px system-ui";
+  c.fillText("公園の小道 / 会場へ ↑", 240, 670);
+  c.font = "10px system-ui";
+  c.fillText("駅前の大通り / 4車線", 240, 758);
+  c.restore();
+}
+export function hallInterior(c, { time = 0, reducedMotion = false } = {}) {
+  c.save();
+  c.fillStyle = "#ded8c9";
+  c.fillRect(18, 715, 444, 340);
+  c.fillStyle = "#848199";
+  c.fillRect(18, -800, 444, 1485);
+  // Lighting lives under the actors, so outlines and gaps retain their contrast.
+  for (const [x, y, color] of [
+    [120, 300, "#d6b9e4"],
+    [340, 430, "#96cccd"],
+    [240, 150, "#e6cf9d"],
+  ]) {
+    const drift = reducedMotion ? 0 : Math.sin(time * 0.25 + x) * 8;
+    const light = c.createRadialGradient(x + drift, y, 5, x + drift, y, 95);
+    light.addColorStop(0, color + "92");
+    light.addColorStop(1, color + "00");
+    c.fillStyle = light;
+    c.fillRect(x - 105, y - 105, 210, 210);
+  }
+  box(c, 18, 690, 112, 28, 3, "#453a49");
+  box(c, 350, 690, 112, 28, 3, "#453a49");
+  box(c, 115, 690, 18, 90, 3, "#624d48");
+  box(c, 347, 690, 18, 90, 3, "#624d48");
+  box(c, 120, 715, 5, 16, 2, "#c9ad71");
+  box(c, 355, 715, 5, 16, 2, "#c9ad71");
+  box(c, 30, 800, 95, 22, 4, "#9b8566");
+  box(c, 355, 800, 95, 22, 4, "#9b8566");
+  for (const x of [125, 355]) {
+    box(c, x - 3, 796, 6, 40, 2, "#695c62");
+  }
+  c.fillStyle = "#4a414b";
+  c.font = "bold 12px system-ui";
+  c.textAlign = "center";
+  c.fillText("受付 / チケット確認", 240, 855);
+  c.fillText("ロビー / ホールへ ↑", 240, 923);
+  c.fillStyle = "#eee4cd";
+  c.fillText("HALL / 扉は開いています", 240, 708);
+  // Tickets on the desk and the attendant's side make the check readable.
+  box(c, 110, 802, 12, 7, 1, "#f5dd9e");
+  box(c, 165, 802, 22, 5, 2, "#9b8566");
   c.restore();
 }

@@ -1,4 +1,4 @@
-import { trafficWaypoint, trafficBlocks } from "./traffic.js";
+import { trafficWaypoint, trafficBlocks, walkerTraffic } from "./traffic.js";
 // Seeded destination-driven station walkers. No random decisions during a frame.
 export function random(seed) {
   let value = seed >>> 0;
@@ -95,6 +95,7 @@ export function makeCrowd(
   environment = "station",
   traffic = null,
 ) {
+  if (environment === "party") return makeAudience(count, speed, seed);
   const profile = FLOW_PROFILES[environment] || FLOW_PROFILES.station;
   const queueY = traffic ? 175 : 370,
     readerY = traffic ? 175 : 320;
@@ -102,11 +103,13 @@ export function makeCrowd(
     crowd = [];
   for (let id = 0; id < count; id++) {
     const flow =
-      id % 10 < (environment === "party" ? 7 : 5)
-        ? "along"
-        : id % 10 < (environment === "cafe" ? 8 : 9)
-          ? "opposing"
-          : "crossing";
+      environment === "cafe" && id % 10 >= 2
+        ? "crossing"
+        : id % 10 < (environment === "party" ? 7 : 5)
+          ? "along"
+          : id % 10 < (environment === "cafe" ? 8 : 9)
+            ? "opposing"
+            : "crossing";
     const urgency =
       environment === "residential" ||
       environment === "cafe" ||
@@ -391,7 +394,9 @@ export function reactToContact(p, player) {
   p.vy = 0;
 }
 export function moveCrowd(crowd, dt, traffic = null) {
+  const crossings = traffic;
   const velocities = crowd.map((p) => {
+    const traffic = walkerTraffic(p, p.route[p.leg], crossings);
     if (!p.active || p.state !== "walking" || p.reaction) return null;
     const target = trafficWaypoint(p, p.route[p.leg], traffic),
       dx = target.x - p.x,
@@ -471,7 +476,12 @@ export function moveCrowd(crowd, dt, traffic = null) {
           relative =
             ((a?.vx || 0) - (b?.vx || 0)) * nx +
             ((a?.vy || 0) - (b?.vy || 0)) * ny;
-        const minimum = ((traffic ? 32 : 28) - d) / dt;
+        const minimum =
+          (((Array.isArray(crossings) ? crossings.length > 0 : !!crossings)
+            ? 32
+            : 28) -
+            d) /
+          dt;
         if (relative >= minimum) continue;
         const correction = (minimum - relative) / (a && b ? 2 : 1);
         if (a) {
@@ -536,6 +546,7 @@ export function moveCrowd(crowd, dt, traffic = null) {
       }
       return;
     }
+    const traffic = walkerTraffic(p, p.route[p.leg], crossings);
     if (trafficBlocks(p, velocities[i].vy, traffic, dt)) {
       velocities[i].vy = 0;
       p.trafficWait = true;
@@ -560,6 +571,68 @@ export function moveCrowd(crowd, dt, traffic = null) {
     }
   });
 }
+// The concert has its own destination layout; other scene movement stays shared.
+export function makeAudience(count, speed, seed) {
+  const rand = random(seed),
+    crowd = [];
+  for (let id = 0; id < count; id++) {
+    const row = Math.floor(id / 5),
+      col = id % 5;
+    const watching = id < 20;
+    const x = watching
+      ? 50 + col * 85 + (row % 2) * 40
+      : 65 + col * 80 + (rand() - 0.5) * 10;
+    const y = watching
+      ? 135 + row * 70
+      : 395 + (row - 4) * 75 + (rand() - 0.5) * 10;
+    const spot = {
+      x: 50 + col * 85 + ((row + 1) % 2) * 40,
+      y: 135 + (id % 4) * 70,
+    };
+    const entry = { x: 65 + col * 80, y: 760 };
+    const pace = speed * 0.55 * (0.8 + rand() * 0.28);
+    const p = {
+      id,
+      environment: "party",
+      role: "ライブの観客",
+      origin: "south",
+      destination: "north",
+      originName: "会場入口",
+      destinationName: "ステージ前",
+      flow: "along",
+      urgency: "relaxed",
+      habit: "watching",
+      archetype: id === 17 ? "curious-child" : "ordinary",
+      x,
+      y,
+      entry,
+      route: [watching ? { x, y } : spot, { x: spot.x, y: -80 }],
+      leg: 0,
+      pace,
+      personalSpace: 35 + rand() * 10,
+      yielding: 1,
+      acceleration: 3,
+      pauseDuration: 8 + (id % 5),
+      wait: watching ? 8 + (id % 5) : 0,
+      state: watching ? "watching" : "walking",
+      active: true,
+      cycle: 0,
+      walk: 0,
+      reaction: null,
+      r: 13,
+      color: id % 4,
+      glowStick: id % 3 === 0,
+      ux: 0,
+      uy: -1,
+      vx: 0,
+      vy: watching ? 0 : -pace,
+    };
+    crowd.push(p);
+  }
+  return crowd;
+}
 export function visiblePerson(p) {
-  return p.active && p.x > 18 && p.x < 462 && p.y > 110 && p.y < 670;
+  return (
+    p.active && p.x > 18 && p.x < 462 && p.y > 110 && p.y < (p.boundsH || 670)
+  );
 }

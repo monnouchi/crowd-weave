@@ -22,7 +22,7 @@ test("rain, umbrellas and shelter destinations belong only to the outdoor venue 
       assert.equal(p.umbrella, false);
       assert.equal(p.route.length, 2);
       assert.ok([65, 415].includes(p.route[0].x));
-      assert.ok([-80, 760].includes(p.route.at(-1).y));
+      assert.ok([-80, 1260].includes(p.route.at(-1).y));
       assert.equal(p.r, 13);
     }
     for (const p of g.crowd.filter((p) => p.group))
