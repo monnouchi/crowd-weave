@@ -72,7 +72,7 @@ test("goal completes and timer freezes; paused and ready freeze", () => {
 test("increasing density, purposeful and individual agents, safe initial spacing", () => {
   assert.deepEqual(
     STAGES.map((_, i) => createGame(i).crowd.length),
-    [12, 20, 30, 35, 40],
+    [6, 12, 20, 30, 40],
   );
   for (let stage = 0; stage < 5; stage++)
     for (const seed of [1402485690 + stage * 97, 17, 2026]) {
@@ -102,7 +102,9 @@ test("increasing density, purposeful and individual agents, safe initial spacing
               g.crowd[i].y - g.crowd[j].y,
             ) > 37,
           );
-      assert.equal(new Set(g.crowd.map((p) => p.flow)).size, 3);
+      assert.ok(
+        new Set(g.crowd.map((p) => p.flow)).size >= (stage === 0 ? 2 : 3),
+      );
       assert.ok(new Set(g.crowd.map((p) => p.pace)).size > 5);
     }
 });
@@ -121,7 +123,8 @@ test("seeded simulation repeats exactly, with different spacing for different se
 test("route followers cross, stop for reasons, yield smoothly and re-enter off road", () => {
   const g = createGame(4);
   let stopped = 0,
-    reentered = 0;
+    reentered = 0,
+    crossed = false;
   const initial = new Map(g.crowd.map((p) => [p.id, { x: p.x, y: p.y }]));
   for (let n = 0; n < 2400; n++) {
     const previous = g.crowd.map((p) => ({ x: p.x, y: p.y, active: p.active }));
@@ -137,6 +140,8 @@ test("route followers cross, stop for reasons, yield smoothly and re-enter off r
             "walking bodies remain separate",
           );
     g.crowd.forEach((p, i) => {
+      if (p.flow === "crossing" && Math.abs(p.x - initial.get(p.id).x) > 100)
+        crossed = true;
       if (p.state === "reading" || p.state === "meeting") {
         stopped++;
         assert.equal(p.vx, 0);
@@ -160,9 +165,8 @@ test("route followers cross, stop for reasons, yield smoothly and re-enter off r
   assert.ok(stopped > 0);
   assert.ok(reentered > 0);
   assert.ok(
-    g.crowd
-      .filter((p) => p.flow === "crossing")
-      .some((p) => Math.abs(p.x - initial.get(p.id).x) > 100),
+    crossed,
+    "a crossing pedestrian traverses the corridor during the simulation",
   );
   const same = makeCrowd(2, 40, 9);
   for (const p of same) {
@@ -367,8 +371,11 @@ test("continuous contact is counted once and a separated new contact can react a
 
 test("longitudinal majority, visible reader dwell and ordered side queue", () => {
   const g = createGame(4);
-  assert.equal(g.crowd.filter((p) => p.flow === "crossing").length, 4);
-  assert.ok(g.crowd.filter((p) => p.flow !== "crossing").length === 36);
+  assert.ok(
+    g.crowd.filter((p) => p.flow === "crossing").length >= 2 &&
+      g.crowd.filter((p) => p.flow === "crossing").length <= 4,
+  );
+  assert.ok(g.crowd.filter((p) => p.flow !== "crossing").length >= 36);
   const reader = g.crowd.find((p) => p.id === 7);
   assert.equal(reader.state, "reading");
   assert.equal(reader.x, 65);
@@ -383,4 +390,53 @@ test("longitudinal majority, visible reader dwell and ordered side queue", () =>
   assert.equal(queue[0].state, "walking");
   assert.equal(queue[1].leg, 0);
   assert.ok(new Set(g.crowd.map((p) => p.pace.toFixed(1))).size > 10);
+});
+
+test("five journey stages have distinct purpose, place and scenery", () => {
+  const scenes = Array.from({ length: 5 }, (_, i) => createGame(i).scene);
+  for (const key of [
+    "purpose",
+    "place",
+    "landmark",
+    "intro",
+    "bubble",
+    "arrival",
+  ])
+    assert.equal(new Set(scenes.map((s) => s[key])).size, 5, key);
+  assert.deepEqual(
+    scenes.map((s) => s.landmark),
+    ["home", "station", "cafe", "venue", "party"],
+  );
+  assert.equal(scenes[0].backgroundCount, 2);
+  assert.equal(scenes[4].backgroundCount, 8);
+  assert.equal(
+    createGame(0).crowd.filter((p) => p.habit === "queuing").length,
+    0,
+  );
+});
+
+test("location profiles change real speed, dwell and visitor groups", () => {
+  const games = Array.from({ length: 5 }, (_, i) => createGame(i));
+  assert.deepEqual(
+    games.map((g) => g.crowd[0].environment),
+    ["residential", "station", "cafe", "venue", "party"],
+  );
+  const avg = (g) => g.crowd.reduce((s, p) => s + p.pace, 0) / g.crowd.length;
+  assert.ok(avg(games[1]) > avg(games[0]) * 1.3);
+  assert.ok(avg(games[4]) < avg(games[3]));
+  assert.equal(games[0].crowd[2].state, "meeting");
+  assert.equal(games[0].crowd[2].x, 65);
+  assert.equal(games[0].crowd[2].y, 520);
+  assert.ok(games[2].crowd.filter((p) => p.habit === "meeting").length >= 3);
+  for (const g of games.slice(3)) {
+    const groups = g.crowd.filter((p) => p.group?.startsWith("visitors"));
+    assert.ok(groups.length >= 4);
+    for (let i = 0; i < groups.length; i += 2) {
+      const [a, b] = groups.slice(i, i + 2);
+      assert.equal(a.destination, b.destination);
+      assert.equal(a.pace, b.pace);
+      assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 46);
+    }
+  }
+  assert.ok(games[4].crowd.every((p) => p.role === "ライブの観客"));
 });

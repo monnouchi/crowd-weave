@@ -1,12 +1,62 @@
+// One original motif, arranged for each part of the journey.
+export const MOTIF = [0, 7, 2, 5, 0, 9, 5, 2];
+export const MUSIC = [
+  {
+    root: 220,
+    beat: 0.48,
+    type: "triangle",
+    volume: 0.007,
+    duration: 0.22,
+    mood: "軽い出発",
+  },
+  {
+    root: 247,
+    beat: 0.33,
+    type: "triangle",
+    volume: 0.009,
+    duration: 0.14,
+    mood: "駅へ急ぐリズム",
+  },
+  {
+    root: 196,
+    beat: 0.56,
+    type: "sine",
+    volume: 0.006,
+    duration: 0.3,
+    mood: "カフェのひと休み",
+  },
+  {
+    root: 262,
+    beat: 0.37,
+    type: "triangle",
+    volume: 0.009,
+    duration: 0.18,
+    mood: "会場への期待",
+  },
+  {
+    root: 294,
+    beat: 0.27,
+    type: "triangle",
+    volume: 0.011,
+    duration: 0.16,
+    mood: "パーティーの高揚",
+  },
+].map((m) => ({
+  ...m,
+  notes: MOTIF.map((semitone) => m.root * 2 ** (semitone / 12)),
+}));
 // Original synthesized notes; no recordings or third-party music.
 export class GameAudio {
   constructor() {
     this.context = null;
-    this.muted = false;
+    this.muted = true;
     this.nextNote = 0;
     this.note = 0;
     this.active = false;
     this.braking = false;
+    this.stage = -1;
+    this.voices = new Set();
+    this.seenGoals = new WeakSet();
   }
   unlock() {
     if (this.muted) return;
@@ -31,10 +81,29 @@ export class GameAudio {
     g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     o.connect(g);
     g.connect(c.destination);
+    this.voices.add(o);
+    o.onended = () => {
+      this.voices.delete(o);
+      o.disconnect();
+      g.disconnect();
+    };
     o.start(t);
     o.stop(t + duration + 0.02);
   }
-  effect(kind) {
+  stopVoices() {
+    for (const o of this.voices) {
+      try {
+        o.stop();
+      } catch {}
+    }
+    this.voices.clear();
+  }
+  goal(stage, run) {
+    if (this.seenGoals.has(run)) return;
+    this.seenGoals.add(run);
+    this.effect(stage === 4 ? "final" : "goal", stage);
+  }
+  effect(kind, stage = 0) {
     if (kind === "contact") {
       this.tone(165, 0.14, 0.04, 0, "triangle");
       this.tone(125, 0.16, 0.025, 0.08, "triangle");
@@ -42,10 +111,16 @@ export class GameAudio {
     if (kind === "brake") this.tone(220, 0.08, 0.012);
     if (kind === "goal")
       [392, 494, 587, 784].forEach((n, i) =>
-        this.tone(n, 0.22, 0.035, i * 0.1),
+        this.tone(n * (1 + stage * 0.035), 0.22, 0.035, i * 0.1),
       );
+    if (kind === "final") {
+      [392, 494, 587, 784, 659, 784, 988, 1175].forEach((n, i) =>
+        this.tone(n, 0.3, 0.026, i * 0.14, "triangle"),
+      );
+      [587, 784, 1175].forEach((n) => this.tone(n, 0.75, 0.018, 1.25, "sine"));
+    }
   }
-  update(playing, braking) {
+  update(playing, braking, stage = 0) {
     const c = this.context;
     if (!playing) {
       this.active = false;
@@ -53,23 +128,33 @@ export class GameAudio {
       this.braking = false;
       return;
     }
+    if (!c || this.muted || c.state !== "running") return;
+    if (!this.active || this.stage !== stage) {
+      this.stopVoices();
+      this.nextNote = 0;
+      this.note = 0;
+      this.stage = stage;
+    }
     if (braking && !this.braking) this.effect("brake");
     this.braking = braking;
-    if (!c || this.muted || c.state !== "running") return;
     this.active = true;
     if (c.currentTime >= this.nextNote) {
-      const melody = [220, 330, 247, 294, 220, 349, 294, 247];
+      const music = MUSIC[stage] || MUSIC[0],
+        note = this.note++;
+      if (stage === 4 && note % 4 === 0)
+        this.tone(music.root / 2, 0.24, 0.006, 0, "sine");
       this.tone(
-        melody[this.note++ % melody.length],
-        0.18,
-        0.009,
+        music.notes[note % music.notes.length],
+        music.duration,
+        music.volume,
         0,
-        "triangle",
+        music.type,
       );
-      this.nextNote = c.currentTime + 0.38;
+      this.nextNote = c.currentTime + music.beat * (note % 4 === 3 ? 1.5 : 1);
     }
   }
   suspend() {
+    this.stopVoices();
     this.active = false;
     this.nextNote = 0;
     if (this.context?.state === "running")

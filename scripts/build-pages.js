@@ -15,6 +15,7 @@ export const PUBLIC_FILES = Object.freeze([
   "pose.js",
   "sound.js",
   "share.js",
+  "tilt.js",
   "LICENSE",
 ]);
 export async function buildPages(sourceRoot, destinationRoot) {

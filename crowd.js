@@ -7,10 +7,77 @@ export function random(seed) {
   };
 }
 export const PLACES = {
-  north: "北口・カフェ",
+  north: "北口・コンコース",
   south: "改札",
   west: "1・2番ホーム",
   east: "3・4番ホーム",
+};
+export const FLOW_PROFILES = {
+  residential: {
+    pace: 0.78,
+    space: 52,
+    spaceRange: 14,
+    acceleration: 4,
+    queue: false,
+    role: "近所の人",
+    places: {
+      north: "住宅街の角",
+      south: "自宅側",
+      west: "商店街",
+      east: "公園",
+    },
+  },
+  station: {
+    pace: 1.1,
+    space: 42,
+    spaceRange: 18,
+    acceleration: 5,
+    queue: true,
+    role: "駅利用者",
+    places: PLACES,
+  },
+  cafe: {
+    pace: 0.8,
+    space: 46,
+    spaceRange: 16,
+    acceleration: 4,
+    queue: true,
+    role: "カフェの客",
+    places: {
+      north: "カフェ入口",
+      south: "駅通路",
+      west: "注文口",
+      east: "待合席",
+    },
+  },
+  venue: {
+    pace: 0.92,
+    space: 44,
+    spaceRange: 16,
+    acceleration: 4,
+    queue: true,
+    role: "来場する友人",
+    places: {
+      north: "会場入口",
+      south: "会場最寄り駅",
+      west: "受付",
+      east: "待ち合わせ",
+    },
+  },
+  party: {
+    pace: 0.55,
+    space: 35,
+    spaceRange: 12,
+    acceleration: 3,
+    queue: true,
+    role: "ライブの観客",
+    places: {
+      north: "ステージ前",
+      south: "会場入口",
+      west: "ドリンク",
+      east: "ロビー",
+    },
+  },
 };
 function aim(p) {
   const target = p.route[p.leg];
@@ -20,13 +87,35 @@ function aim(p) {
   p.ux = dx / d;
   p.uy = dy / d;
 }
-export function makeCrowd(count, speed, seed) {
+export function makeCrowd(count, speed, seed, environment = "station") {
+  const profile = FLOW_PROFILES[environment] || FLOW_PROFILES.station;
   const rand = random(seed),
     crowd = [];
   for (let id = 0; id < count; id++) {
-    const flow = id % 10 < 5 ? "along" : id % 10 < 9 ? "opposing" : "crossing";
+    const flow =
+      id % 10 < (environment === "party" ? 7 : 5)
+        ? "along"
+        : id % 10 < (environment === "cafe" ? 8 : 9)
+          ? "opposing"
+          : "crossing";
     const urgency =
-      id % 5 === 0 ? "hurried" : id % 3 === 0 ? "relaxed" : "steady";
+      environment === "residential" ||
+      environment === "cafe" ||
+      environment === "party"
+        ? id % 3 === 0
+          ? "relaxed"
+          : "steady"
+        : environment === "station"
+          ? id % 3 === 0
+            ? "hurried"
+            : id % 7 === 0
+              ? "relaxed"
+              : "steady"
+          : id % 5 === 0
+            ? "hurried"
+            : id % 3 === 0
+              ? "relaxed"
+              : "steady";
     const lane = 65 + rand() * 350,
       slope = (rand() - 0.5) * 60;
     const eastbound = id % 2 === 0;
@@ -64,15 +153,21 @@ export function makeCrowd(count, speed, seed) {
             y: flow === "along" ? -80 : 760,
           };
     const habit =
-      id >= 1 && id <= 3
+      profile.queue && id >= 1 && id <= 3
         ? "queuing"
-        : urgency === "hurried"
-          ? "direct"
-          : id % 11 === 0
+        : environment === "residential" && id === 2
+          ? "meeting"
+          : environment === "cafe" && id % 4 === 0
             ? "meeting"
-            : id % 7 === 0
-              ? "reading"
-              : "direct";
+            : environment === "party" && id % 8 === 0
+              ? "meeting"
+              : urgency === "hurried"
+                ? "direct"
+                : id % 11 === 0
+                  ? "meeting"
+                  : id % 7 === 0
+                    ? "reading"
+                    : "direct";
     const stop =
       habit === "queuing"
         ? { x: 415, y: 370 }
@@ -80,7 +175,12 @@ export function makeCrowd(count, speed, seed) {
           ? null
           : {
               x: id === 7 ? 65 : lane < 240 ? 65 : 415,
-              y: habit === "meeting" ? 520 : 320,
+              y:
+                habit === "meeting"
+                  ? environment === "cafe" || environment === "party"
+                    ? 160
+                    : 520
+                  : 320,
             };
     const route = stop ? [stop, b] : [b];
     let x, y;
@@ -90,6 +190,19 @@ export function makeCrowd(count, speed, seed) {
         flow === "crossing"
           ? a.y + (b.y - a.y) * ((x - a.x) / (b.x - a.x)) + (rand() - 0.5) * 20
           : 140 + rand() * 405;
+      if (
+        (environment === "venue" || environment === "party") &&
+        id >= 20 &&
+        id % 6 === 3
+      ) {
+        const q = crowd.at(-1),
+          angle = rand() * Math.PI * 2;
+        if (q) {
+          x = q.x + Math.cos(angle) * 45;
+          y = q.y + Math.sin(angle) * 45;
+          if (x < 50 || x > 430 || y < 140 || y > 545) continue;
+        }
+      }
       if (habit === "queuing") {
         x = 415;
         y = 370 + (id - 1) * 42;
@@ -97,6 +210,10 @@ export function makeCrowd(count, speed, seed) {
       if (id === 16 || id === 17) {
         x = id === 17 ? 120 : 165;
         y = 540;
+      }
+      if (environment === "residential" && id === 2) {
+        x = 65;
+        y = 520;
       }
       if (id === 7) {
         x = 65;
@@ -107,10 +224,12 @@ export function makeCrowd(count, speed, seed) {
         id === 7 ||
         id === 16 ||
         id === 17 ||
+        (environment === "residential" && id === 2) ||
         ([370, 412, 454].every((qy) => Math.hypot(x - 415, y - qy) > 38) &&
           Math.hypot(x - 65, y - 320) > 38 &&
           Math.hypot(x - 120, y - 540) > 38 &&
-          Math.hypot(x - 165, y - 540) > 38);
+          Math.hypot(x - 165, y - 540) > 38 &&
+          (environment !== "residential" || Math.hypot(x - 65, y - 520) > 38));
       if (reserved && crowd.every((p) => Math.hypot(p.x - x, p.y - y) > 38))
         break;
     }
@@ -118,10 +237,16 @@ export function makeCrowd(count, speed, seed) {
     // Starting positions are walkers already en route, rather than simultaneous entries.
     const pace =
       speed *
+      profile.pace *
       (0.8 + rand() * 0.28) *
       (urgency === "hurried" ? 1.15 : urgency === "relaxed" ? 0.78 : 1);
     const p = {
       id,
+      environment,
+      role: profile.role,
+      originName: profile.places[origin],
+      destinationName: profile.places[destination],
+      acceleration: profile.acceleration,
       flow,
       suitcase: id % 20 === 4,
       archetype:
@@ -140,7 +265,7 @@ export function makeCrowd(count, speed, seed) {
       route,
       leg: 0,
       pace,
-      personalSpace: 42 + rand() * 18,
+      personalSpace: profile.space + rand() * profile.spaceRange,
       yielding: 0.7 + rand() * 0.6,
       pauseDuration:
         habit === "queuing"
@@ -161,7 +286,11 @@ export function makeCrowd(count, speed, seed) {
       walk: rand() * 30,
       reaction: null,
     };
-    if (habit === "queuing" || id === 7) {
+    if (
+      habit === "queuing" ||
+      id === 7 ||
+      (environment === "residential" && id === 2)
+    ) {
       p.state = habit;
       p.wait = p.pauseDuration;
       p.ux = 0;
@@ -179,10 +308,32 @@ export function makeCrowd(count, speed, seed) {
       p.archetype = id === 17 ? "curious-child" : "companion";
       p.habit = "interest";
       p.pauseDuration = id === 17 ? 1.2 : 1.8;
-      p.pace = speed * 0.78;
+      p.pace = speed * profile.pace * 0.78;
       p.route = [{ x: id === 17 ? 110 : 155, y: 500 }, b];
       p.leg = 0;
       aim(p);
+    }
+    if (
+      (environment === "venue" || environment === "party") &&
+      id >= 20 &&
+      (id % 6 === 2 || id % 6 === 3)
+    ) {
+      p.group = `visitors-${Math.floor(id / 6)}`;
+      p.archetype = "visitor";
+      const partner = crowd.find((q) => q.group === p.group);
+      if (partner) {
+        p.color = partner.color;
+        p.pace = partner.pace;
+        p.flow = partner.flow;
+        p.origin = partner.origin;
+        p.destination = partner.destination;
+        p.destinationName = partner.destinationName;
+        const end = partner.route.at(-1);
+        p.route = [{ x: Math.max(50, Math.min(430, end.x + 40)), y: end.y }];
+        p.leg = 0;
+        p.habit = "direct";
+        aim(p);
+      }
     }
     crowd.push(p);
   }
@@ -247,7 +398,7 @@ export function moveCrowd(crowd, dt) {
     }
     vx *= paceFactor;
     vy *= paceFactor;
-    const blend = 1 - Math.exp(-dt * 5);
+    const blend = 1 - Math.exp(-dt * (p.acceleration || 5));
     return {
       vx: p.vx + (vx - p.vx) * blend,
       vy: p.vy + (vy - p.vy) * blend,

@@ -8,7 +8,7 @@
     />
     <meta
       name="description"
-      content="人混みをよけて、待ち合わせへ。全5ステージの駅の人流ゲーム。スマホとキーボードで遊べます。"
+      content="人混みをよけて、待ち合わせへ。自宅からライブ会場へ向かう全5ステージの人流ゲーム。スマホとキーボードで遊べます。"
     />
     <link rel="canonical" href="https://monnouchi.github.io/crowd-weave/" />
     <meta property="og:type" content="website" />
@@ -16,7 +16,7 @@
     <meta property="og:title" content="雑踏突破 / Crowd Weave" />
     <meta
       property="og:description"
-      content="人の流れに、すきまを見つけよう。人混みをよけて待ち合わせへ向かう全5ステージのゲーム。"
+      content="人の流れに、すきまを見つけよう。人混みをよけて待ち合わせへ向かう友だちと合流しながらライブ会場を目指す全5ステージのゲーム。"
     />
     <meta
       property="og:url"
@@ -31,13 +31,13 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="雑踏突破のタイトルと、駅の人混みをよけて歩く実際のゲーム画面"
+      content="雑踏突破のタイトルと、住宅街からライブ会場へ歩く実際のゲーム画面"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="雑踏突破 / Crowd Weave" />
     <meta
       name="twitter:description"
-      content="人の流れに、すきまを見つけよう。全5ステージの駅の人流ゲーム。"
+      content="人の流れに、すきまを見つけよう。自宅からライブ会場へ向かう全5ステージの人流ゲーム。"
     />
     <meta
       name="twitter:image"
@@ -45,7 +45,7 @@
     />
     <meta
       name="twitter:image:alt"
-      content="雑踏突破のタイトルと駅のゲーム画面"
+      content="雑踏突破のタイトルと人混みをよけて歩くゲーム画面"
     />
     <link rel="icon" href="data:," />
     <title>雑踏突破 | Crowd Weave</title>
@@ -55,13 +55,13 @@
     <main>
       <header>
         <div>
-          <span class="eyebrow">STATION / 01</span>
+          <span class="eyebrow" id="scene-label">HOME / 01</span>
           <h1>
             <b id="game-name">雑踏突破</b
-            ><span id="scene-purpose">北口のカフェ前で待ち合わせ</span>
+            ><span id="scene-purpose">家を出て、住宅街の角で友だちと合流</span>
           </h1>
         </div>
-        <span class="badge" id="stage">STAGE 1 / 5 · 朝の改札</span>
+        <span class="badge" id="stage">STAGE 1 / 5 · ひとりで出発</span>
       </header>
       <section class="stats" aria-label="記録">
         <div>
@@ -81,7 +81,7 @@
           aria-describedby="keyboard-help"
           width="480"
           height="680"
-          aria-label="駅の人混みを避けて待ち合わせ相手まで歩くゲーム"
+          aria-label="人混みを避け、友だちと合流しながらライブ会場まで歩くゲーム"
         ></canvas>
         <div
           id="overlay"
@@ -93,18 +93,22 @@
           <div class="card">
             <span class="eyebrow" id="label">FIND YOUR WAY THROUGH</span>
             <h2 id="title">人の流れに、<br />すきまを見つけよう。</h2>
+            <p id="next-purpose" hidden></p>
             <p id="message">
-              駅を行き交う人をよけて、北口で待つ人のもとへ。<br />自動で前へ。左右ボタンでよけ、両方でブレーキ。
+              家をひとりで出発。友だちと合流しながら、郊外のライブ会場を目指そう。<br />自動で前へ。左右ボタンでよけ、両方でブレーキ。
             </p>
             <button id="action" aria-describedby="enter-hint">
-              突破をはじめる →
+              音なしで開始 →
             </button>
             <div id="share-actions" hidden>
               <button id="share" class="secondary">結果画像を共有・保存</button
               ><button id="copy-result" class="secondary">文章コピー</button>
               <p id="share-status" role="status"></p>
             </div>
-            <p id="enter-hint" class="enter-hint">Enter で開始</p>
+            <button id="start-sound" class="secondary">音ありで開始 →</button>
+            <p id="enter-hint" class="enter-hint">
+              Enter：音なしで開始 · Tabで音ありを選べます
+            </p>
           </div>
         </div>
         <div id="goal-callout" hidden>こっちだよ！</div>
@@ -115,6 +119,22 @@
         ><span id="motion">自動で前進 · 両押しで停止</span
         ><button id="right" aria-label="右へ移動">右へ →</button>
       </div>
+      <section class="input-modes" aria-label="スマホの操作方法">
+        <div>
+          <button id="mode-buttons" class="secondary" aria-pressed="true">
+            左右ボタン</button
+          ><button id="mode-tilt" class="secondary" aria-pressed="false">
+            傾きで操作
+          </button>
+        </div>
+        <div id="tilt-controls" hidden>
+          <button id="recenter" class="secondary">正面合わせ</button
+          ><button id="brake">押している間ブレーキ</button>
+        </div>
+        <p id="tilt-status" role="status">
+          操作方法を選べます。傾き操作は対応したスマホで利用できます。
+        </p>
+      </section>
       <footer>
         <p id="keyboard-help">
           PC：← → / A D · Enterで次へ · Escで停止
@@ -123,13 +143,14 @@
         <div>
           <button
             id="sound"
+            disabled
             class="secondary"
             aria-label="ミュート切り替え"
-            aria-pressed="false"
+            aria-pressed="true"
           >
-            音：ON</button
+            音：OFF</button
           ><button id="pause" class="secondary" disabled>一時停止</button
-          ><button id="restart" class="secondary">やり直す</button>
+          ><button id="restart" class="secondary" disabled>やり直す</button>
         </div>
       </footer>
       <p class="license">

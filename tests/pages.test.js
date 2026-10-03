@@ -29,6 +29,7 @@ const expected = [
   "share.js",
   "sound.js",
   "style.css",
+  "tilt.js",
 ];
 async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), "crowd-pages-"));
@@ -93,6 +94,7 @@ test("Browser asset references stay within a GitHub Pages project base path", as
     "pose.js",
     "sound.js",
     "share.js",
+    "tilt.js",
     "crowd.js",
     "input.js",
     "branding.js",
@@ -104,7 +106,7 @@ test("Browser asset references stay within a GitHub Pages project base path", as
     const url = new URL(ref, base);
     assert.equal(url.origin, base.origin);
     assert.ok(url.pathname.startsWith("/crowd-weave/"), ref);
-    if(url.pathname===base.pathname) continue;
+    if (url.pathname === base.pathname) continue;
     assert.ok(
       expected.includes(url.pathname.slice("/crowd-weave/".length)),
       ref,

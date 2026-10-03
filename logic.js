@@ -19,49 +19,79 @@ export const MEETING_PARTNER = Object.freeze({
   walk: 0,
 });
 export const STAGES = [
-  { name: "朝の改札", count: 12, speed: 30 },
-  { name: "ホームへ向かう人", count: 20, speed: 35 },
-  { name: "乗り換えの時間", count: 30, speed: 40 },
-  { name: "夕方の改札", count: 35, speed: 45 },
-  { name: "混雑する駅", count: 40, speed: 50 },
+  { name: "ひとりで出発", count: 6, speed: 30 },
+  { name: "住宅街から最寄り駅へ", count: 12, speed: 35 },
+  { name: "駅のカフェで合流", count: 20, speed: 40 },
+  { name: "会場前のにぎわい", count: 30, speed: 45 },
+  { name: "ライブの最前方へ", count: 40, speed: 50 },
 ];
 export const SCENES = [
   {
-    purpose: "北口のカフェ前で待ち合わせ",
-    bubble: "こっちだよ！",
-    arrival: "待つ人と合流！",
+    place: "住宅街の角",
+    landmark: "home",
+    environment: "residential",
+    purpose: "家を出て、住宅街の角で友だちと合流",
+    intro: "家をひとりで出発。住宅街の角で友だちに会おう。",
+    bubble: "一緒に駅へ行こう！",
+    arrival: "最初の友だちと合流。駅へ出発！",
     shirt: "#d5ab53",
     visualScale: 1,
+    floor: "#eeecdc",
+    backgroundCount: 2,
   },
   {
-    purpose: "ホームへ向かう前に合流",
-    bubble: "ここで待ってるよ！",
-    arrival: "出発前に合流！",
-    shirt: "#839d76",
+    place: "最寄り駅の入口",
+    landmark: "station",
+    environment: "station",
+    purpose: "住宅街を抜け、最寄り駅の入口へ",
+    intro: "住宅街を抜けよう。最寄り駅の入口でもうひとりと合流。",
+    bubble: "駅の入口にいるよ！",
+    arrival: "駅の入口で合流。カフェに向かおう！",
+    shirt: "#83a9bb",
     visualScale: 1,
+    floor: "#e7ece1",
+    backgroundCount: 3,
   },
   {
-    purpose: "乗り換え前に待ち合わせ",
-    bubble: "合流したらホームへ！",
-    arrival: "乗り換え前に合流！",
+    place: "駅のカフェ",
+    landmark: "cafe",
+    environment: "cafe",
+    purpose: "駅のカフェで友だちと待ち合わせ",
+    intro: "駅のカフェで合流し、郊外のライブ会場へ向かおう。",
+    bubble: "カフェで待ってるよ！",
+    arrival: "カフェで合流。次は会場の最寄り駅！",
     shirt: "#cc8b74",
     visualScale: 1,
+    floor: "#e9ecdf",
+    backgroundCount: 6,
   },
   {
-    purpose: "夕方、カフェ前で待ち合わせ",
-    bubble: "おつかれさま、こっち！",
-    arrival: "待ち合わせに到着！",
+    place: "ライブ会場前",
+    landmark: "venue",
+    environment: "venue",
+    purpose: "会場の最寄り駅から、ライブ会場前へ",
+    intro: "会場の最寄り駅の改札から、ライブ会場前の友だちへ。",
+    bubble: "会場の入口だよ！",
+    arrival: "会場前で合流。いよいよ中へ！",
     shirt: "#9788a9",
     visualScale: 1,
+    floor: "#e6e7df",
+    backgroundCount: 6,
   },
   {
-    purpose: "混雑する駅で待つ人のもとへ",
-    bubble: "もう少し、ここだよ！",
-    arrival: "人混みを抜けて合流！",
+    place: "ステージ前",
+    landmark: "party",
+    environment: "party",
+    purpose: "ライブ会場の中を抜け、ステージ前へ",
+    intro: "ライブ会場へ。人のすきまを読んで、ステージ前の友だちのもとへ。",
+    bubble: "ここから一緒に楽しもう！",
+    arrival: "ステージ前に到着。みんなでライブを楽しもう！",
     shirt: "#c4a46c",
     visualScale: 1,
+    floor: "#e6e0e9",
+    backgroundCount: 8,
   },
-];
+].map((scene) => ({ ...scene, targetKind: "friend" }));
 export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   const config = STAGES[stage];
   const scene = SCENES[stage];
@@ -73,6 +103,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     meetingPartner: {
       ...MEETING_PARTNER,
       shirt: scene.shirt,
+      targetKind: scene.targetKind,
       visualScale: scene.visualScale,
     },
     elapsed: 0,
@@ -82,7 +113,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     lastContactId: null,
     touchingIds: [],
     seed,
-    crowd: makeCrowd(config.count, config.speed, seed),
+    crowd: makeCrowd(config.count, config.speed, seed, scene.environment),
   };
 }
 export function step(g, dt, input) {
@@ -94,7 +125,12 @@ export function step(g, dt, input) {
   if (!g.stun) {
     const brake = input.left && input.right;
     if (!brake) {
-      g.player.x += (Number(!!input.right) - Number(!!input.left)) * 100 * dt;
+      g.player.x +=
+        (Number.isFinite(input.axis)
+          ? Math.max(-1, Math.min(1, input.axis))
+          : Number(!!input.right) - Number(!!input.left)) *
+        100 *
+        dt;
       g.player.y -= 75 * dt;
     }
   }

@@ -8,5 +8,5 @@
     "build:pages": "node scripts/build-pages.js"
   },
   "license": "MIT",
-  "description": "雑踏突破 — 駅の人流をよけて待ち合わせ相手のもとへ向かうゲーム"
+  "description": "雑踏突破 — 人混みをよけ、友だちと合流しながら自宅からライブ会場へ向かうゲーム"
 }
