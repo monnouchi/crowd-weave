@@ -158,20 +158,16 @@ footer > div {
   flex-shrink: 0;
 }
 #notice {
-  position: absolute;
-  top: 20%;
-  left: 50%;
-  transform: translateX(-50%);
-  color: #fff;
-  background: #af5635;
-  border-radius: 20px;
-  padding: 8px 14px;
+  min-height: 28px;
+  padding: 5px 12px;
   font-size: 12px;
-  pointer-events: none;
-  opacity: 0;
+  line-height: 18px;
+  color: #9a482d;
+  background: #fff3e7;
+  visibility: hidden;
 }
 #notice.active {
-  opacity: 1;
+  visibility: visible;
 }
 @media (max-width: 420px) {
   main {
@@ -322,4 +318,63 @@ canvas:focus-visible {
 }
 .party-strip span {
   letter-spacing: 2px;
+}
+
+/* Keep the full-width playfield readable beside controls on larger screens. */
+@media (min-width: 850px) {
+  main {
+    width: min(calc(100% - 48px), 920px);
+    margin: 24px auto;
+    display: grid;
+    grid-template-columns: minmax(380px, 480px) minmax(280px, 1fr);
+    grid-template-rows: repeat(8, min-content);
+    gap: 12px 24px;
+    align-items: start;
+  }
+  main > :not(.stage) {
+    grid-column: 2;
+  }
+  .stage {
+    grid-column: 1;
+    grid-row: 1 / span 8;
+    border-radius: 18px;
+  }
+  canvas {
+    max-height: none;
+    width: 100%;
+  }
+  header {
+    flex-wrap: wrap;
+  }
+  h1 {
+    margin-bottom: 8px;
+  }
+  .stats {
+    border-radius: 14px;
+  }
+  .party-strip {
+    border-radius: 10px;
+  }
+  #notice {
+    border-radius: 10px;
+    min-height: 38px;
+  }
+  .steering {
+    margin: 0;
+  }
+  .input-modes {
+    margin-top: 0;
+  }
+  footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  footer p {
+    font-size: 12px;
+    margin: 0 0 8px;
+  }
+  .license {
+    margin: 0;
+  }
 }

@@ -75,8 +75,8 @@ function start(stage = 0) {
   overlay.hidden = true;
   pause.disabled = false;
   last = performance.now();
-  $("#notice").textContent = game.scene.intro;
-  noticeUntil = performance.now() + 3500;
+  $("#notice").textContent = "";
+  noticeUntil = 0;
   canvas.focus({ preventScroll: true });
 }
 function setPaused() {
@@ -747,17 +747,22 @@ function frame(now) {
   );
   $("#left").classList.toggle("held", steering.left);
   $("#right").classList.toggle("held", steering.right);
-  $("#motion").textContent = game.arriving
-    ? "合流中 · 仲間の到着を待っています"
-    : steering.left && steering.right
-      ? game.party.members.length
-        ? "ブレーキ · 仲間が隊列を整えます"
-        : "ブレーキ · 停止中"
-      : steering.left
-        ? "← 左へよける"
-        : steering.right
-          ? "右へよける →"
-          : "自動で前進 · 両押しで停止";
+  $("#motion").textContent =
+    game.phase === "finished"
+      ? "全員到着 · 次へ進めます"
+      : game.phase === "paused"
+        ? "一時停止 · 時計も停止中"
+        : game.arriving
+          ? "合流中 · 仲間の到着を待っています"
+          : steering.left && steering.right
+            ? game.party.members.length
+              ? "ブレーキ · 仲間が隊列を整えます"
+              : "ブレーキ · 停止中"
+            : steering.left
+              ? "← 左へよける"
+              : steering.right
+                ? "右へよける →"
+                : "自動で前進 · 両押しで停止";
   if (game.hits > hits) {
     audio.effect("contact");
     noticeUntil = now + 950;
@@ -797,7 +802,7 @@ function frame(now) {
     $("#next-purpose").hidden = game.stage === 4;
     panel(
       game.stage === 4 ? "全5ステージを踏破！" : game.scene.arrival,
-      `${game.stage === 4 ? "全員がステージ前に到着！ " : `友だち${game.stage + 1}と合流。仲間が${game.stage + 1}人になりました。 `}${game.stage === 4 ? `合計 ${records.reduce((s, r) => s + r.time, 0).toFixed(1)}秒 / 接触 ${records.reduce((s, r) => s + r.hits, 0)}回。最終ステージ：` : ""}${game.scene.arrival} タイム ${game.elapsed.toFixed(1)}秒（接触の加算を含む） / 接触 ${game.hits}回。${game.hits === 0 ? "見事な雑踏突破でした。" : "すきまを読むほど、早く到着できます。"}`,
+      `${game.stage === 4 ? "全員がステージ前に到着！ " : `友だち${game.stage + 1}と合流。仲間が${game.stage + 1}人になりました。 `}${game.stage === 4 ? `合計 ${records.reduce((s, r) => s + r.time, 0).toFixed(1)}秒 / 接触 ${records.reduce((s, r) => s + r.hits, 0)}回。最終ステージ：` : ""}タイム ${game.elapsed.toFixed(1)}秒（接触の加算を含む） / 接触 ${game.hits}回。${game.hits === 0 ? "見事な雑踏突破でした。" : "すきまを読むほど、早く到着できます。"}`,
       game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
