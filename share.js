@@ -2,28 +2,28 @@ export const GAME_URL = "https://monnouchi.github.io/crowd-weave/";
 export function resultTotals(records) {
   const time = records.reduce((s, r) => s + r.time, 0),
     hits = records.reduce((s, r) => s + r.hits, 0),
-    safetyStops = records.reduce((s, r) => s + (r.safetyStops || 0), 0);
-  const clean = records.length === 5 && hits === 0 && safetyStops === 0;
+    violations = records.reduce((s, r) => s + (r.violations || 0), 0);
+  const clean = records.length === 5 && hits === 0 && violations === 0;
   return {
     time,
     hits,
-    safetyStops,
+    violations,
     clean,
     label: clean ? "すきまの名案内" : "みんなで最前列",
   };
 }
 export function resultText(records) {
   const r = resultTotals(records);
-  return `雑踏突破 / Crowd Weave\n全5ステージ ${r.time.toFixed(1)}秒・接触${r.hits}回\n急停止${r.safetyStops}回 · ${r.label}\n${GAME_URL}`;
+  return `雑踏突破 / Crowd Weave\n全5ステージ ${r.time.toFixed(1)}秒・接触${r.hits}回\n信号無視${r.violations}回 · ${r.label}\n${GAME_URL}`;
 }
 export function drawResultCard(records, scene) {
   const totals = resultTotals(records),
     c = document.createElement("canvas");
   c.width = 720;
-  c.height = 560;
+  c.height = 520;
   const x = c.getContext("2d");
   x.fillStyle = "#edf0e4";
-  x.fillRect(0, 0, 720, 560);
+  x.fillRect(0, 0, 720, 520);
   const ratio = scene.width / 480;
   x.drawImage(
     scene,
@@ -51,12 +51,11 @@ export function drawResultCard(records, scene) {
   x.fillText(`${totals.time.toFixed(1)} 秒`, 35, 238);
   x.font = "20px system-ui";
   x.fillText(`接触 ${totals.hits}回`, 35, 292);
-  x.fillText(`急停止 ${totals.safetyStops}回`, 35, 332);
+  x.fillText(`信号無視 ${totals.violations}回`, 35, 332);
   x.font = "bold 19px system-ui";
   x.fillText(totals.label, 35, 390);
   x.font = "17px system-ui";
-  x.fillText(GAME_URL, 35, 490);
-  x.fillText("人の流れに、すきまを見つけよう。", 35, 530);
+  x.fillText(GAME_URL, 35, 480);
   return c;
 }
 export async function shareResult(records, scene) {

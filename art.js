@@ -162,3 +162,43 @@ export function concert(
   }
   c.restore();
 }
+
+// Rain stays on the side strips, behind people and signals. No flashing or haze.
+export function rainShelters(c, { time = 0, reducedMotion = false } = {}) {
+  c.save();
+  for (const [x, y, w] of [
+    [30, 478, 70],
+    [380, 130, 70],
+    [170, 12, 140],
+  ]) {
+    box(c, x, y, w, 13, 3, "#3d6474");
+    c.strokeStyle = "#bfd1d6";
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let i = 8; i < w; i += 14) {
+      c.moveTo(x + i, y);
+      c.lineTo(x + i - 4, y + 12);
+    }
+    c.stroke();
+    c.fillStyle = "#365760";
+    c.font = "bold 10px system-ui";
+    c.textAlign = "center";
+    c.fillText("軒下 / 雨宿り", x + w / 2, y - 7);
+    c.fillStyle = "#7fadb536";
+    c.beginPath();
+    c.ellipse(x + w / 2, y + 73, w * 0.35, 7, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.strokeStyle = "#406f8c60";
+  c.lineWidth = 1.2;
+  c.beginPath();
+  const drift = reducedMotion ? 0 : time * 95;
+  for (let i = 0; i < 44; i++) {
+    const x = i % 2 ? 386 + ((i * 17) % 63) : 26 + ((i * 19) % 62);
+    const y = -220 + ((i * 47 + drift) % 930);
+    c.moveTo(x, y);
+    c.lineTo(x - 3, y + 11);
+  }
+  c.stroke();
+  c.restore();
+}

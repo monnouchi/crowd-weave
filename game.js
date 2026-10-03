@@ -1,8 +1,13 @@
-import { floorDetails, concert } from "./art.js";
+import { floorDetails, concert, rainShelters } from "./art.js";
 import { TiltState, tiltPermission } from "./tilt.js";
 import { shareResult, resultText, resultTotals } from "./share.js";
 import { GameAudio } from "./sound.js";
-import { updatePlayerPose } from "./pose.js";
+import {
+  updatePlayerPose,
+  createWalkingPose,
+  updateWalkingPose,
+} from "./pose.js";
+import { drawCharacter } from "./character.js";
 import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import { createGame, step, W, H, GOAL, STAGES, SCENES } from "./logic.js";
 import { visiblePerson } from "./crowd.js";
@@ -35,6 +40,8 @@ let game = createGame(),
   noticeUntil = 0,
   records = [],
   playerPose = { lean: 0 };
+const walkingPoses = new Map();
+let visualDt = 0;
 const tilt = new TiltState();
 let steeringMode = "buttons",
   tiltWaitingUntil = 0,
@@ -88,9 +95,13 @@ function start(stage = 0) {
   clearInput();
   if (stage === 0) records = [];
   game = createGame(stage);
+  $("main").classList.toggle("with-traffic", !!game.traffic);
   playerPose = { lean: 0 };
+  walkingPoses.clear();
   $("#goal-callout").textContent = game.scene.bubble;
-  $("#scene-purpose").textContent = game.scene.purpose;
+  $("#scene-purpose").textContent = game.traffic
+    ? `${game.scene.weather ? "雨の" : ""}${game.scene.place}へ · 赤は両押しで停止`
+    : game.scene.purpose;
   $("#scene-label").textContent =
     `${["HOME", "STATION", "CAFÉ", "VENUE", "LIVE"][stage]} / 0${stage + 1}`;
   $("#stage").textContent = `STAGE ${stage + 1} / 5 · ${STAGES[stage].name}`;
@@ -100,6 +111,7 @@ function start(stage = 0) {
   pause.disabled = false;
   last = performance.now();
   $("#notice").textContent = "";
+  $("#notice").classList.remove("companion");
   noticeUntil = 0;
   canvas.focus({ preventScroll: true });
 }
@@ -189,6 +201,11 @@ window.addEventListener("blur", () => {
   setPaused();
 });
 window.addEventListener("touchcancel", clearInput);
+for (const surface of document.querySelectorAll(
+  "#game, .steering, #brake, #goal-callout, .stats, .party-strip, #notice, #traffic-status",
+))
+  for (const event of ["contextmenu", "selectstart", "dragstart"])
+    surface.addEventListener(event, (e) => e.preventDefault());
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     enterLatch.release();
@@ -287,145 +304,60 @@ function rounded(x, y, w, h, r, color) {
   ctx.fill();
 }
 function person(p, player = false) {
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  if (p.archetype === "curious-child") ctx.scale(0.8, 0.8);
-  if (p.partner) ctx.scale(p.visualScale, p.visualScale);
-  if (!player) {
-    ctx.globalAlpha =
-      p.partner || p.background || p.friend
-        ? 1
-        : Math.min(
-            1,
-            (p.x - 18) / 18,
-            (462 - p.x) / 18,
-            (p.y - 110) / 20,
-            (670 - p.y) / 20,
-          );
-    ctx.rotate(
-      Math.atan2(p.reaction?.faceX ?? p.ux, -(p.reaction?.faceY ?? p.uy)),
-    );
-  }
-  const steering = input();
-  const moving =
+  const key = player
+    ? "self"
+    : p.friend
+      ? `friend:${p.id}`
+      : p.partner
+        ? "meeting"
+        : p.id !== undefined
+          ? `crowd:${p.id}`
+          : p.visualKey || `scenery:${p.x}:${p.y}`;
+  const heading = {
+    x: p.vx || p.ux || 0,
+    y: p.vy || p.uy || (player ? -1 : 0),
+  };
+  const previous = walkingPoses.get(key);
+  const reset = !previous || previous.cycle !== p.cycle;
+  const old = reset ? createWalkingPose(p, heading) : previous;
+  const canMove =
     game.phase === "playing" &&
-    !game.stun &&
-    !(steering.left && steering.right);
-  const stride = reducedMotion.matches
-    ? 0
-    : player
-      ? moving
-        ? Math.sin(game.worldTime * 12) * 2
-        : 0
-      : p.reaction || !["walking", "following", "docking"].includes(p.state)
-        ? 0
-        : Math.sin(p.walk / 7 + (p.color ?? p.id ?? 0) * 1.7) * 1.6;
-  rounded(-8, 9 + stride, 5, 8, 2, "#3b4b49");
-  rounded(3, 9 - stride, 5, 8, 2, "#3b4b49");
-  ctx.fillStyle = "#173d3c20";
-  ctx.beginPath();
-  ctx.ellipse(2, 9, 14, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
+    !p.partner &&
+    !p.reaction &&
+    (!(player || p.friend) || !game.stun);
+  const look = p.reaction
+    ? { x: p.reaction.faceX, y: p.reaction.faceY }
+    : p.partner || p.state === "celebrating"
+      ? { x: p.ux || 0, y: p.uy || -1 }
+      : null;
+  const pose = updateWalkingPose(old, p, visualDt, { canMove, look, reset });
+  walkingPoses.set(key, { ...pose, cycle: p.cycle });
+  let opacity =
+    p.partner || p.background || p.friend || player
+      ? 1
+      : Math.min(
+          1,
+          (p.x - 18) / 18,
+          (462 - p.x) / 18,
+          (p.y - 110) / 20,
+          (670 - p.y) / 20,
+        );
   if (
     player &&
     game.cooldown > 0 &&
     !reducedMotion.matches &&
     Math.floor(game.cooldown * 9) % 2
-  ) {
-    ctx.globalAlpha = 0.45;
-  }
-  ctx.save();
-  if (player) ctx.rotate(playerPose.lean);
-  rounded(
-    -p.r,
-    -9,
-    p.r * 2,
-    24,
-    10,
-    player
-      ? "#2185ae"
-      : p.partner || p.friend
-        ? p.shirt
-        : ["#ce866b", "#758e79", "#b1a075", "#8c87a2"][p.color],
-  );
-  ctx.fillStyle = player ? "#ffdf9e" : "#f4cfab";
-  for (const x of [-p.r - 1, p.r + 1]) {
-    ctx.beginPath();
-    ctx.arc(x, 4 + (x < 0 ? stride : -stride), 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.beginPath();
-  ctx.arc(0, -7, 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#3b4b49";
-  ctx.beginPath();
-  ctx.arc(0, -10, 7, Math.PI, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#54645b";
-  ctx.fillRect(-4, -6, 2, 1.5);
-  ctx.fillRect(2, -6, 2, 1.5);
-  ctx.strokeStyle = "#fff6dc60";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-6, 2);
-  ctx.quadraticCurveTo(0, 5, 6, 2);
-  ctx.stroke();
-  if (p.reaction) {
-    ctx.strokeStyle = "#85432c";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-5, -5);
-    ctx.lineTo(-1, -3);
-    ctx.moveTo(1, -3);
-    ctx.lineTo(5, -5);
-    ctx.stroke();
-  }
-  if (!player && p.state === "reading") {
-    rounded(7, 0, 10, 8, 2, "#fff4d6");
-    ctx.strokeStyle = "#8a7657";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(12, 1);
-    ctx.lineTo(12, 7);
-    ctx.stroke();
-  }
-  if (p.suitcase) {
-    rounded(14, 8, 12, 20, 3, "#775f4b");
-    ctx.strokeStyle = "#775f4b";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(13, 5);
-    ctx.lineTo(20, 10);
-    ctx.stroke();
-  }
-  if (p.targetKind === "clerk") {
-    rounded(-9, -16, 18, 5, 2, "#496c64");
-  }
-  if (p.partner) {
-    ctx.fillStyle = "#f4cfab";
-    ctx.beginPath();
-    ctx.arc(
-      -15,
-      -3 + (reducedMotion.matches ? 0 : Math.sin(game.worldTime * 3) * 2),
-      4,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-  }
-  ctx.restore();
-  if (player) {
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 2, 19, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "#245c56";
-    ctx.font = "bold 11px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("YOU", 0, 34);
-  }
-  ctx.restore();
+  )
+    opacity = 0.45;
+  drawCharacter(ctx, p, {
+    pose,
+    player,
+    lean: player ? playerPose.lean : 0,
+    reducedMotion: reducedMotion.matches,
+    opacity,
+    waving: p.partner,
+    wave: Math.sin(game.worldTime * 3) * 2,
+  });
 }
 function destination(scene) {
   ctx.textAlign = "center";
@@ -524,23 +456,51 @@ function drawTraffic() {
   ctx.fillStyle = "#d7c483";
   for (let x = 10; x < W; x += 40)
     if (x < t.left - 25 || x > t.right + 5) ctx.fillRect(x, 331, 24, 2);
-  ctx.fillStyle = "#6c8777";
-  ctx.fillRect(t.left, t.bottom + 16, t.right - t.left, 2);
+  ctx.fillStyle = "#173f48";
+  ctx.fillRect(t.left, t.bottom + 11, t.right - t.left, 6);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(t.left, t.bottom + 12, t.right - t.left, 3);
   ctx.font = "bold 12px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("横断歩道 ↑", 240, t.bottom + 37);
+  ctx.fillText("停止線 · 赤は両押しで待つ", 240, t.bottom + 42);
   for (const [x, y] of [
-    [136, t.bottom + 24],
-    [344, t.top - 24],
+    [100, t.bottom + 50],
+    [380, t.top - 50],
   ]) {
-    rounded(x - 8, y - 15, 16, 29, 5, "#334e4e");
-    ctx.fillStyle = t.green || t.reserved ? "#b6ddbd" : "#f7b59e";
-    ctx.beginPath();
-    ctx.arc(x, y - 1, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#f4efe2";
-    ctx.font = "bold 11px system-ui";
-    ctx.fillText(t.green || t.reserved ? "↑" : "■", x, y + 3);
+    const green = t.nominalGreen,
+      proceed = t.canEnter || t.reserved;
+    rounded(x - 22, y - 45, 44, 90, 7, "#0d1c25");
+    ctx.strokeStyle = "#f9fcf5";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 19, y - 42, 38, 84);
+    for (const [dy, lit, color] of [
+      [-24, !green, "#ff4356"],
+      [8, green, "#2df4b7"],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y + dy, 14, 0, Math.PI * 2);
+      ctx.fillStyle = lit ? color : "#26333d";
+      ctx.fill();
+      if (!lit) continue;
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = ctx.strokeStyle = "#0a1820";
+      if (proceed && green) {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y + dy + 7);
+        ctx.lineTo(x, y + dy - 7);
+        ctx.moveTo(x - 5, y + dy - 2);
+        ctx.lineTo(x, y + dy - 7);
+        ctx.lineTo(x + 5, y + dy - 2);
+        ctx.stroke();
+      } else ctx.fillRect(x - 5, y + dy - 5, 10, 10);
+    }
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 13px system-ui";
+    ctx.font = `bold ${t.reserved ? 11 : 13}px system-ui`;
+    ctx.fillText(t.reserved ? "横断中" : proceed ? "進む" : "待つ", x, y + 37);
   }
   const v = t.vehicle;
   if (!v.active || v.x < -50 || v.x > 530) return;
@@ -612,6 +572,11 @@ function draw() {
     ctx.stroke();
   }
   floorDetails(ctx, game.scene);
+  if (game.scene.weather === "rain")
+    rainShelters(ctx, {
+      time: game.worldTime,
+      reducedMotion: reducedMotion.matches,
+    });
   rounded(18, -500, 444, 55, 8, "#cbd7ca");
   ctx.fillStyle = "#285d55";
   ctx.font = "bold 16px system-ui";
@@ -637,10 +602,11 @@ function draw() {
       y,
       r: 13,
       ux: 0,
-      uy: i % 2 ? 1 : -1,
+      uy: i % 2 ? -1 : 1,
+      visualKey: `background:${i}`,
       color: i % 4,
       state: "walking",
-      walk: game.worldTime * (24 + i),
+      walk: game.worldTime * (i % 2 ? 20 : 18),
       background: true,
     });
   }
@@ -771,6 +737,8 @@ function draw() {
         x: 180 + i * 40,
         y: -43,
         state: "celebrating",
+        ux: 0,
+        uy: -1,
         flash: 0,
         docking: false,
       }))
@@ -786,7 +754,15 @@ function draw() {
       }
     : game.meetingPartner;
   const displayPlayer = finale
-    ? { ...game.player, x: 140, y: -43, player: true }
+    ? {
+        ...game.player,
+        x: 140,
+        y: -43,
+        player: true,
+        state: "celebrating",
+        ux: 0,
+        uy: -1,
+      }
     : { ...game.player, player: true };
   if (game.party.members.length && !finale) {
     ctx.save();
@@ -877,7 +853,7 @@ function frame(now) {
     );
   }
   const hits = game.hits;
-  const safetyStops = game.traffic?.safetyStops || 0;
+  const violations = game.traffic?.violations || 0;
   audio.update(
     game.phase === "playing",
     input().left && input().right,
@@ -902,6 +878,7 @@ function frame(now) {
     }
   }
   const movementDt = Math.max(0, Math.min(0.05, dt));
+  visualDt = movementDt;
   playerPose = updatePlayerPose(
     playerPose,
     movementDt ? (game.player.x - previousX) / movementDt : 0,
@@ -930,8 +907,11 @@ function frame(now) {
   signal.hidden = !game.traffic;
   if (game.traffic) {
     const t = game.traffic;
-    signal.className =
-      t.reserved || t.canEnter ? "green" : t.warning ? "warning" : "red";
+    signal.className = !t.nominalGreen
+      ? "red"
+      : t.warning || !t.green
+        ? "warning"
+        : "green";
     signal.textContent = t.reserved
       ? "↑ 横断中 · 仲間全員が渡るまで車は待ちます"
       : t.canEnter
@@ -940,18 +920,25 @@ function frame(now) {
           ? "■ もうすぐ赤 · 次の青まで待とう"
           : t.nominalGreen
             ? "■ 車の通過待ち · 両押しで待とう"
-            : `■ 赤 · 両押しで待とう（青まで${t.remaining.toFixed(1)}秒）`;
-    if (t.safetyStops > safetyStops) {
+            : `■ 赤 · 両押しで停止（青まで${t.remaining.toFixed(1)}秒）`;
+    if (t.violations > violations) {
       noticeUntil = now + 1800;
-      $("#notice").textContent = "赤信号で急停止！ +2秒 · 両押しで待とう";
+      const event = t.violationEvent;
+      $("#notice").classList.toggle("companion", !!event.memberId);
+      $("#notice").textContent = event.memberId
+        ? `友だち${event.memberId}「${event.message}」 信号無視 +2秒`
+        : "信号無視 +2秒 · 赤では両押しで待とう";
       audio.effect("contact");
     }
   }
   if (game.hits > hits) {
     audio.effect("contact");
     noticeUntil = now + 950;
-    $("#notice").textContent =
-      `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒${game.traffic && game.traffic.safetyStops > safetyStops ? " · 赤で急停止 +2秒" : ""}`;
+    if (!game.traffic || game.traffic.violations === violations) {
+      $("#notice").classList.remove("companion");
+      $("#notice").textContent =
+        `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒`;
+    }
   }
   $("#notice").classList.toggle(
     "active",
@@ -981,20 +968,23 @@ function frame(now) {
     records[game.stage] = {
       time: game.elapsed,
       hits: game.hits,
-      safetyStops: game.traffic?.safetyStops || 0,
+      violations: game.traffic?.violations || 0,
     };
     const totals = resultTotals(records);
-    const cleanStage = game.hits === 0 && !game.traffic?.safetyStops;
+    const cleanStage = game.hits === 0 && !game.traffic?.violations;
     $("#share-actions").hidden = game.stage !== 4;
     if (game.stage < 4)
       $("#next-purpose").textContent =
-        `次の目的：${SCENES[game.stage + 1].intro}`;
+        `次の目的：${SCENES[game.stage + 1].intro}` +
+        ([0, 2].includes(game.stage)
+          ? " 赤は両押しで待とう。赤で横断開始は信号無視 +2秒。"
+          : "");
     $("#next-purpose").hidden = game.stage === 4;
     panel(
       game.stage === 4 ? "仲間全員、ライブ最前列へ！" : game.scene.arrival,
       game.stage === 4
-        ? `全5区間を完走。合計 ${totals.time.toFixed(1)}秒 / 接触 ${totals.hits}回 / 急停止 ${totals.safetyStops}回。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
-        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。タイム ${game.elapsed.toFixed(1)}秒（加算を含む） / 接触 ${game.hits}回${game.traffic ? ` / 急停止 ${game.traffic.safetyStops}回` : ""}。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
+        ? `全5区間を完走。合計 ${totals.time.toFixed(1)}秒 / 接触 ${totals.hits}回 / 信号無視 ${totals.violations}回。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
+        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。タイム ${game.elapsed.toFixed(1)}秒（加算を含む） / 接触 ${game.hits}回${game.traffic ? ` / 信号無視 ${game.traffic.violations}回` : ""}。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
       game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );

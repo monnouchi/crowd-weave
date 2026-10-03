@@ -9,6 +9,7 @@ export const PUBLIC_FILES = Object.freeze([
   "style.css",
   "game.js",
   "crowd.js",
+  "character.js",
   "input.js",
   "logic.js",
   "branding.js",

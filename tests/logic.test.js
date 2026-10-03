@@ -199,7 +199,7 @@ test("all stages have a verified clean route, including the full-party signal wi
       step(careless, 0.025, {});
     assert.equal(careless.phase, "finished");
     if (g.traffic) {
-      assert.equal(g.traffic.safetyStops, 0);
+      assert.equal(g.traffic.violations, 0);
       assert.ok(g.elapsed < 30, "safe waiting has a bounded completion time");
     } else
       assert.ok(

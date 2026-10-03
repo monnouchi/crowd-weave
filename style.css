@@ -169,6 +169,12 @@ footer > div {
 #notice.active {
   visibility: visible;
 }
+#notice.companion {
+  border: 1px solid #567777;
+  border-radius: 12px 12px 12px 2px;
+  color: #193b3c;
+  background: #fffdf5;
+}
 @media (max-width: 420px) {
   main {
     width: calc(100% - 20px);
@@ -214,6 +220,21 @@ footer > div {
 .steering button.held {
   background: #e6b25d;
   color: #193b3c;
+}
+/* Hold controls and the live game surface do not participate in selection.
+   Instructions, dialogs and sharing text retain normal browser behavior. */
+#game,
+.steering,
+#brake,
+#goal-callout,
+.stats,
+.party-strip,
+#notice,
+#traffic-status {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 .steering span {
   font-size: 10px;
@@ -380,25 +401,58 @@ canvas:focus-visible {
 }
 
 #traffic-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 9px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   font-weight: 700;
   margin: 6px 0;
-  color: #793e30;
-  background: #f8e1d5;
+  color: #802033;
+  background: #ffe7ec;
+  border: 2px solid #a72b40;
+}
+#traffic-status::before {
+  content: "";
+  flex: 0 0 52px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px #0d1c25;
+  background:
+    radial-gradient(circle at 13px 13px, #ff4356 9px, transparent 9.5px),
+    radial-gradient(circle at 39px 13px, #26333d 9px, transparent 9.5px),
+    #0d1c25;
 }
 #traffic-status[hidden] {
   display: none;
 }
 #traffic-status.green {
-  color: #1b5547;
-  background: #d8ead7;
+  color: #075343;
+  background: #d4fff0;
+  border-color: #08775d;
+}
+#traffic-status.green::before,
+#traffic-status.warning::before {
+  background:
+    radial-gradient(circle at 13px 13px, #26333d 9px, transparent 9.5px),
+    radial-gradient(circle at 39px 13px, #2df4b7 9px, transparent 9.5px),
+    #0d1c25;
 }
 #traffic-status.warning {
   color: #78531a;
   background: #f5e6bd;
+  border-color: #85611d;
+}
+@media (max-width: 849px) and (min-height: 501px) {
+  .with-traffic #game {
+    max-height: min(
+      52svh,
+      calc(100svh - 380px - env(safe-area-inset-bottom, 0px))
+    );
+  }
 }
 @media (min-width: 850px) {
   .stage {
@@ -436,7 +490,7 @@ canvas:focus-visible {
   }
   #traffic-status {
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: 14px;
     margin: 4px 0;
   }
   canvas {

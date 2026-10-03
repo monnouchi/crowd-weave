@@ -347,6 +347,32 @@ export function makeCrowd(
         aim(p);
       }
     }
+    if (environment === "venue" && traffic) {
+      p.weather = "rain";
+      const identity = p.group
+        ? [...p.group].reduce((n, char) => n + char.charCodeAt(0), 0)
+        : id;
+      p.umbrella = identity % 3 !== 0;
+      if (!p.umbrella) {
+        if (!p.group || !crowd.some((q) => q.group === p.group)) p.pace *= 1.12;
+        p.weatherRole = "傘がなく、入口へ急ぐ";
+        if (!p.group && p.habit === "direct" && p.flow !== "crossing") {
+          // A short shelter stop precedes the original destination. Existing
+          // readers, families, queues and visitor groups keep their routes.
+          const southSide = p.y > traffic.bottom;
+          p.route.unshift({
+            x: southSide ? 65 : 415,
+            y: southSide ? 520 : 175,
+          });
+          p.habit = "shelter";
+          p.pauseDuration = 2.5;
+          p.weatherRole = "傘がなく、近い軒下へ急ぐ";
+          aim(p);
+        }
+      } else p.weatherRole = "傘を差して目的地へ歩く";
+      p.vx = p.state === "walking" ? p.ux * p.pace : 0;
+      p.vy = p.state === "walking" ? p.uy * p.pace : 0;
+    }
     crowd.push(p);
   }
   return crowd;
@@ -413,7 +439,9 @@ export function moveCrowd(crowd, dt, traffic = null) {
     const blend = 1 - Math.exp(-dt * (p.acceleration || 5));
     if (trafficBlocks(p, vy, traffic, dt)) {
       p.trafficWait = true;
-      return { vx: 0, vy: 0, ux, uy, locked: true };
+      // A red light stops forward motion, but people can still settle sideways
+      // into their flow's queue. Freezing both axes made a wall across the path.
+      return { vx: p.vx + (vx - p.vx) * blend, vy: 0, ux, uy };
     }
     p.trafficWait = false;
     return {
@@ -443,7 +471,7 @@ export function moveCrowd(crowd, dt, traffic = null) {
           relative =
             ((a?.vx || 0) - (b?.vx || 0)) * nx +
             ((a?.vy || 0) - (b?.vy || 0)) * ny;
-        const minimum = (28 - d) / dt;
+        const minimum = ((traffic ? 32 : 28) - d) / dt;
         if (relative >= minimum) continue;
         const correction = (minimum - relative) / (a && b ? 2 : 1);
         if (a) {

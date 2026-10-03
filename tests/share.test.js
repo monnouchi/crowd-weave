@@ -18,14 +18,14 @@ test("clean journey honors every friend and signal stop, without making contact 
   const records = Array.from({ length: 5 }, () => ({
     time: 10,
     hits: 0,
-    safetyStops: 0,
+    violations: 0,
   }));
   assert.equal(resultTotals(records).clean, true);
-  records[3].safetyStops = 1;
+  records[3].violations = 1;
   assert.equal(resultTotals(records).clean, false);
-  assert.match(resultText(records), /急停止1回/);
+  assert.match(resultText(records), /信号無視1回/);
   assert.match(resultText(records), /みんなで最前列/);
-  records[3].safetyStops = 0;
+  records[3].violations = 0;
   records[2].hits = 1;
   assert.equal(resultTotals(records).clean, false);
   assert.equal(resultTotals(records.slice(0, 4)).clean, false);
