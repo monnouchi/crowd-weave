@@ -91,7 +91,7 @@
         ></canvas>
         <div
           id="overlay"
-          class="overlay"
+          class="overlay initial"
           role="dialog"
           aria-labelledby="title"
           aria-describedby="message enter-hint"
@@ -101,19 +101,21 @@
             <h2 id="title">人の流れに、<br />すきまを見つけよう。</h2>
             <p id="next-purpose" hidden></p>
             <p id="message">
-              家をひとりで出発。合流した仲間全員を、ライブ最前列へ連れていこう。<br />自動で前へ。左右ボタンでよけ、両方でブレーキ。仲間は歩いた道をついてきます。接触は+2秒。まずは完走、慣れたら全員で接触ゼロに挑戦！
+              仲間全員をライブ最前列へ！<br />自動で前進、左右でよけ、両押しで停止。仲間は同じ道を歩き、誰かが接触すると＋2秒。慣れたら全員で接触ゼロに挑戦。
             </p>
-            <button id="action" aria-describedby="enter-hint">
-              音なしで開始 →
-            </button>
+            <div class="start-actions">
+              <button id="action" aria-describedby="enter-hint">
+                音なしで開始
+              </button>
+              <button id="start-sound" class="secondary">音ありで開始</button>
+            </div>
             <div id="share-actions" hidden>
               <button id="share" class="secondary">結果画像を共有・保存</button
               ><button id="copy-result" class="secondary">文章コピー</button>
               <p id="share-status" role="status"></p>
             </div>
-            <button id="start-sound" class="secondary">音ありで開始 →</button>
             <p id="enter-hint" class="enter-hint">
-              Enter：音なしで開始 · Tabで音ありを選べます
+              Enter：音なし開始 · Tabで音あり
             </p>
           </div>
         </div>

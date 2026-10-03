@@ -153,7 +153,20 @@ test("outdoor alternate seeds allow all-member zero-contact zero-emergency arriv
       const g = createGame(stage, seed);
       g.phase = "playing";
       for (const a of route.path)
-        for (let k = 0; k < 4; k++) step(g, 0.025, routeInput(a));
+        for (let k = 0; k < 4; k++) {
+          step(g, 0.025, routeInput(a));
+          const v = g.traffic.vehicle;
+          if (v.active && v.entered)
+            for (const p of [
+              g.player,
+              ...g.party.members,
+              ...g.crowd.filter((p) => p.active),
+            ])
+              assert.ok(
+                !overlap(v, p),
+                "moving party and all pedestrians remain safe",
+              );
+        }
       assert.equal(g.phase, "finished");
       assert.equal(g.hits, 0);
       assert.equal(g.traffic.safetyStops, 0);

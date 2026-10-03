@@ -12,6 +12,7 @@ export const PUBLIC_FILES = Object.freeze([
   "input.js",
   "logic.js",
   "branding.js",
+  "art.js",
   "pose.js",
   "party.js",
   "sound.js",

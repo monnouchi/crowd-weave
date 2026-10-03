@@ -145,8 +145,22 @@ export class GameAudio {
     if (c.currentTime >= this.nextNote) {
       const music = MUSIC[stage] || MUSIC[0],
         note = this.note++;
-      if (stage === 4 && note % 4 === 0)
-        this.tone(music.root / 2, 0.24, 0.006, 0, "sine");
+      // Each companion brings a quiet original part into the shared motif.
+      if (stage >= 1 && note % 4 === 0)
+        this.tone(music.root / 2, 0.35, 0.004, 0, "sine");
+      if (stage >= 2 && note % 2 === 1)
+        this.tone(
+          music.notes[(note + 2) % 8] / 2,
+          0.13,
+          0.003,
+          0.06,
+          "triangle",
+        );
+      if (stage >= 3 && note % 4 === 2) {
+        this.tone(music.root * 2 ** (4 / 12), 0.4, 0.0015, 0, "sine");
+        this.tone(music.root * 2 ** (7 / 12), 0.4, 0.0015, 0, "sine");
+      }
+      if (stage >= 4) this.tone(music.root / 4, 0.07, 0.002, 0, "sine");
       this.tone(
         music.notes[note % music.notes.length],
         music.duration,

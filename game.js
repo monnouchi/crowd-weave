@@ -1,3 +1,4 @@
+import { floorDetails, concert } from "./art.js";
 import { TiltState, tiltPermission } from "./tilt.js";
 import { shareResult, resultText, resultTotals } from "./share.js";
 import { GameAudio } from "./sound.js";
@@ -12,6 +13,22 @@ const canvas = document.querySelector("canvas"),
   overlay = document.querySelector("#overlay"),
   action = document.querySelector("#action"),
   pause = document.querySelector("#pause");
+let renderRatio = 1;
+function resizeDrawingSurface() {
+  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  if (
+    ratio === renderRatio &&
+    canvas.width === Math.round(W * ratio) &&
+    canvas.height === Math.round(H * ratio)
+  )
+    return;
+  renderRatio = ratio;
+  canvas.width = Math.round(W * ratio);
+  canvas.height = Math.round(H * ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+resizeDrawingSurface();
+window.addEventListener("resize", resizeDrawingSurface);
 let game = createGame(),
   last = performance.now(),
   buttons = new TwoButtons(),
@@ -42,6 +59,12 @@ function clearInput() {
 }
 function panel(title, message, button, label = "CROWD WEAVE") {
   overlay.hidden = false;
+  overlay.classList.toggle("paused", game.phase === "paused");
+  overlay.classList.remove("initial");
+  overlay.classList.toggle(
+    "finale",
+    game.phase === "finished" && game.stage === 4,
+  );
   $("#title").textContent = title;
   $("#message").textContent = message;
   action.textContent = button;
@@ -73,6 +96,7 @@ function start(stage = 0) {
   $("#stage").textContent = `STAGE ${stage + 1} / 5 · ${STAGES[stage].name}`;
   game.phase = "playing";
   overlay.hidden = true;
+  overlay.classList.remove("finale", "initial", "paused");
   pause.disabled = false;
   last = performance.now();
   $("#notice").textContent = "";
@@ -199,6 +223,9 @@ function chooseMode(mode, message) {
   $("#mode-tilt").setAttribute("aria-pressed", String(mode === "tilt"));
   $("#tilt-controls").hidden = mode !== "tilt";
   $("#tilt-status").textContent = message;
+  if (game.phase === "paused")
+    $("#message").textContent =
+      message + " 時計は止まっています。準備ができたら再開してください。";
 }
 $("#mode-buttons").addEventListener("click", () => {
   tiltRequest++;
@@ -288,7 +315,7 @@ function person(p, player = false) {
     ? 0
     : player
       ? moving
-        ? Math.sin(game.elapsed * 12) * 2
+        ? Math.sin(game.worldTime * 12) * 2
         : 0
       : p.reaction || !["walking", "following", "docking"].includes(p.state)
         ? 0
@@ -322,6 +349,11 @@ function person(p, player = false) {
         : ["#ce866b", "#758e79", "#b1a075", "#8c87a2"][p.color],
   );
   ctx.fillStyle = player ? "#ffdf9e" : "#f4cfab";
+  for (const x of [-p.r - 1, p.r + 1]) {
+    ctx.beginPath();
+    ctx.arc(x, 4 + (x < 0 ? stride : -stride), 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.beginPath();
   ctx.arc(0, -7, 8, 0, Math.PI * 2);
   ctx.fill();
@@ -329,6 +361,15 @@ function person(p, player = false) {
   ctx.beginPath();
   ctx.arc(0, -10, 7, Math.PI, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = "#54645b";
+  ctx.fillRect(-4, -6, 2, 1.5);
+  ctx.fillRect(2, -6, 2, 1.5);
+  ctx.strokeStyle = "#fff6dc60";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-6, 2);
+  ctx.quadraticCurveTo(0, 5, 6, 2);
+  ctx.stroke();
   if (p.reaction) {
     ctx.strokeStyle = "#85432c";
     ctx.lineWidth = 2;
@@ -460,7 +501,13 @@ function destination(scene) {
     ctx.fillStyle = "#b5a6c9";
     ctx.fillText("♪", 225, -96);
     ctx.font = "10px system-ui";
-    ctx.fillText("ステージ / 前方エリア", 240, -25);
+    if (game.phase !== "finished")
+      ctx.fillText("ステージ / 前方エリア", 240, -25);
+    concert(ctx, {
+      time: game.worldTime,
+      reducedMotion: reducedMotion.matches,
+      complete: game.phase === "finished",
+    });
   }
 }
 function drawTraffic() {
@@ -550,7 +597,8 @@ function draw() {
   ctx.fillStyle = "#d4dfcf";
   ctx.fillRect(0, 0, W, H);
   ctx.save();
-  ctx.translate(240 - game.player.x, CAMERA_Y - game.player.y);
+  const finale = game.stage === 4 && game.phase === "finished";
+  ctx.translate(240 - game.player.x, (finale ? 320 : CAMERA_Y) - game.player.y);
   ctx.fillStyle = game.scene.floor;
   ctx.fillRect(0, -800, W, H + 1000);
   ctx.fillStyle = "#d4dfcf";
@@ -563,6 +611,7 @@ function draw() {
     ctx.lineTo(W - 20, y);
     ctx.stroke();
   }
+  floorDetails(ctx, game.scene);
   rounded(18, -500, 444, 55, 8, "#cbd7ca");
   ctx.fillStyle = "#285d55";
   ctx.font = "bold 16px system-ui";
@@ -596,23 +645,25 @@ function draw() {
     });
   }
   destination(game.scene);
-  rounded(GOAL.x, GOAL.y, GOAL.w, GOAL.h, 12, "#dbe7d4");
-  rounded(GOAL.x, 5, GOAL.w, 22, 8, "#285d55");
-  ctx.fillStyle = "#fff5d8";
-  ctx.textAlign = "center";
-  ctx.font = "bold 13px system-ui";
-  ctx.fillText(game.scene.place, 240, 21);
-  ctx.font = "10px system-ui";
-  ctx.fillStyle = "#55796c";
-  ctx.fillText(
-    game.scene.targetKind === "clerk" ? "GOAL / 忘れ物受取" : "GOAL / 合流",
-    240,
-    82,
-  );
-  ctx.fillStyle = "#55796c";
-  ctx.font = "bold 12px system-ui";
-  ctx.textAlign = "center";
-  ctx.fillText(`${game.scene.place} ↑`, 240, 108);
+  if (!finale) {
+    rounded(GOAL.x, GOAL.y, GOAL.w, GOAL.h, 12, "#dbe7d4");
+    rounded(GOAL.x, 5, GOAL.w, 22, 8, "#285d55");
+    ctx.fillStyle = "#fff5d8";
+    ctx.textAlign = "center";
+    ctx.font = "bold 13px system-ui";
+    ctx.fillText(game.scene.place, 240, 21);
+    ctx.font = "10px system-ui";
+    ctx.fillStyle = "#55796c";
+    ctx.fillText(
+      game.scene.targetKind === "clerk" ? "GOAL / 忘れ物受取" : "GOAL / 合流",
+      240,
+      82,
+    );
+    ctx.fillStyle = "#55796c";
+    ctx.font = "bold 12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(`${game.scene.place} ↑`, 240, 108);
+  }
   if (game.scene.environment === "cafe") {
     rounded(44, 178, 38, 5, 2, "#839781");
     rounded(398, 178, 38, 5, 2, "#839781");
@@ -682,9 +733,12 @@ function draw() {
   rounded(96, 474, 28, 12, 3, "#d6b579");
   ctx.font = "8px system-ui";
   ctx.fillText(
-    game.scene.environment === "station" || game.scene.environment === "cafe"
-      ? "駅の絵"
-      : "公演ポスター",
+    game.scene.environment === "residential"
+      ? "街のお知らせ"
+      : game.scene.environment === "station" ||
+          game.scene.environment === "cafe"
+        ? "駅の絵"
+        : "公演ポスター",
     110,
     482,
   );
@@ -711,7 +765,30 @@ function draw() {
   ctx.font = "11px system-ui";
   ctx.fillText("START", 240, 662);
   drawTraffic();
-  if (game.party.members.length) {
+  const displayMembers = finale
+    ? game.party.members.map((m, i) => ({
+        ...m,
+        x: 180 + i * 40,
+        y: -43,
+        state: "celebrating",
+        flash: 0,
+        docking: false,
+      }))
+    : game.party.members;
+  const displayPartner = finale
+    ? {
+        ...game.meetingPartner,
+        x: 340,
+        y: -43,
+        ux: 0,
+        uy: -1,
+        state: "celebrating",
+      }
+    : game.meetingPartner;
+  const displayPlayer = finale
+    ? { ...game.player, x: 140, y: -43, player: true }
+    : { ...game.player, player: true };
+  if (game.party.members.length && !finale) {
     ctx.save();
     ctx.strokeStyle = "#477f775c";
     ctx.lineWidth = 2;
@@ -726,19 +803,19 @@ function draw() {
   }
   for (const p of [
     ...game.crowd.filter(visiblePerson),
-    ...game.party.members,
-    game.meetingPartner,
-    { ...game.player, player: true },
+    ...displayMembers,
+    displayPartner,
+    displayPlayer,
   ].sort((a, b) => a.y - b.y))
     person(p, p.player);
-  if (game.cooldown > 0 && game.lastContactMember === 0) {
+  if (!finale && game.cooldown > 0 && game.lastContactMember === 0) {
     ctx.strokeStyle = "#d37a46";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(game.player.x, game.player.y, 22, 0, Math.PI * 2);
     ctx.stroke();
   }
-  for (const m of game.party.members) {
+  for (const m of displayMembers) {
     ctx.save();
     ctx.fillStyle = m.flash > 0 ? "#b65b39" : "#245c56";
     ctx.beginPath();
@@ -858,12 +935,12 @@ function frame(now) {
     signal.textContent = t.reserved
       ? "↑ 横断中 · 仲間全員が渡るまで車は待ちます"
       : t.canEnter
-        ? `↑ 青 · 全員で渡れます（残り${Math.ceil(t.remaining)}秒）`
+        ? `↑ 青 · 全員で渡れます（残り${t.remaining.toFixed(1)}秒）`
         : t.warning
           ? "■ もうすぐ赤 · 次の青まで待とう"
           : t.nominalGreen
             ? "■ 車の通過待ち · 両押しで待とう"
-            : `■ 赤 · 両押しで待とう（青まで${Math.ceil(t.remaining)}秒）`;
+            : `■ 赤 · 両押しで待とう（青まで${t.remaining.toFixed(1)}秒）`;
     if (t.safetyStops > safetyStops) {
       noticeUntil = now + 1800;
       $("#notice").textContent = "赤信号で急停止！ +2秒 · 両押しで待とう";
@@ -874,7 +951,7 @@ function frame(now) {
     audio.effect("contact");
     noticeUntil = now + 950;
     $("#notice").textContent =
-      `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒`;
+      `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒${game.traffic && game.traffic.safetyStops > safetyStops ? " · 赤で急停止 +2秒" : ""}`;
   }
   $("#notice").classList.toggle(
     "active",

@@ -18,6 +18,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const expected = [
   ".nojekyll",
   "LICENSE",
+  "art.js",
   "branding.js",
   "crowd.js",
   "game.js",
@@ -102,6 +103,7 @@ test("Browser asset references stay within a GitHub Pages project base path", as
     "crowd.js",
     "input.js",
     "branding.js",
+    "art.js",
   ]) {
     const code = await readFile(join(root, file), "utf8");
     for (const m of code.matchAll(/from\s+"([^"]+)"/g)) refs.push(m[1]);

@@ -1,0 +1,164 @@
+// Original Canvas scenery. Decorations never alter a path, collider or signal.
+function box(c, x, y, w, h, r, color) {
+  c.fillStyle = color;
+  c.beginPath();
+  c.roundRect(x, y, w, h, r);
+  c.fill();
+}
+export function floorDetails(c, scene) {
+  const outdoor =
+    scene.landmark === "home" ||
+    scene.landmark === "station" ||
+    scene.landmark === "venue";
+  c.save();
+  if (outdoor) {
+    c.strokeStyle = "#c8d2c244";
+    c.lineWidth = 1;
+    for (let y = -280; y < 790; y += 80) {
+      c.beginPath();
+      for (let x = 32; x < 470; x += 80) {
+        c.moveTo(x, y);
+        c.lineTo(x, y + 40);
+      }
+      c.stroke();
+    }
+    for (const x of [7, 473])
+      for (const y of [150, 250, 455, 570]) {
+        c.fillStyle = "#254e3930";
+        c.beginPath();
+        c.ellipse(x + 3, y + 10, 17, 13, 0, 0, Math.PI * 2);
+        c.fill();
+        for (const [dx, dy, r] of [
+          [0, 0, 12],
+          [-6, 3, 9],
+          [6, 2, 9],
+        ]) {
+          c.fillStyle = scene.landmark === "home" ? "#8faa79" : "#789a7b";
+          c.beginPath();
+          c.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+          c.fill();
+        }
+        c.fillStyle = "#d8dabc";
+        c.beginPath();
+        c.arc(x - 4, y - 4, 2, 0, Math.PI * 2);
+        c.fill();
+      }
+  } else if (scene.landmark === "cafe") {
+    c.strokeStyle = "#c6c2a72b";
+    for (let x = 18; x < 465; x += 32) {
+      c.beginPath();
+      c.moveTo(x, 115);
+      c.lineTo(x, 680);
+      c.stroke();
+    }
+    for (const x of [57, 423]) {
+      box(c, x - 20, 124, 40, 28, 6, "#d0b78e");
+      box(c, x - 13, 120, 26, 8, 3, "#9c8268");
+      c.fillStyle = "#f6f1dc";
+      c.beginPath();
+      c.arc(x, 137, 5, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#f6f1dc";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(x + 5, 137, 3, -Math.PI / 2, Math.PI / 2);
+      c.stroke();
+    }
+  } else {
+    c.fillStyle = "#b49cc011";
+    for (let y = 140; y < 680; y += 55) c.fillRect(18, y, 444, 2);
+    for (const x of [28, 452])
+      for (const y of [160, 250, 450, 560]) {
+        box(c, x - 7, y - 12, 14, 24, 4, "#4f4866");
+        box(c, x - 4, y - 7, 8, 14, 3, "#80718d");
+        c.fillStyle = "#dfbe7b";
+        c.beginPath();
+        c.arc(x, y + 8, 2, 0, Math.PI * 2);
+        c.fill();
+      }
+  }
+  c.restore();
+}
+function musician(c, x, y, color, instrument) {
+  c.save();
+  c.translate(x, y);
+  c.fillStyle = "#17182b30";
+  c.beginPath();
+  c.ellipse(2, 14, 17, 8, 0, 0, Math.PI * 2);
+  c.fill();
+  box(c, -7, 12, 5, 11, 2, "#252d42");
+  box(c, 2, 12, 5, 11, 2, "#252d42");
+  box(c, -11, -6, 22, 25, 8, color);
+  c.fillStyle = "#edc6a4";
+  c.beginPath();
+  c.arc(0, -9, 8, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = "#403d50";
+  c.beginPath();
+  c.arc(0, -11, 7, Math.PI, Math.PI * 2);
+  c.fill();
+  if (instrument === "guitar") {
+    c.save();
+    c.rotate(-0.35);
+    box(c, -14, 3, 18, 16, 7, "#d7b079");
+    box(c, 0, 7, 22, 5, 2, "#aa8059");
+    c.fillStyle = "#735547";
+    c.beginPath();
+    c.arc(-5, 11, 3, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  } else if (instrument === "keys") {
+    box(c, -24, 3, 48, 15, 3, "#3c4158");
+    box(c, -21, 7, 42, 8, 1, "#ebe7d6");
+    c.fillStyle = "#343447";
+    for (let x = -15; x < 21; x += 7) c.fillRect(x, 7, 3, 5);
+  } else {
+    c.strokeStyle = "#cfc5cc";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(10, 1);
+    c.lineTo(10, 23);
+    c.moveTo(4, 23);
+    c.lineTo(17, 23);
+    c.stroke();
+    box(c, 6, -4, 8, 6, 3, "#333448");
+  }
+  c.restore();
+}
+export function concert(
+  c,
+  { time = 0, reducedMotion = false, complete = false } = {},
+) {
+  c.save();
+  // Slow, low-opacity beams stay entirely in the decorative stage area.
+  for (const [x, color, offset] of [
+    [135, "#e6c77d", 0],
+    [240, "#c9a3d8", 1],
+    [345, "#87bcb3", 2],
+  ]) {
+    const drift = reducedMotion ? 0 : Math.sin(time * 0.28 + offset) * 13;
+    c.fillStyle = color + "24";
+    c.beginPath();
+    c.moveTo(x, -173);
+    c.lineTo(x - 38 + drift, -54);
+    c.lineTo(x + 38 + drift, -54);
+    c.closePath();
+    c.fill();
+  }
+  musician(c, 155, -112, "#c79770", "guitar");
+  musician(c, 240, -120, "#9ba6b7", "voice");
+  musician(c, 325, -112, "#a788ac", "keys");
+  c.strokeStyle = "#2c2b45";
+  c.lineWidth = 3;
+  c.beginPath();
+  c.moveTo(106, -45);
+  c.lineTo(374, -45);
+  c.stroke();
+  if (complete) {
+    c.fillStyle = "#f1d3a0";
+    c.font = "bold 10px system-ui";
+    c.textAlign = "center";
+    c.fillText("一緒に、いい夜を。", 240, -66);
+  }
+  c.restore();
+}

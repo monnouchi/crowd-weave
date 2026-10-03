@@ -54,7 +54,9 @@ test("five stage music patterns have distinct rhythm or tone and quiet headroom"
     assert.equal(f.voices.at(-1).frequency.value, MUSIC[stage].notes[0]);
     assert.equal(a.nextNote, MUSIC[stage].beat);
   }
-  assert.ok(f.voices.slice(0, -2).every((v) => v.stops >= 2));
+  assert.ok(
+    f.voices.filter((v) => !a.voices.has(v)).every((v) => v.stops >= 2),
+  );
 });
 test("one cue per result; final fanfare is longer and richer; retry cancels queued voices", () => {
   const a = new GameAudio(),
@@ -96,4 +98,25 @@ test("fresh game audio is silent before a start choice", () => {
   a.goal(0, {});
   assert.equal(a.muted, true);
   assert.equal(f.voices.length, 0);
+});
+
+test("each joined companion adds a bounded quiet musical part and mute cancels all", () => {
+  const counts = [];
+  for (let stage = 0; stage < 5; stage++) {
+    const a = new GameAudio(),
+      f = fakeContext();
+    a.context = f.context;
+    a.muted = false;
+    for (let n = 0; n < 8; n++) {
+      f.context.currentTime = a.nextNote + 0.001;
+      a.update(true, false, stage);
+    }
+    counts.push(f.voices.length);
+    a.toggle();
+    assert.ok(f.voices.every((v) => v.stops >= 2));
+    const before = f.voices.length;
+    a.update(true, false, stage);
+    assert.equal(f.voices.length, before);
+  }
+  assert.deepEqual(counts, [8, 10, 14, 18, 26]);
 });
