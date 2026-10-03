@@ -1,0 +1,12 @@
+{
+  "name": "zatto-toppa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 4175 --bind 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "build:pages": "node scripts/build-pages.js"
+  },
+  "license": "MIT",
+  "description": "雑踏突破 — 駅の人流をよけて待ち合わせ相手のもとへ向かうゲーム"
+}

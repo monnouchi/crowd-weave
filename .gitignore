@@ -1,0 +1,10 @@
+node_modules/
+output/
+.playwright-cli/
+.DS_Store
+_site/
+validation/browser-*.js
+.env
+.env.*
+*.pem
+*.key
