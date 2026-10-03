@@ -378,3 +378,78 @@ canvas:focus-visible {
     margin: 0;
   }
 }
+
+#traffic-status {
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 700;
+  margin: 6px 0;
+  color: #793e30;
+  background: #f8e1d5;
+}
+#traffic-status[hidden] {
+  display: none;
+}
+#traffic-status.green {
+  color: #1b5547;
+  background: #d8ead7;
+}
+#traffic-status.warning {
+  color: #78531a;
+  background: #f5e6bd;
+}
+@media (min-width: 850px) {
+  .stage {
+    grid-row: 1 / span 9;
+  }
+  #traffic-status {
+    margin: 0;
+  }
+}
+
+@media (max-width: 849px) {
+  main {
+    margin: 8px auto;
+  }
+  h1 {
+    margin: 3px 0 9px;
+    font-size: 25px;
+  }
+  h1 span {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .stats {
+    padding: 9px 14px;
+  }
+  .stats strong {
+    font-size: 23px;
+  }
+  .party-strip {
+    padding: 6px 14px;
+  }
+  #notice {
+    min-height: 22px;
+    padding: 2px 10px;
+  }
+  #traffic-status {
+    padding: 6px 10px;
+    font-size: 12px;
+    margin: 4px 0;
+  }
+  canvas {
+    max-height: min(
+      52svh,
+      calc(100svh - 328px - env(safe-area-inset-bottom, 0px))
+    );
+  }
+  .steering {
+    margin: 8px 0;
+  }
+  .steering button {
+    padding: 15px 10px;
+    min-height: 54px;
+  }
+}

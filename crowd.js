@@ -1,3 +1,4 @@
+import { trafficWaypoint, trafficBlocks } from "./traffic.js";
 // Seeded destination-driven station walkers. No random decisions during a frame.
 export function random(seed) {
   let value = seed >>> 0;
@@ -87,8 +88,16 @@ function aim(p) {
   p.ux = dx / d;
   p.uy = dy / d;
 }
-export function makeCrowd(count, speed, seed, environment = "station") {
+export function makeCrowd(
+  count,
+  speed,
+  seed,
+  environment = "station",
+  traffic = null,
+) {
   const profile = FLOW_PROFILES[environment] || FLOW_PROFILES.station;
+  const queueY = traffic ? 175 : 370,
+    readerY = traffic ? 175 : 320;
   const rand = random(seed),
     crowd = [];
   for (let id = 0; id < count; id++) {
@@ -139,7 +148,7 @@ export function makeCrowd(count, speed, seed, environment = "station") {
       flow === "crossing"
         ? {
             x: eastbound ? -60 : 540,
-            y: (eastbound ? 230 : 430) + (rand() - 0.5) * 90,
+            y: (eastbound ? 230 : 430) + (rand() - 0.5) * (traffic ? 30 : 90),
           }
         : { x: lane, y: flow === "along" ? 760 : -80 };
     const b =
@@ -170,7 +179,7 @@ export function makeCrowd(count, speed, seed, environment = "station") {
                     : "direct";
     const stop =
       habit === "queuing"
-        ? { x: 415, y: 370 }
+        ? { x: 415, y: queueY }
         : habit === "direct"
           ? null
           : {
@@ -180,7 +189,7 @@ export function makeCrowd(count, speed, seed, environment = "station") {
                   ? environment === "cafe" || environment === "party"
                     ? 160
                     : 520
-                  : 320,
+                  : readerY,
             };
     const route = stop ? [stop, b] : [b];
     let x, y;
@@ -205,7 +214,7 @@ export function makeCrowd(count, speed, seed, environment = "station") {
       }
       if (habit === "queuing") {
         x = 415;
-        y = 370 + (id - 1) * 42;
+        y = queueY + (id - 1) * 42;
       }
       if (id === 16 || id === 17) {
         x = id === 17 ? 120 : 165;
@@ -217,7 +226,7 @@ export function makeCrowd(count, speed, seed, environment = "station") {
       }
       if (id === 7) {
         x = 65;
-        y = 320;
+        y = readerY;
       }
       const reserved =
         habit === "queuing" ||
@@ -225,11 +234,14 @@ export function makeCrowd(count, speed, seed, environment = "station") {
         id === 16 ||
         id === 17 ||
         (environment === "residential" && id === 2) ||
-        ([370, 412, 454].every((qy) => Math.hypot(x - 415, y - qy) > 38) &&
-          Math.hypot(x - 65, y - 320) > 38 &&
+        ([queueY, queueY + 42, queueY + 84].every(
+          (qy) => Math.hypot(x - 415, y - qy) > 38,
+        ) &&
+          Math.hypot(x - 65, y - readerY) > 38 &&
           Math.hypot(x - 120, y - 540) > 38 &&
           Math.hypot(x - 165, y - 540) > 38 &&
           (environment !== "residential" || Math.hypot(x - 65, y - 520) > 38));
+      if (traffic && y > traffic.top - 20 && y < traffic.bottom + 20) continue;
       if (reserved && crowd.every((p) => Math.hypot(p.x - x, p.y - y) > 38))
         break;
     }
@@ -352,10 +364,10 @@ export function reactToContact(p, player) {
   p.vx = 0;
   p.vy = 0;
 }
-export function moveCrowd(crowd, dt) {
+export function moveCrowd(crowd, dt, traffic = null) {
   const velocities = crowd.map((p) => {
     if (!p.active || p.state !== "walking" || p.reaction) return null;
-    const target = p.route[p.leg],
+    const target = trafficWaypoint(p, p.route[p.leg], traffic),
       dx = target.x - p.x,
       dy = target.y - p.y,
       d = Math.hypot(dx, dy) || 1;
@@ -399,6 +411,11 @@ export function moveCrowd(crowd, dt) {
     vx *= paceFactor;
     vy *= paceFactor;
     const blend = 1 - Math.exp(-dt * (p.acceleration || 5));
+    if (trafficBlocks(p, vy, traffic, dt)) {
+      p.trafficWait = true;
+      return { vx: 0, vy: 0, ux, uy, locked: true };
+    }
+    p.trafficWait = false;
     return {
       vx: p.vx + (vx - p.vx) * blend,
       vy: p.vy + (vy - p.vy) * blend,
@@ -418,8 +435,8 @@ export function moveCrowd(crowd, dt) {
           dy = p.y - q.y,
           d = Math.hypot(dx, dy);
         if (d >= 38 || d < 0.001) continue;
-        const a = velocities[i],
-          b = velocities[j];
+        const a = velocities[i]?.locked ? null : velocities[i],
+          b = velocities[j]?.locked ? null : velocities[j];
         if (!a && !b) continue;
         const nx = dx / d,
           ny = dy / d,
@@ -490,6 +507,10 @@ export function moveCrowd(crowd, dt) {
         aim(p);
       }
       return;
+    }
+    if (trafficBlocks(p, velocities[i].vy, traffic, dt)) {
+      velocities[i].vy = 0;
+      p.trafficWait = true;
     }
     Object.assign(p, velocities[i]);
     p.x += p.vx * dt;

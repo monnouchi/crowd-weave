@@ -78,6 +78,7 @@
         <strong id="party-count">自分 + 仲間0人</strong
         ><span id="party-roster">ひとりで出発</span>
       </div>
+      <div id="traffic-status" hidden aria-label="横断歩道の信号"></div>
       <div id="notice" role="status" aria-live="polite"></div>
       <div class="stage">
         <canvas
@@ -100,7 +101,7 @@
             <h2 id="title">人の流れに、<br />すきまを見つけよう。</h2>
             <p id="next-purpose" hidden></p>
             <p id="message">
-              家をひとりで出発。合流した仲間全員を、ライブ最前列へ連れていこう。<br />自動で前へ。左右ボタンでよけ、両方でブレーキ。仲間は歩いた道をついてきます。
+              家をひとりで出発。合流した仲間全員を、ライブ最前列へ連れていこう。<br />自動で前へ。左右ボタンでよけ、両方でブレーキ。仲間は歩いた道をついてきます。接触は+2秒。まずは完走、慣れたら全員で接触ゼロに挑戦！
             </p>
             <button id="action" aria-describedby="enter-hint">
               音なしで開始 →

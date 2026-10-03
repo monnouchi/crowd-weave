@@ -1,8 +1,20 @@
 export const GAME_URL = "https://monnouchi.github.io/crowd-weave/";
-export function resultText(records) {
+export function resultTotals(records) {
   const time = records.reduce((s, r) => s + r.time, 0),
-    hits = records.reduce((s, r) => s + r.hits, 0);
-  return `雑踏突破 / Crowd Weave\n全5ステージ ${time.toFixed(1)}秒・接触${hits}回\n${GAME_URL}`;
+    hits = records.reduce((s, r) => s + r.hits, 0),
+    safetyStops = records.reduce((s, r) => s + (r.safetyStops || 0), 0);
+  const clean = records.length === 5 && hits === 0 && safetyStops === 0;
+  return {
+    time,
+    hits,
+    safetyStops,
+    clean,
+    label: clean ? "すきまの名案内" : "みんなで最前列",
+  };
+}
+export function resultText(records) {
+  const r = resultTotals(records);
+  return `雑踏突破 / Crowd Weave\n全5ステージ ${r.time.toFixed(1)}秒・接触${r.hits}回\n急停止${r.safetyStops}回 · ${r.label}\n${GAME_URL}`;
 }
 export async function shareResult(records, scene) {
   const text = resultText(records),
@@ -23,6 +35,8 @@ export async function shareResult(records, scene) {
   const lines = text.split("\n");
   x.font = "20px system-ui";
   x.fillText(lines[1], 35, 250);
+  x.font = "18px system-ui";
+  x.fillText(lines[2], 35, 285);
   x.font = "17px system-ui";
   x.fillText(GAME_URL, 35, 490);
   x.fillText("人の流れに、すきまを見つけよう。", 35, 530);

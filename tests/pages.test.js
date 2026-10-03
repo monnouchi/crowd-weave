@@ -31,6 +31,7 @@ const expected = [
   "sound.js",
   "style.css",
   "tilt.js",
+  "traffic.js",
 ];
 async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), "crowd-pages-"));
@@ -97,6 +98,7 @@ test("Browser asset references stay within a GitHub Pages project base path", as
     "sound.js",
     "share.js",
     "tilt.js",
+    "traffic.js",
     "crowd.js",
     "input.js",
     "branding.js",

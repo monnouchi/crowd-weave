@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resultText, GAME_URL } from "../share.js";
+import { resultText, resultTotals, GAME_URL } from "../share.js";
 test("share result includes all five totals and canonical URL", () => {
   const text = resultText([
     { time: 10.2, hits: 1 },
@@ -12,4 +12,21 @@ test("share result includes all five totals and canonical URL", () => {
   assert.ok(text.includes("50.2秒・接触6回"));
   assert.ok(text.includes(GAME_URL));
   assert.ok(text.includes("Crowd Weave"));
+});
+
+test("clean journey honors every friend and signal stop, without making contact a failure", () => {
+  const records = Array.from({ length: 5 }, () => ({
+    time: 10,
+    hits: 0,
+    safetyStops: 0,
+  }));
+  assert.equal(resultTotals(records).clean, true);
+  records[3].safetyStops = 1;
+  assert.equal(resultTotals(records).clean, false);
+  assert.match(resultText(records), /急停止1回/);
+  assert.match(resultText(records), /みんなで最前列/);
+  records[3].safetyStops = 0;
+  records[2].hits = 1;
+  assert.equal(resultTotals(records).clean, false);
+  assert.equal(resultTotals(records.slice(0, 4)).clean, false);
 });

@@ -1,5 +1,5 @@
 import { TiltState, tiltPermission } from "./tilt.js";
-import { shareResult, resultText } from "./share.js";
+import { shareResult, resultText, resultTotals } from "./share.js";
 import { GameAudio } from "./sound.js";
 import { updatePlayerPose } from "./pose.js";
 import { GAME_NAME, PAGE_TITLE } from "./branding.js";
@@ -365,7 +365,7 @@ function person(p, player = false) {
     ctx.beginPath();
     ctx.arc(
       -15,
-      -3 + (reducedMotion.matches ? 0 : Math.sin(game.elapsed * 3) * 2),
+      -3 + (reducedMotion.matches ? 0 : Math.sin(game.worldTime * 3) * 2),
       4,
       0,
       Math.PI * 2,
@@ -463,6 +463,88 @@ function destination(scene) {
     ctx.fillText("ステージ / 前方エリア", 240, -25);
   }
 }
+function drawTraffic() {
+  const t = game.traffic;
+  if (!t) return;
+  ctx.fillStyle = "#66777a";
+  ctx.fillRect(0, t.top, W, t.bottom - t.top);
+  ctx.fillStyle = "#b7c3bc";
+  ctx.fillRect(0, t.top - 5, W, 5);
+  ctx.fillRect(0, t.bottom, W, 5);
+  ctx.fillStyle = "#e9eddf";
+  for (let y = t.top + 6; y < t.bottom - 3; y += 11)
+    ctx.fillRect(t.left, y, t.right - t.left, 7);
+  ctx.fillStyle = "#d7c483";
+  for (let x = 10; x < W; x += 40)
+    if (x < t.left - 25 || x > t.right + 5) ctx.fillRect(x, 331, 24, 2);
+  ctx.fillStyle = "#6c8777";
+  ctx.fillRect(t.left, t.bottom + 16, t.right - t.left, 2);
+  ctx.font = "bold 12px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("横断歩道 ↑", 240, t.bottom + 37);
+  for (const [x, y] of [
+    [136, t.bottom + 24],
+    [344, t.top - 24],
+  ]) {
+    rounded(x - 8, y - 15, 16, 29, 5, "#334e4e");
+    ctx.fillStyle = t.green || t.reserved ? "#b6ddbd" : "#f7b59e";
+    ctx.beginPath();
+    ctx.arc(x, y - 1, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f4efe2";
+    ctx.font = "bold 11px system-ui";
+    ctx.fillText(t.green || t.reserved ? "↑" : "■", x, y + 3);
+  }
+  const v = t.vehicle;
+  if (!v.active || v.x < -50 || v.x > 530) return;
+  ctx.save();
+  ctx.translate(v.x, v.y);
+  ctx.scale(v.direction, 1);
+  ctx.fillStyle = "#233e3b25";
+  ctx.beginPath();
+  ctx.ellipse(0, 8, v.width / 2 + 4, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (v.kind === "car") {
+    for (const x of [-18, 18]) {
+      rounded(x - 5, -18, 10, 8, 2, "#2f4346");
+      rounded(x - 5, 10, 10, 8, 2, "#2f4346");
+    }
+    rounded(-29, -15, 58, 30, 8, "#bf8763");
+    rounded(-12, -12, 27, 24, 5, "#e1c3a0");
+    rounded(8, -10, 6, 20, 2, "#b8d4ce");
+    rounded(-9, -10, 12, 20, 2, "#496e73");
+    rounded(25, -10, 4, 6, 2, "#fff3bc");
+    rounded(25, 4, 4, 6, 2, "#fff3bc");
+  } else {
+    ctx.strokeStyle = "#274e58";
+    ctx.lineWidth = 3;
+    for (const x of [-12, 12]) {
+      ctx.beginPath();
+      ctx.ellipse(x, 0, 5, 2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-12, 0);
+    ctx.lineTo(0, -3);
+    ctx.lineTo(12, 0);
+    ctx.stroke();
+    rounded(-6, -7, 13, 14, 5, "#8aab85");
+    ctx.fillStyle = "#e9b89a";
+    ctx.beginPath();
+    ctx.arc(5, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#486c71";
+    ctx.beginPath();
+    ctx.arc(7, 0, 5, -Math.PI / 2, Math.PI / 2);
+    ctx.fill();
+    ctx.strokeStyle = "#274e58";
+    ctx.beginPath();
+    ctx.moveTo(10, -8);
+    ctx.lineTo(10, 8);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function draw() {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = "#d4dfcf";
@@ -500,7 +582,7 @@ function draw() {
   rounded(350, -230, 90, 35, 5, "#839781");
   for (let i = 0; i < game.scene.backgroundCount; i++) {
     const y =
-      -100 - ((i * 63 + game.elapsed * (i % 2 ? 20 : -18) + 1200) % 350);
+      -100 - ((i * 63 + game.worldTime * (i % 2 ? 20 : -18) + 1200) % 350);
     person({
       x: 75 + i * 64,
       y,
@@ -509,7 +591,7 @@ function draw() {
       uy: i % 2 ? 1 : -1,
       color: i % 4,
       state: "walking",
-      walk: game.elapsed * (24 + i),
+      walk: game.worldTime * (24 + i),
       background: true,
     });
   }
@@ -581,20 +663,22 @@ function draw() {
     0,
   );
   ctx.restore();
-  rounded(397, 340, 40, 16, 4, "#67836f");
+  const facilityY = game.traffic ? 145 : 340,
+    boardY = game.traffic ? 153 : 298;
+  rounded(397, facilityY, 40, 16, 4, "#67836f");
   ctx.fillStyle = "#fff";
   ctx.font = "9px system-ui";
   ctx.fillText(
     game.scene.environment === "residential" ? "花壇" : "トイレ",
     417,
-    351,
+    facilityY + 11,
   );
   ctx.fillStyle = "#55796c";
-  rounded(43, 298, 40, 8, 3, "#67836f");
-  rounded(397, 298, 40, 8, 3, "#67836f");
+  rounded(43, boardY, 40, 8, 3, "#67836f");
+  if (!game.traffic) rounded(397, boardY, 40, 8, 3, "#67836f");
   ctx.font = "9px system-ui";
-  ctx.fillText("案内板", 63, 294);
-  ctx.fillText("案内板", 417, 294);
+  ctx.fillText("案内板", 63, boardY - 4);
+  if (!game.traffic) ctx.fillText("案内板", 417, boardY - 4);
   rounded(96, 474, 28, 12, 3, "#d6b579");
   ctx.font = "8px system-ui";
   ctx.fillText(
@@ -626,6 +710,7 @@ function draw() {
   ctx.fillStyle = "#759081";
   ctx.font = "11px system-ui";
   ctx.fillText("START", 240, 662);
+  drawTraffic();
   if (game.party.members.length) {
     ctx.save();
     ctx.strokeStyle = "#477f775c";
@@ -715,6 +800,7 @@ function frame(now) {
     );
   }
   const hits = game.hits;
+  const safetyStops = game.traffic?.safetyStops || 0;
   audio.update(
     game.phase === "playing",
     input().left && input().right,
@@ -763,6 +849,27 @@ function frame(now) {
               : steering.right
                 ? "右へよける →"
                 : "自動で前進 · 両押しで停止";
+  const signal = $("#traffic-status");
+  signal.hidden = !game.traffic;
+  if (game.traffic) {
+    const t = game.traffic;
+    signal.className =
+      t.reserved || t.canEnter ? "green" : t.warning ? "warning" : "red";
+    signal.textContent = t.reserved
+      ? "↑ 横断中 · 仲間全員が渡るまで車は待ちます"
+      : t.canEnter
+        ? `↑ 青 · 全員で渡れます（残り${Math.ceil(t.remaining)}秒）`
+        : t.warning
+          ? "■ もうすぐ赤 · 次の青まで待とう"
+          : t.nominalGreen
+            ? "■ 車の通過待ち · 両押しで待とう"
+            : `■ 赤 · 両押しで待とう（青まで${Math.ceil(t.remaining)}秒）`;
+    if (t.safetyStops > safetyStops) {
+      noticeUntil = now + 1800;
+      $("#notice").textContent = "赤信号で急停止！ +2秒 · 両押しで待とう";
+      audio.effect("contact");
+    }
+  }
   if (game.hits > hits) {
     audio.effect("contact");
     noticeUntil = now + 950;
@@ -794,15 +901,23 @@ function frame(now) {
     audio.goal(game.stage, game);
     clearInput();
     pause.disabled = true;
-    records[game.stage] = { time: game.elapsed, hits: game.hits };
+    records[game.stage] = {
+      time: game.elapsed,
+      hits: game.hits,
+      safetyStops: game.traffic?.safetyStops || 0,
+    };
+    const totals = resultTotals(records);
+    const cleanStage = game.hits === 0 && !game.traffic?.safetyStops;
     $("#share-actions").hidden = game.stage !== 4;
     if (game.stage < 4)
       $("#next-purpose").textContent =
         `次の目的：${SCENES[game.stage + 1].intro}`;
     $("#next-purpose").hidden = game.stage === 4;
     panel(
-      game.stage === 4 ? "全5ステージを踏破！" : game.scene.arrival,
-      `${game.stage === 4 ? "全員がステージ前に到着！ " : `友だち${game.stage + 1}と合流。仲間が${game.stage + 1}人になりました。 `}${game.stage === 4 ? `合計 ${records.reduce((s, r) => s + r.time, 0).toFixed(1)}秒 / 接触 ${records.reduce((s, r) => s + r.hits, 0)}回。最終ステージ：` : ""}タイム ${game.elapsed.toFixed(1)}秒（接触の加算を含む） / 接触 ${game.hits}回。${game.hits === 0 ? "見事な雑踏突破でした。" : "すきまを読むほど、早く到着できます。"}`,
+      game.stage === 4 ? "仲間全員、ライブ最前列へ！" : game.scene.arrival,
+      game.stage === 4
+        ? `全5区間を完走。合計 ${totals.time.toFixed(1)}秒 / 接触 ${totals.hits}回 / 急停止 ${totals.safetyStops}回。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
+        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。タイム ${game.elapsed.toFixed(1)}秒（加算を含む） / 接触 ${game.hits}回${game.traffic ? ` / 急停止 ${game.traffic.safetyStops}回` : ""}。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
       game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );

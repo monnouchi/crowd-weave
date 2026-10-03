@@ -185,7 +185,7 @@ test("route followers cross, stop for reasons, yield smoothly and re-enter off r
   assert.ok(Math.abs(same[0].vx) > 0);
   assert.ok(Math.abs(same[0].vy) < 40);
 });
-test("all stages have a verified zero-contact route; reading gaps beats colliding", () => {
+test("all stages have a verified clean route, including the full-party signal window", () => {
   for (let stage = 0; stage < 5; stage++) {
     const result = planRoute(stage);
     assert.ok(result, `stage ${stage + 1} route`);
@@ -198,12 +198,16 @@ test("all stages have a verified zero-contact route; reading gaps beats collidin
     for (let n = 0; n < 4000 && careless.phase === "playing"; n++)
       step(careless, 0.025, {});
     assert.equal(careless.phase, "finished");
-    assert.ok(
-      careless.hits
-        ? g.elapsed < careless.elapsed
-        : g.elapsed <= careless.elapsed + 0.001,
-      `stage ${stage + 1} ${g.elapsed} vs ${careless.elapsed}`,
-    );
+    if (g.traffic) {
+      assert.equal(g.traffic.safetyStops, 0);
+      assert.ok(g.elapsed < 30, "safe waiting has a bounded completion time");
+    } else
+      assert.ok(
+        careless.hits
+          ? g.elapsed < careless.elapsed
+          : g.elapsed <= careless.elapsed + 0.001,
+        `stage ${stage + 1} ${g.elapsed} vs ${careless.elapsed}`,
+      );
   }
 });
 test("alternate-seed busy stations retain fair routes", () => {

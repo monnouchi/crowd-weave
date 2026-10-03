@@ -1,3 +1,4 @@
+import { updateTraffic, crossingTime } from "../traffic.js";
 import { createGame } from "../logic.js";
 import { moveCrowd, visiblePerson } from "../crowd.js";
 import { moveParty, partyArrived } from "../party.js";
@@ -13,7 +14,7 @@ function safeTeam(head, party, people) {
     ),
   );
 }
-function gatherSafely(head, party, crowd) {
+function gatherSafely(head, party, crowd, model) {
   const people = crowd.map((p) => ({
     ...p,
     route: p.route.map((t) => ({ ...t })),
@@ -28,7 +29,9 @@ function gatherSafely(head, party, crowd) {
     head.x += dx * ratio;
     head.y += dy * ratio;
     moveParty(party, head, 0.025, { arriving: true });
-    moveCrowd(people, 0.025);
+    model.worldTime += 0.025;
+    updateTraffic(model, 0.025);
+    moveCrowd(people, 0.025, model.traffic);
     if (!safeTeam(head, party, people.filter(visiblePerson))) return null;
     if (partyArrived(party) && Math.hypot(head.x - 240, head.y - 84) < 0.01)
       return (tick + 1) * 0.025;
@@ -41,14 +44,18 @@ export function planRoute(stage, seed, maxSeconds = 25) {
   const model = createGame(stage, seed),
     crowd = model.crowd;
   let nodes = new Map([
-    [21 * 80, { x: 240, f: 0, path: "", party: model.party }],
+    [21 * 80, { x: 240, f: 0, path: "", party: model.party, reserved: false }],
   ]);
   const dt = 0.1,
     substeps = 4;
   for (let tick = 0; tick < maxSeconds / dt; tick++) {
-    const snapshots = [];
+    const snapshots = [],
+      signals = [];
     for (let k = 0; k < substeps; k++) {
-      moveCrowd(crowd, dt / substeps);
+      model.worldTime += dt / substeps;
+      updateTraffic(model, dt / substeps);
+      moveCrowd(crowd, dt / substeps, model.traffic);
+      signals.push(model.traffic ? { ...model.traffic } : null);
       snapshots.push(
         crowd.filter(visiblePerson).map((p) => ({ x: p.x, y: p.y })),
       );
@@ -67,6 +74,7 @@ export function planRoute(stage, seed, maxSeconds = 25) {
           key = ((x - 30) / 10) * 80 + f;
         if (next.has(key) || f > 72) continue;
         const party = copyParty(node.party);
+        let reserved = node.reserved;
         let safe = true,
           head;
         for (let k = 0; k < substeps && safe; k++) {
@@ -75,6 +83,35 @@ export function planRoute(stage, seed, maxSeconds = 25) {
             x: node.x + (x - node.x) * fraction,
             y: 625 - 7.5 * node.f + dy * fraction,
           };
+          const t = signals[k],
+            previousY = 625 - 7.5 * node.f + dy * (k / substeps);
+          if (
+            t &&
+            !reserved &&
+            previousY >= t.bottom + 14 &&
+            head.y < t.bottom + 14
+          ) {
+            if (
+              head.x < t.left + 12 ||
+              head.x > t.right - 12 ||
+              !t.green ||
+              t.remaining < crossingTime(party)
+            ) {
+              safe = false;
+              break;
+            }
+            reserved = true;
+          }
+          if (
+            t &&
+            reserved &&
+            head.y + 12 >= t.top &&
+            head.y - 12 <= t.bottom &&
+            (head.x < t.left + 12 || head.x > t.right - 12)
+          ) {
+            safe = false;
+            break;
+          }
           const arriving =
             head.y <= 85 + 0.000001 && head.x >= 175 && head.x <= 305;
           if (arriving && party.members.length) {
@@ -92,7 +129,13 @@ export function planRoute(stage, seed, maxSeconds = 25) {
         const path = node.path + action;
         if (y <= 85 && x >= 175 && x <= 305) {
           const settle = party.members.length
-            ? gatherSafely(head, party, crowd)
+            ? gatherSafely(head, party, crowd, {
+                ...model,
+                player: head,
+                party,
+                crowd,
+                traffic: model.traffic ? structuredClone(model.traffic) : null,
+              })
             : 0;
           if (settle !== null)
             return {
@@ -101,7 +144,7 @@ export function planRoute(stage, seed, maxSeconds = 25) {
             };
           continue;
         }
-        next.set(key, { x, f, path, party });
+        next.set(key, { x, f, path, party, reserved });
       }
     nodes = next;
     if (!nodes.size) return null;

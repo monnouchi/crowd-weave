@@ -1,3 +1,9 @@
+import {
+  createTraffic,
+  trafficSpec,
+  updateTraffic,
+  constrainTraffic,
+} from "./traffic.js";
 import { createParty, moveParty, partyArrived } from "./party.js";
 import {
   makeCrowd,
@@ -112,19 +118,30 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
       visualScale: scene.visualScale,
     },
     elapsed: 0,
+    worldTime: 0,
+    traffic: createTraffic(stage),
     hits: 0,
     cooldown: 0,
     stun: 0,
     lastContactId: null,
     touchingIds: [],
     seed,
-    crowd: makeCrowd(config.count, config.speed, seed, scene.environment),
+    crowd: makeCrowd(
+      config.count,
+      config.speed,
+      seed,
+      scene.environment,
+      trafficSpec(stage),
+    ),
   };
 }
 export function step(g, dt, input) {
   if (g.phase !== "playing") return;
   dt = Math.max(0, Math.min(dt, 0.05));
   g.elapsed += dt;
+  g.worldTime += dt;
+  updateTraffic(g, dt);
+  const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
   g.stun = Math.max(0, g.stun - dt);
   if (!g.stun && !g.arriving) {
@@ -139,6 +156,7 @@ export function step(g, dt, input) {
       g.player.y -= 75 * dt;
     }
   }
+  constrainTraffic(g, previousPlayer, input);
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
   g.player.y = Math.max(32, Math.min(H - 25, g.player.y));
   if (
@@ -161,7 +179,7 @@ export function step(g, dt, input) {
     stunned: g.stun > 0,
     arriving: g.arriving,
   });
-  moveCrowd(g.crowd, dt);
+  moveCrowd(g.crowd, dt, g.traffic);
   let contacted = null,
     contactMember = null,
     nearest = Infinity;
