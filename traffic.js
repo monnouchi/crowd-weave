@@ -89,6 +89,7 @@ export function createTraffic(stage, spec = trafficSpec(stage)) {
         remaining: spec.greenStart,
         canEnter: false,
         reserved: false,
+        crossing: false,
         redId: 0,
         vehicle: {
           ...vehicle(0),
@@ -124,8 +125,10 @@ function updateCrossing(g, t, dt) {
       ? t.greenStart - phase
       : t.period - phase + t.greenStart;
   const team = [g.player, ...g.party.members];
-  if (t.reserved && team.every((p) => p.y + p.r < t.top - 2))
+  if (t.crossing && team.every((p) => p.y + p.r < t.top - 2)) {
     t.reserved = false;
+    t.crossing = false;
+  }
   const redId = Math.floor((clock + t.period - t.greenEnd) / t.period);
   if (t.redId !== redId) {
     t.redId = redId;
@@ -135,19 +138,28 @@ function updateCrossing(g, t, dt) {
       (t.bottom - t.top) * (t.vehicle.kind === "bicycle" ? 0.875 : 0.375);
   }
   const v = t.vehicle;
-  const occupied = [...g.crowd.filter((p) => p.active), ...team].some(
+  const occupied = [
+    ...g.crowd.filter((p) => p.active),
+    ...(t.reserved ? team : []),
+  ].some(
     (p) =>
       p.y + p.r > t.top - 5 &&
       p.y - p.r < t.bottom + 5 &&
       p.x + p.r > -10 &&
       p.x - p.r < 490,
   );
+  v.previousX = v.x;
+  v.wasActive = v.active;
   if (v.active) {
     // Traffic yields before entering whenever anyone is in the road. A reserved
     // party never loses its crossing even if a pedestrian contact delays the tail.
     if (v.entered || (!t.nominalGreen && !t.reserved && !occupied)) {
       v.x += v.direction * v.speed * dt;
-      if (v.x + v.width / 2 > 0 && v.x - v.width / 2 < 480) v.entered = true;
+      if (
+        Math.max(v.previousX, v.x) + v.width / 2 > 0 &&
+        Math.min(v.previousX, v.x) - v.width / 2 < 480
+      )
+        v.entered = true;
     } else if (t.nominalGreen && !v.entered) v.active = false;
     if (v.x > 640 || v.x < -160) v.active = false;
   }
@@ -168,7 +180,7 @@ export function constrainTraffic(g, previous, input) {
     constrainCrossing(g, t, previous, input);
 }
 function constrainCrossing(g, t, previous, input) {
-  if (t.reserved) {
+  if (t.crossing) {
     if (g.player.y + g.player.r >= t.top && g.player.y - g.player.r <= t.bottom)
       g.player.x = Math.max(
         t.left + g.player.r,
@@ -180,8 +192,9 @@ function constrainCrossing(g, t, previous, input) {
   if (previous.y >= stop && g.player.y < stop) {
     const aligned =
       g.player.x >= t.left + g.player.r && g.player.x <= t.right - g.player.r;
-    if (aligned && t.vehicleClear) {
-      t.reserved = true;
+    if (aligned) {
+      t.crossing = true;
+      t.reserved = t.nominalGreen && t.vehicleClear;
       t.enteredOnGreen = t.nominalGreen;
       if (!t.nominalGreen) {
         t.violations++;
@@ -202,9 +215,9 @@ function constrainCrossing(g, t, previous, input) {
       return;
     }
     g.player.y = stop;
-    // Color never forces the player's brake. An actual car still occupying the
-    // crossing or leaving the marked crossing requires physical clearance.
-    t.message = aligned ? "車の通過を待とう" : "横断歩道へ寄ろう";
+    // Only the marked crossing's physical approach constrains lateral entry.
+    // Signal color and an occupied vehicle lane never apply the player's brake.
+    t.message = "横断歩道へ寄ろう";
   }
 }
 function crossingLane(p, target, t) {
@@ -249,4 +262,79 @@ export function trafficBlocks(p, vy, t, dt) {
     (vy < 0 && p.y >= t.bottom + 15 && p.y + vy * dt < t.bottom + 15) ||
     (vy > 0 && p.y <= t.top - 15 && p.y + vy * dt > t.top - 15)
   );
+}
+
+function segmentBox(a, b, left, top, right, bottom) {
+  let enter = 0,
+    leave = 1;
+  for (const [start, delta, low, high] of [
+    [a.x, b.x - a.x, left, right],
+    [a.y, b.y - a.y, top, bottom],
+  ]) {
+    if (Math.abs(delta) < 1e-12) {
+      if (start < low || start > high) return null;
+      continue;
+    }
+    let first = (low - start) / delta,
+      last = (high - start) / delta;
+    if (first > last) [first, last] = [last, first];
+    enter = Math.max(enter, first);
+    leave = Math.min(leave, last);
+    if (enter > leave) return null;
+  }
+  return enter;
+}
+function segmentCircle(a, b, x, y, r) {
+  const dx = b.x - a.x,
+    dy = b.y - a.y,
+    ox = a.x - x,
+    oy = a.y - y;
+  const c = ox * ox + oy * oy - r * r;
+  if (c <= 0) return 0;
+  const length = dx * dx + dy * dy;
+  if (!length) return null;
+  const dot = ox * dx + oy * dy,
+    disc = dot * dot - length * c;
+  if (disc < 0) return null;
+  const t = (-dot - Math.sqrt(disc)) / length;
+  return t >= 0 && t <= 1 ? t : null;
+}
+// Exact swept circle against the vehicle rectangle, including rounded corners.
+// The bags keep the existing owner body radius; no extra invisible hitbox.
+export function sweptVehicleContact(vehicle, previous, current) {
+  const a = {
+    x: previous.x - (vehicle.previousX ?? vehicle.x),
+    y: previous.y - vehicle.y,
+  };
+  const b = { x: current.x - vehicle.x, y: current.y - vehicle.y };
+  const w = vehicle.width / 2,
+    h = vehicle.kind === "car" ? 15 : 8,
+    r = current.r;
+  const times = [
+    segmentBox(a, b, -w - r, -h, w + r, h),
+    segmentBox(a, b, -w, -h - r, w, h + r),
+  ];
+  for (const x of [-w, w])
+    for (const y of [-h, h]) times.push(segmentCircle(a, b, x, y, r));
+  const hits = times.filter((t) => t !== null);
+  return hits.length ? Math.min(...hits) : null;
+}
+export function vehicleContact(g, previousTeam) {
+  let first = null;
+  for (const t of g.crossings || []) {
+    const v = t.vehicle;
+    if (!v.active && !v.wasActive) continue;
+    const team = [g.player, ...g.party.members];
+    for (let i = 0; i < team.length; i++) {
+      const time = sweptVehicleContact(v, previousTeam[i], team[i]);
+      if (time !== null && (!first || time < first.time))
+        first = {
+          crossingId: t.id || "road",
+          vehicleKind: v.kind,
+          memberId: team[i].id || 0,
+          time,
+        };
+    }
+  }
+  return first;
 }

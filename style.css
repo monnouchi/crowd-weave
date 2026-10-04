@@ -1122,3 +1122,18 @@ main:has(.overlay.finale:not([hidden])) .hud {
     min-height: 44px;
   }
 }
+
+#result-party[hidden] {
+  display: none;
+}
+#result-roster {
+  width: 100%;
+  height: 82px;
+  max-height: none;
+}
+#result-party-label {
+  text-align: center;
+  font-weight: 700;
+  margin: 0 0 6px;
+  font-size: 12px;
+}

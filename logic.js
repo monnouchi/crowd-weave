@@ -4,6 +4,7 @@ import {
   updateTraffic,
   constrainTraffic,
   trafficSpecs,
+  vehicleContact,
 } from "./traffic.js";
 import { createParty, moveParty, partyArrived } from "./party.js";
 import {
@@ -272,6 +273,7 @@ export function step(g, dt, input) {
   dt = Math.max(0, Math.min(dt, 0.05));
   g.elapsed += dt;
   g.worldTime += dt;
+  const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
@@ -343,6 +345,12 @@ export function step(g, dt, input) {
     arriving: g.arriving,
   });
   moveCrowd(g.crowd, dt, g.crossings);
+  const crash = vehicleContact(g, previousTeam);
+  if (crash) {
+    g.phase = "gameover";
+    g.crash = crash;
+    return;
+  }
   let contacted = null,
     contactMember = null,
     nearest = Infinity;
@@ -404,4 +412,42 @@ export function advanceAudienceAmbience(
   if (!dt) return;
   g.ambientTime = (g.ambientTime || 0) + dt;
   moveCrowd(g.crowd, dt, [], [g.player, ...g.party.members, g.meetingPartner]);
+}
+
+// A visual join does not add a second copy to the current gameplay party.
+export function joiningFriend(g, reducedMotion = false) {
+  if (g.phase !== "finished" || g.stage >= 4) return null;
+  const progress = reducedMotion ? 1 : Math.min(1, (g.joinTime || 0) / 0.8);
+  const target = {
+    x: g.stage < 2 ? 270 : g.stage === 2 ? 210 : 270,
+    y: g.stage < 2 ? 84 : 54,
+  };
+  const dx = target.x - g.meetingPartner.x,
+    dy = target.y - g.meetingPartner.y,
+    distance = Math.hypot(dx, dy) || 1;
+  return {
+    ...g.meetingPartner,
+    partner: false,
+    friend: true,
+    id: g.stage + 1,
+    newFriend: true,
+    x: g.meetingPartner.x + dx * progress,
+    y: g.meetingPartner.y + dy * progress,
+    ux: progress < 1 ? dx / distance : 0,
+    uy: progress < 1 ? dy / distance : -1,
+    state: progress < 1 ? "joining" : "celebrating",
+    joinProgress: progress,
+  };
+}
+export function advanceJoining(
+  g,
+  dt,
+  { active = true, reducedMotion = false } = {},
+) {
+  if (g.phase !== "finished" || g.stage >= 4 || !active || reducedMotion)
+    return;
+  g.joinTime = Math.min(
+    0.8,
+    (g.joinTime || 0) + Math.max(0, Math.min(0.05, dt)),
+  );
 }

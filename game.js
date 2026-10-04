@@ -25,6 +25,8 @@ import {
   advanceAudienceAmbience,
   nextRunSeed,
   seedForRun,
+  joiningFriend,
+  advanceJoining,
   STAGES,
   SCENES,
 } from "./logic.js";
@@ -207,22 +209,39 @@ function panel(title, message, button, label = "CROWD WEAVE") {
   const final = game.phase === "finished" && game.stage === 4;
   $("#result-toggle").hidden = !final;
   showResultDetails(final && !compactResult.matches);
+  $("#result-party").hidden = game.phase !== "finished";
+  if (final) $("#result-details").prepend($("#result-party"));
+  else $(".card").insertBefore($("#result-party"), $("#next-purpose"));
+  if (game.phase === "finished") {
+    const count = game.party.members.length + (game.stage < 4 ? 1 : 0);
+    $("#result-party-label").textContent =
+      game.stage < 4
+        ? `仲間が1人増えた！ 自分＋仲間${count}人`
+        : `自分＋仲間${count}人・全員到着`;
+    $("#result-roster").setAttribute(
+      "aria-label",
+      `自分と友だち${Array.from({ length: count }, (_, i) => i + 1).join("、友だち")}${game.stage < 4 ? `。友だち${count}が新しく合流` : "。全員到着"}`,
+    );
+  }
   action.textContent = button;
   $("#label").textContent = label;
   $("#enter-hint").textContent =
-    game.phase === "paused"
-      ? "Enter で再開"
-      : game.phase === "finished" && game.stage < 4
-        ? "Enter で次のステージへ"
-        : game.phase === "finished"
-          ? "Enter で最初から再挑戦"
-          : "Enter で開始";
+    game.phase === "gameover"
+      ? "Enter でこの区間を再挑戦"
+      : game.phase === "paused"
+        ? "Enter で再開"
+        : game.phase === "finished" && game.stage < 4
+          ? "Enter で次のステージへ"
+          : game.phase === "finished"
+            ? "Enter で最初から再挑戦"
+            : "Enter で開始";
   action.focus({ preventScroll: true });
 }
 function start(stage = 0) {
   $("#result-score").hidden = true;
   $("#share-actions").hidden = true;
   $("#result-toggle").hidden = true;
+  $("#result-party").hidden = true;
   showResultDetails(false);
   $("#start-sound").hidden = true;
   $("#sound").disabled = false;
@@ -289,6 +308,7 @@ function activatePrimary() {
   } else if (command === "next") start(game.stage + 1);
   else if (command === "start") initialStart(false);
   else if (command === "retry") start();
+  else if (command === "retry-stage") start(game.stage);
 }
 action.addEventListener("click", activatePrimary);
 action.focus({ preventScroll: true });
@@ -462,7 +482,7 @@ function person(p, player = false) {
   const old = reset ? createWalkingPose(p, heading) : previous;
   const canMove =
     (game.phase === "playing" ||
-      (game.stage === 4 && game.phase === "finished" && !document.hidden)) &&
+      (game.phase === "finished" && !document.hidden)) &&
     !p.partner &&
     !p.reaction &&
     (!(player || p.friend) || !game.stun);
@@ -1010,14 +1030,19 @@ function draw() {
         docking: false,
       }))
     : game.party.members;
-  const displayPartner = finale
-    ? {
-        ...game.meetingPartner,
-        ux: 0,
-        uy: -1,
-        state: "celebrating",
-      }
-    : game.meetingPartner;
+  const displayPartner =
+    game.stage === 4
+      ? {
+          ...game.meetingPartner,
+          partner: false,
+          background: true,
+          visualKey: "concert-neighbor",
+          state: "watching",
+          ux: 0,
+          uy: -1,
+          glowStick: true,
+        }
+      : joiningFriend(game, reducedMotion.matches) || game.meetingPartner;
   const displayPlayer = finale
     ? {
         ...game.player,
@@ -1104,6 +1129,71 @@ function draw() {
   }
 }
 
+function drawResultRoster() {
+  if (
+    $("#result-party").hidden ||
+    $("#result-party").getBoundingClientRect().width === 0
+  )
+    return;
+  const roster = $("#result-roster"),
+    rect = roster.getBoundingClientRect(),
+    ratio = Math.min(2, window.devicePixelRatio || 1);
+  roster.width = Math.round(rect.width * ratio);
+  roster.height = Math.round(rect.height * ratio);
+  const c = roster.getContext("2d"),
+    scale = Math.min(rect.width / 300, 1);
+  c.setTransform(
+    ratio * scale,
+    0,
+    0,
+    ratio * scale,
+    ((rect.width - 300 * scale) / 2) * ratio,
+    2 * ratio,
+  );
+  const newcomer = joiningFriend(game, reducedMotion.matches);
+  const actors = [
+    { ...game.player, player: true },
+    ...game.party.members,
+    ...(newcomer ? [newcomer] : []),
+  ];
+  const first = 150 - (actors.length - 1) * 25;
+  actors.forEach((actor, i) => {
+    const target = first + i * 50,
+      progress = actor.newFriend ? actor.joinProgress : 1;
+    const x = target + (1 - progress) * 28;
+    c.save();
+    c.translate(x, 40);
+    const pose = {
+      ...createWalkingPose({ x: 0, y: 0 }, { x: 0, y: 1 }),
+      moving: progress < 1,
+      speed: 60,
+      distance: (game.joinTime || 0) * 60,
+    };
+    drawCharacter(
+      c,
+      { ...actor, x: 0, y: 0, state: progress < 1 ? "joining" : "waiting" },
+      {
+        pose,
+        player: !!actor.player,
+        reducedMotion: reducedMotion.matches,
+        live: game.stage === 4,
+      },
+    );
+    c.restore();
+    if (actor.newFriend) {
+      c.fillStyle = "#f0cf81";
+      c.font = "bold 9px system-ui";
+      c.textAlign = "center";
+      c.fillText("NEW", x, 9);
+    }
+    if (!actor.player) {
+      c.fillStyle = game.stage === 4 ? "#fff3cf" : "#245c56";
+      c.font = "bold 10px system-ui";
+      c.textAlign = "center";
+      c.fillText(String(actor.id), x, 76);
+    }
+  });
+}
 function frame(now) {
   const dt = (now - last) / 1000;
   last = now;
@@ -1130,6 +1220,10 @@ function frame(now) {
   const previousRegroup = game.party.regroup;
   const steering = input();
   step(game, dt, steering);
+  advanceJoining(game, dt, {
+    active: !document.hidden && document.hasFocus(),
+    reducedMotion: reducedMotion.matches,
+  });
   advanceAudienceAmbience(game, dt, {
     active: !document.hidden && document.hasFocus(),
     reducedMotion: reducedMotion.matches,
@@ -1164,21 +1258,23 @@ function frame(now) {
     game.player.y > 740 &&
     game.player.y < 810
       ? "チケット確認 ✓ · ホールへ進もう"
-      : game.phase === "finished"
-        ? "全員到着 · 次へ進めます"
-        : game.phase === "paused"
-          ? "一時停止 · 時計も停止中"
-          : game.arriving
-            ? "合流中 · 仲間の到着を待っています"
-            : steering.left && steering.right
-              ? game.party.members.length
-                ? "ブレーキ · 仲間が隊列を整えます"
-                : "ブレーキ · 停止中"
-              : steering.left
-                ? "← 左へよける"
-                : steering.right
-                  ? "右へよける →"
-                  : "自動で前進 · 両押しで停止";
+      : game.phase === "gameover"
+        ? "ゲームオーバー · この区間から再挑戦"
+        : game.phase === "finished"
+          ? "全員到着 · 次へ進めます"
+          : game.phase === "paused"
+            ? "一時停止 · 時計も停止中"
+            : game.arriving
+              ? "合流中 · 仲間の到着を待っています"
+              : steering.left && steering.right
+                ? game.party.members.length
+                  ? "ブレーキ · 仲間が隊列を整えます"
+                  : "ブレーキ · 停止中"
+                : steering.left
+                  ? "← 左へよける"
+                  : steering.right
+                    ? "右へよける →"
+                    : "自動で前進 · 両押しで停止";
   const signal = $("#traffic-status");
   signal.hidden = !game.traffic;
   if (game.traffic) {
@@ -1229,12 +1325,12 @@ function frame(now) {
     game.phase === "playing" && now < noticeUntil,
   );
   $("#party-count").textContent =
-    `自分 + 仲間${game.party.members.length + (game.phase === "finished" ? 1 : 0)}人`;
+    `自分 + 仲間${game.party.members.length + (game.phase === "finished" && game.stage < 4 ? 1 : 0)}人`;
   $("#party-roster").textContent =
     game.phase === "finished"
       ? [
           ...game.party.members.map((m) => `${m.id}✓`),
-          `${game.stage + 1}（新）✓`,
+          ...(game.stage < 4 ? [`${game.stage + 1}（新）✓`] : []),
         ].join(" · ")
       : game.party.members.length
         ? game.party.members
@@ -1245,6 +1341,17 @@ function frame(now) {
   $("#hits").innerHTML = `${game.hits}<span>回</span>`;
   $("#distance").innerHTML =
     `${Math.round(Math.max(0, Math.min(100, ((Math.max(game.player.y, ...game.party.members.map((m) => m.y)) - 84) / (game.startY - 84 + game.party.members.length * 30)) * 100)))}<span>%</span>`;
+  if (game.phase === "gameover" && overlay.hidden) {
+    clearInput();
+    audio.suspend();
+    pause.disabled = true;
+    panel(
+      "横断中に接触しました",
+      `${game.crash.memberId ? "友だち" + game.crash.memberId : "自分"}が${game.crash.vehicleKind === "car" ? "車" : "自転車"}に接触。信号と車の位置を見て、もう一度この区間に挑戦しよう。`,
+      "この区間をもう一度 →",
+      "GAME OVER",
+    );
+  }
   if (game.phase === "finished" && overlay.hidden) {
     audio.goal(game.stage, game);
     clearInput();
@@ -1287,6 +1394,7 @@ function frame(now) {
     );
   }
   draw();
+  drawResultRoster();
   $("#goal-callout").textContent =
     game.arriving && game.phase !== "finished"
       ? "仲間全員を待とう！"

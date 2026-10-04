@@ -157,6 +157,7 @@ export class EnterLatch {
 export function primaryCommand(phase, stage) {
   if (phase === "ready") return "start";
   if (phase === "paused") return "resume";
+  if (phase === "gameover") return "retry-stage";
   if (phase === "finished") return stage < 4 ? "next" : "retry";
   return null;
 }

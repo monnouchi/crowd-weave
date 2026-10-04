@@ -31,7 +31,7 @@ test("fixed initial signal phases give normal forward arrivals a visible red and
     g.crowd = [];
     const t = g.crossings[0];
     let firstRed;
-    for (let n = 0; n < 1000 && !t.reserved; n++) {
+    for (let n = 0; n < 1000 && !t.crossing && g.phase === "playing"; n++) {
       const before = g.player.y;
       step(g, 0.025, {});
       if (!firstRed && !t.nominalGreen && before > t.bottom + 14)

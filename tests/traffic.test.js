@@ -324,26 +324,31 @@ test("bounded signal waiting and all-member clean routes remain achievable acros
       assert.equal(clean.phase, "finished");
       assert.equal(clean.hits, 0);
       assert.equal(trafficViolations(clean), 0);
-      assert.equal(direct.phase, "finished");
-      assert.ok(clean.elapsed < 32, `${stage}/${seed}: bounded clean arrival ${clean.elapsed}`);
-      assert.ok(direct.elapsed >= direct.hits * 2, "contact adds time in every crowd variant");
+      assert.ok(["finished", "gameover"].includes(direct.phase));
+      assert.ok(
+        clean.elapsed < 32,
+        `${stage}/${seed}: bounded clean arrival ${clean.elapsed}`,
+      );
+      assert.ok(
+        direct.elapsed >= direct.hits * 2,
+        "contact adds time in every crowd variant",
+      );
     }
 });
 
-test("an actual passing car is cleared before entry without a red-light auto-brake penalty", () => {
+test("an occupied vehicle lane permits voluntary red entry without automatic braking", () => {
   const g = fixture();
   g.player.y = 380;
   g.party = createParty(4, g.player);
   g.worldTime = 1;
   Object.assign(g.traffic.vehicle, { x: 240, entered: true, active: true });
   step(g, 0.025, {});
-  assert.equal(
-    g.player.y,
-    379,
-    "wait for the actual vehicle, not for signal color",
+  assert.ok(
+    g.player.y < 379,
+    "an actual vehicle never applies the player's brake",
   );
-  assert.equal(trafficViolations(g), 0);
-  assert.ok(Math.abs(g.elapsed - (g.worldTime - 1)) < 1e-9);
+  assert.equal(trafficViolations(g), 1);
+  assert.ok(Math.abs(g.elapsed - (g.worldTime - 1) - 2) < 1e-9);
   for (let n = 0; n < 400 && g.phase === "playing"; n++) {
     step(g, 0.025, {});
     const v = g.traffic.vehicle;
