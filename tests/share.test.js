@@ -11,7 +11,7 @@ test("share result includes all five totals and canonical URL", () => {
   ]);
   assert.ok(text.includes("50.2秒・接触6回"));
   assert.ok(text.includes(GAME_URL));
-  assert.ok(text.includes("Crowd Weave"));
+  assert.ok(text.startsWith("ライブへ行こう！ / Crowd Weave\n"));
 });
 
 test("clean journey honors every friend and signal stop, without making contact a failure", () => {

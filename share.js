@@ -1,3 +1,4 @@
+import { GAME_NAME, ENGLISH_NAME, SHARE_TITLE } from "./branding.js";
 export const GAME_URL = "https://monnouchi.github.io/crowd-weave/";
 export function resultTotals(records) {
   const time = records.reduce((s, r) => s + r.time, 0),
@@ -14,7 +15,7 @@ export function resultTotals(records) {
 }
 export function resultText(records) {
   const r = resultTotals(records);
-  return `雑踏突破 / Crowd Weave\n全5ステージ ${r.time.toFixed(1)}秒・接触${r.hits}回\n信号無視${r.violations}回 · ${r.label}\n${GAME_URL}`;
+  return `${SHARE_TITLE}\n全5ステージ ${r.time.toFixed(1)}秒・接触${r.hits}回\n信号無視${r.violations}回 · ${r.label}\n${GAME_URL}`;
 }
 export function drawResultCard(records, scene) {
   const totals = resultTotals(records),
@@ -38,9 +39,11 @@ export function drawResultCard(records, scene) {
   );
   x.fillStyle = "#245c56";
   x.font = "bold 44px system-ui";
-  x.fillText("雑踏突破", 35, 72);
+  x.fillText(GAME_NAME, 35, 72);
   x.font = "20px system-ui";
-  x.fillText("Crowd Weave", 275, 69);
+  x.textAlign = "right";
+  x.fillText(ENGLISH_NAME, 685, 69);
+  x.textAlign = "left";
   x.font = "bold 24px system-ui";
   x.fillText("仲間全員、ライブ最前列へ！", 35, 112);
   x.fillStyle = "#567777";
@@ -69,7 +72,7 @@ export async function shareResult(records, scene) {
   if (navigator.canShare?.({ files: [file] }) && navigator.share) {
     try {
       await navigator.share({
-        title: "雑踏突破 / Crowd Weave",
+        title: SHARE_TITLE,
         text,
         files: [file],
       });

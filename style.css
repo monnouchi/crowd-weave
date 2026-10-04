@@ -262,6 +262,7 @@ canvas {
 }
 h1 b {
   font-weight: inherit;
+  white-space: nowrap;
 }
 
 #goal-callout {
