@@ -73,7 +73,7 @@ test("speech stays readable at viewport edges and chooses a position away from v
   assert.ok(p.left >= 150 || p.top + height <= 70);
 });
 test("destination side walls are physical, while left/right edges of central goal remain usable for every party", () => {
-  for (let stage = 0; stage < 5; stage++) {
+  for (let stage = 0; stage < 4; stage++) {
     for (const x of [50, 430]) {
       const g = createGame(stage);
       g.phase = "playing";

@@ -206,37 +206,32 @@ export function rainShelters(c, { time = 0, reducedMotion = false } = {}) {
 // Space continues beyond the destination, behind an explicit local boundary.
 export function goalBoundary(c, scene) {
   c.save();
-  const building = ["station", "cafe", "venue", "party"].includes(
-    scene.landmark,
-  );
+  if (scene.landmark === "party") {
+    // The security lane stays between stage and audience. One parallel rail,
+    // connected to both walls, has no central entrance onto the stage.
+    box(c, 18, -195, 18, 260, 3, "#4d435e");
+    box(c, 444, -195, 18, 260, 3, "#4d435e");
+    box(c, 36, 22, 408, 8, 3, "#211d3380");
+    for (let x = 36; x <= 444; x += 51) {
+      box(c, x - 6, 18, 12, 6, 2, "#343340");
+      box(c, x - 2, -5, 4, 27, 2, "#aab5bb");
+    }
+    box(c, 34, -5, 412, 5, 2, "#c3cdd1");
+    box(c, 34, 8, 412, 3, 1, "#788d98");
+    box(c, 34, -5, 412, 1, 0, "#e5e9e8");
+    c.restore();
+    return;
+  }
+  const building = ["station", "cafe", "venue"].includes(scene.landmark);
   for (const [x, w] of [
     [18, 144],
     [318, 144],
   ]) {
     if (building) {
-      if (scene.landmark === "party") {
-        box(c, x, -45, w, 141, 3, "#4d435e");
-        box(c, x === 18 ? 18 : 395, -195, 67, 150, 3, "#4d435e");
-      } else box(c, x, -180, w, 276, 3, "#9ca99f");
-      box(
-        c,
-        x,
-        89,
-        w,
-        7,
-        2,
-        scene.landmark === "party" ? "#b5a6bc" : "#65766f",
-      );
+      box(c, x, -180, w, 276, 3, "#9ca99f");
+      box(c, x, 89, w, 7, 2, "#65766f");
       for (const windowX of [x + 18, x + w - 46]) {
-        box(
-          c,
-          windowX,
-          -72,
-          28,
-          58,
-          3,
-          scene.landmark === "party" ? "#756884" : "#b9d6cf",
-        );
+        box(c, windowX, -72, 28, 58, 3, "#b9d6cf");
         c.strokeStyle = "#687a75";
         c.lineWidth = 2;
         c.beginPath();

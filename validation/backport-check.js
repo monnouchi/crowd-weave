@@ -26,7 +26,7 @@ for (const seed of [17, 2026, 1402486078, 1, 97, 4004]) {
       crowd.filter((p) => p.active && p.y < 310).length,
     );
   }
-  assert.ok(minY >= 145);
+  assert.ok(minY >= 33);
   assert.ok(
     crowd.some((p) => p.cycle > 0),
     "rear lifecycle cycles",
@@ -34,7 +34,7 @@ for (const seed of [17, 2026, 1402486078, 1, 97, 4004]) {
   assert.ok(centralMax >= 6);
   assert.ok(frontMin > 4);
   assert.ok(
-    crowd.every((p) => p.entry.y >= 620 && p.route.every((t) => t.y >= 145)),
+    crowd.every((p) => p.entry.y >= 620 && p.route.every((t) => t.y >= 33)),
   );
   let route = planRoute(4, seed, 40);
   for (const delay of [2, 4, 6, 8, 10, 15]) {

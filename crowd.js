@@ -393,7 +393,7 @@ export function reactToContact(p, player) {
   p.vx = 0;
   p.vy = 0;
 }
-export function moveCrowd(crowd, dt, traffic = null) {
+export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
   const crossings = traffic;
   const velocities = crowd.map((p) => {
     const traffic = walkerTraffic(p, p.route[p.leg], crossings);
@@ -493,6 +493,27 @@ export function moveCrowd(crowd, dt, traffic = null) {
           b.vy -= ny * correction;
         }
       }
+  // After arrival, stationary friends remain real obstacles for the audience.
+  for (let pass = 0; pass < 3; pass++)
+    for (let i = 0; i < crowd.length; i++) {
+      const p = crowd[i],
+        v = velocities[i];
+      if (!v || v.locked) continue;
+      for (const q of obstacles) {
+        const dx = p.x - q.x,
+          dy = p.y - q.y,
+          d = Math.hypot(dx, dy);
+        if (d < 0.001 || d > 45) continue;
+        const nx = dx / d,
+          ny = dy / d;
+        const minimum = (p.r + q.r + 3 - d) / dt;
+        const approach = v.vx * nx + v.vy * ny;
+        if (approach < minimum) {
+          v.vx += nx * (minimum - approach);
+          v.vy += ny * (minimum - approach);
+        }
+      }
+    }
   crowd.forEach((p, i) => {
     if (!p.active) {
       p.wait -= dt;
@@ -567,7 +588,7 @@ export function moveCrowd(crowd, dt, traffic = null) {
     p.y += p.vy * dt;
     p.walk += Math.hypot(p.vx, p.vy) * dt;
     if (p.environment === "party") {
-      p.y = Math.max(145, p.y);
+      p.y = Math.max(33, p.y);
       p.x = Math.max(
         p.y < 600 ? 55 : -24,
         Math.min(p.y < 600 ? 425 : 504, p.x),
@@ -587,7 +608,8 @@ export function moveCrowd(crowd, dt, traffic = null) {
           audienceShift(p);
         } else {
           p.state = "watching";
-          p.ux = 0; p.uy = -1;
+          p.ux = 0;
+          p.uy = -1;
           p.wait =
             p.leg === 0
               ? (p.spot.y < 310 ? 18 : 8) + ((p.id * 7 + p.cycle * 11) % 12)
@@ -615,7 +637,7 @@ function audienceShift(p) {
   const rand = random(p.seed + p.id * 101 + p.cycle * 7919);
   p.route[1] = {
     x: Math.max(65, Math.min(415, p.spot.x + (rand() - 0.5) * 100)),
-    y: Math.max(155, Math.min(590, p.spot.y + (rand() - 0.5) * 65)),
+    y: Math.max(54, Math.min(590, p.spot.y + (rand() - 0.5) * 65)),
   };
 }
 export function makeAudience(count, speed, seed) {
@@ -632,10 +654,10 @@ export function makeAudience(count, speed, seed) {
       const candidate = {
         x: 65 + rand() * 350,
         y:
-          (id < 24 ? 165 : id < 34 ? 325 : 460) +
-          rand() *
-            (id < 24 ? (attempt < 1000 ? 205 : 260) : id < 34 ? 115 : 120),
+          (id < 4 ? 60 : id < 24 ? 125 : id < 34 ? 365 : 490) +
+          rand() * (id < 4 ? 22 : id < 24 ? 230 : id < 34 ? 110 : 90),
       };
+      if (Math.hypot(candidate.x - 240, candidate.y - 54) < 35) continue;
       const distance = Math.min(
         ...crowd.map((p) =>
           Math.hypot(p.spot.x - candidate.x, p.spot.y - candidate.y),
@@ -645,7 +667,7 @@ export function makeAudience(count, speed, seed) {
         spot = candidate;
         bestDistance = distance;
       }
-      if (distance > (id < 24 ? 48 : 40)) break;
+      if (distance > (id < 4 ? 84 : id < 24 ? 48 : 40)) break;
     }
     let x = spot.x,
       y = spot.y;
@@ -714,6 +736,10 @@ export function makeAudience(count, speed, seed) {
 }
 export function visiblePerson(p) {
   return (
-    p.active && p.x > 18 && p.x < 462 && p.y > 110 && p.y < (p.boundsH || 670)
+    p.active &&
+    p.x > 18 &&
+    p.x < 462 &&
+    p.y > (p.environment === "party" ? 32 : 110) &&
+    p.y < (p.boundsH || 670)
   );
 }

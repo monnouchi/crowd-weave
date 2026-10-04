@@ -32,16 +32,19 @@ export function drawResultCard(records, scene) {
     width: 300 * ratio,
     height: 215 * ratio,
   };
+  const fit = Math.min(350 / region.width, 251 / region.height);
+  const imageW = region.width * fit,
+    imageH = region.height * fit;
   x.drawImage(
     scene,
     region.x,
     region.y,
     region.width,
     region.height,
-    330,
-    145,
-    350,
-    251,
+    330 + (350 - imageW) / 2,
+    145 + (251 - imageH) / 2,
+    imageW,
+    imageH,
   );
   x.fillStyle = "#245c56";
   x.font = "bold 44px system-ui";

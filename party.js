@@ -106,9 +106,10 @@ export function moveParty(
     )
       m.docking = true;
     if (m.docking) {
-      advance(m, SLOTS[i], 85 * dt);
+      const slot = (party.dockSlots || SLOTS)[i];
+      advance(m, slot, 85 * dt);
       m.state = "docking";
-      if (Math.hypot(m.x - SLOTS[i].x, m.y - SLOTS[i].y) < 0.01) {
+      if (Math.hypot(m.x - slot.x, m.y - slot.y) < 0.01) {
         m.docked = true;
         m.state = "docked";
       }

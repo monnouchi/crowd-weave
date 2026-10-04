@@ -16,6 +16,31 @@ export const W = 480,
   H = 680,
   START = { x: 240, y: 625 },
   GOAL = { x: 175, y: 20, w: 130, h: 65 };
+export const FRONT_BARRIER_Y = 20;
+export function goalFor(stage) {
+  return stage === 4 ? { x: 95, y: 20, w: 290, h: 65 } : GOAL;
+}
+export function arrivalPoint(stage, player) {
+  return { x: stage === 4 ? player.x : 240, y: 84 };
+}
+export function setArrivalSlots(party, stage, player) {
+  if (stage === 4 && !party.dockSlots) {
+    const x = player.x;
+    party.dockSlots = [
+      { x: x - 30, y: 84 },
+      { x: x + 30, y: 84 },
+      { x: x - 30, y: 54 },
+      { x: x + 30, y: 54 },
+    ].map((slot, i) =>
+      i >= 2 && Math.abs(slot.x - 240) < 26
+        ? {
+            ...slot,
+            x: slot.x < 240 || (slot.x === 240 && i === 2) ? 214 : 266,
+          }
+        : slot,
+    );
+  }
+}
 export const MEETING_PARTNER = Object.freeze({
   x: 240,
   y: 54,
@@ -254,11 +279,19 @@ export function step(g, dt, input) {
   }
   constrainTraffic(g, previousPlayer, input);
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
-  g.player.y = Math.max(32, Math.min(g.worldHeight - 25, g.player.y));
+  g.player.y = Math.max(
+    g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
+    Math.min(g.worldHeight - 25, g.player.y),
+  );
   // Shops, hedges and the hall wall leave the destination's central entrance.
-  if ((g.player.x < 174 || g.player.x > 306) && g.player.y < 107)
+  if (
+    g.stage !== 4 &&
+    (g.player.x < 174 || g.player.x > 306) &&
+    g.player.y < 107
+  )
     g.player.y = 107;
   if (g.stage === 4) {
+    if (g.player.y < 650) g.player.x = Math.max(48, Math.min(432, g.player.x));
     for (const [top, bottom] of [
       [790, 825],
       [685, 720],
@@ -274,15 +307,19 @@ export function step(g, dt, input) {
     }
     if (!g.ticketChecked && g.player.y < 790) g.ticketChecked = true;
   }
+  const goal = goalFor(g.stage);
   if (
     !g.arriving &&
-    g.player.x >= GOAL.x &&
-    g.player.x <= GOAL.x + GOAL.w &&
-    g.player.y <= GOAL.y + GOAL.h + 0.000001
-  )
+    g.player.x >= goal.x &&
+    g.player.x <= goal.x + goal.w &&
+    g.player.y <= goal.y + goal.h + 0.000001
+  ) {
     g.arriving = true;
+    g.arrivalTarget = arrivalPoint(g.stage, g.player);
+    setArrivalSlots(g.party, g.stage, g.player);
+  }
   if (g.arriving && g.party.members.length && !g.stun) {
-    const dx = 240 - g.player.x,
+    const dx = g.arrivalTarget.x - g.player.x,
       dy = 84 - g.player.y,
       d = Math.hypot(dx, dy),
       ratio = d ? Math.min(1, (100 * dt) / d) : 0;
@@ -337,9 +374,23 @@ export function step(g, dt, input) {
     g.arriving &&
     partyArrived(g.party) &&
     (!g.party.members.length ||
-      Math.hypot(g.player.x - 240, g.player.y - 84) < 0.01)
+      Math.hypot(g.player.x - g.arrivalTarget.x, g.player.y - 84) < 0.01)
   ) {
     g.phase = "finished";
     g.meetingPartner.state = "met";
   }
+}
+
+// Arrival animation advances independently of the immutable race result.
+export function advanceAudienceAmbience(
+  g,
+  dt,
+  { active = true, reducedMotion = false } = {},
+) {
+  if (g.stage !== 4 || g.phase !== "finished" || !active || reducedMotion)
+    return;
+  dt = Math.max(0, Math.min(0.05, dt));
+  if (!dt) return;
+  g.ambientTime = (g.ambientTime || 0) + dt;
+  moveCrowd(g.crowd, dt, [], [g.player, ...g.party.members, g.meetingPartner]);
 }

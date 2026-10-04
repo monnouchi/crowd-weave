@@ -124,7 +124,7 @@ test("cafe has primarily lateral station traffic; the concert gathers northward 
     "central area has spectators too",
   );
   assert.ok(
-    live.crowd.every((p) => p.route.every((t) => t.y >= 145)),
+    live.crowd.every((p) => p.route.every((t) => t.y >= 33)),
     "nobody enters or exits through the stage",
   );
   live.phase = "playing";

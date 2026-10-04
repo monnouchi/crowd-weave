@@ -16,7 +16,16 @@ import {
 } from "./pose.js";
 import { drawCharacter, placeSpeech } from "./character.js";
 import { GAME_NAME, PAGE_TITLE } from "./branding.js";
-import { createGame, step, W, H, GOAL, STAGES, SCENES } from "./logic.js";
+import {
+  createGame,
+  step,
+  W,
+  H,
+  GOAL,
+  advanceAudienceAmbience,
+  STAGES,
+  SCENES,
+} from "./logic.js";
 import { trafficViolations } from "./traffic.js";
 import { visiblePerson } from "./crowd.js";
 import {
@@ -362,7 +371,8 @@ function person(p, player = false) {
   const reset = !previous || previous.cycle !== p.cycle;
   const old = reset ? createWalkingPose(p, heading) : previous;
   const canMove =
-    game.phase === "playing" &&
+    (game.phase === "playing" ||
+      (game.stage === 4 && game.phase === "finished" && !document.hidden)) &&
     !p.partner &&
     !p.reaction &&
     (!(player || p.friend) || !game.stun);
@@ -380,7 +390,7 @@ function person(p, player = false) {
           1,
           (p.x - 18) / 18,
           (462 - p.x) / 18,
-          (p.y - 110) / 20,
+          (p.y - (p.environment === "party" ? 32 : 110)) / 20,
           (670 - p.y) / 20,
         );
   if (
@@ -398,9 +408,9 @@ function person(p, player = false) {
     reducedMotion: reducedMotion.matches,
     opacity,
     waving: p.partner,
-    wave: Math.sin(game.worldTime * 3) * 2,
+    wave: Math.sin((game.worldTime + (game.ambientTime || 0)) * 3) * 2,
     live: game.stage === 4,
-    time: game.worldTime,
+    time: game.worldTime + (game.ambientTime || 0),
   });
 }
 function destination(scene) {
@@ -486,7 +496,7 @@ function destination(scene) {
     if (game.phase !== "finished")
       ctx.fillText("ステージ / 前方エリア", 240, -25);
     concert(ctx, {
-      time: game.worldTime,
+      time: game.worldTime + (game.ambientTime || 0),
       reducedMotion: reducedMotion.matches,
       complete: game.phase === "finished",
     });
@@ -628,7 +638,10 @@ function draw() {
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
   const finale = game.stage === 4 && game.phase === "finished";
-  ctx.translate(240 - game.player.x, (finale ? 320 : CAMERA_Y) - game.player.y);
+  ctx.translate(
+    finale ? 0 : 240 - game.player.x,
+    (finale ? 320 : CAMERA_Y) - game.player.y,
+  );
   // Outside the playable corridor: buildings, greenery or hall walls.
   const cameraY = finale ? 320 : CAMERA_Y;
   const leftEdge =
@@ -675,15 +688,16 @@ function draw() {
       );
     }
   }
-  const shareX = (ox + (60 + 240 - game.player.x) * scale) * renderRatio;
+  const shareX =
+    (ox + (finale ? 0 : 60 + 240 - game.player.x) * scale) * renderRatio;
   const shareY =
     (oy + (-195 + (finale ? 320 : CAMERA_Y) - game.player.y) * scale) *
     renderRatio;
   canvas.weaveResultRegion = {
     x: shareX,
     y: shareY,
-    width: 360 * scale * renderRatio,
-    height: 258 * scale * renderRatio,
+    width: (finale ? 480 : 360) * scale * renderRatio,
+    height: (finale ? 390 : 258) * scale * renderRatio,
   };
   ctx.fillStyle = game.scene.floor;
   ctx.fillRect(0, -800, W, H + 1000);
@@ -701,12 +715,12 @@ function draw() {
   if (game.stage === 3) venueJourney(ctx);
   if (game.stage === 4)
     hallInterior(ctx, {
-      time: game.worldTime,
+      time: game.worldTime + (game.ambientTime || 0),
       reducedMotion: reducedMotion.matches,
     });
   if (game.scene.weather === "rain")
     rainShelters(ctx, {
-      time: game.worldTime,
+      time: game.worldTime + (game.ambientTime || 0),
       reducedMotion: reducedMotion.matches,
     });
   rounded(18, -500, 444, 55, 8, "#cbd7ca");
@@ -732,7 +746,11 @@ function draw() {
     i++
   ) {
     const y =
-      -100 - ((i * 63 + game.worldTime * (i % 2 ? 20 : -18) + 1200) % 350);
+      -100 -
+      ((i * 63 +
+        (game.worldTime + (game.ambientTime || 0)) * (i % 2 ? 20 : -18) +
+        1200) %
+        350);
     person({
       x: 75 + i * 64,
       y,
@@ -742,7 +760,7 @@ function draw() {
       visualKey: `background:${i}`,
       color: i % 4,
       state: "walking",
-      walk: game.worldTime * (i % 2 ? 20 : 18),
+      walk: (game.worldTime + (game.ambientTime || 0)) * (i % 2 ? 20 : 18),
       background: true,
     });
   }
@@ -762,7 +780,13 @@ function draw() {
       uy: 0,
       visualKey: "ticket-staff",
     });
-  if (!finale) {
+  if (game.stage === 4 && !finale) {
+    ctx.fillStyle = "#d7d1e9";
+    ctx.textAlign = "center";
+    ctx.font = "bold 11px system-ui";
+    ctx.fillText("GOAL · 柵の手前の最前列へ", 240, 43);
+  }
+  if (!finale && game.stage !== 4) {
     rounded(GOAL.x, GOAL.y, GOAL.w, GOAL.h, 12, "#dbe7d4");
     rounded(GOAL.x, 5, GOAL.w, 22, 8, "#285d55");
     ctx.fillStyle = "#fff5d8";
@@ -883,10 +907,8 @@ function draw() {
   ctx.fillText("START", 240, game.startY + 37);
   for (const t of game.crossings) drawTraffic(t);
   const displayMembers = finale
-    ? game.party.members.map((m, i) => ({
+    ? game.party.members.map((m) => ({
         ...m,
-        x: [215, 250, 285, 215][i],
-        y: i === 3 ? 25 : -15,
         state: "celebrating",
         ux: 0,
         uy: -1,
@@ -897,8 +919,6 @@ function draw() {
   const displayPartner = finale
     ? {
         ...game.meetingPartner,
-        x: 285,
-        y: 25,
         ux: 0,
         uy: -1,
         state: "celebrating",
@@ -907,8 +927,6 @@ function draw() {
   const displayPlayer = finale
     ? {
         ...game.player,
-        x: 180,
-        y: -15,
         player: true,
         state: "celebrating",
         ux: 0,
@@ -937,7 +955,7 @@ function draw() {
     person(p, p.player);
   if (finale && !reducedMotion.matches) {
     // Sparse warm confetti, no flashes and no change to the recorded clock.
-    const t = performance.now() / 1000;
+    const t = game.worldTime + (game.ambientTime || 0);
     for (let i = 0; i < 24; i++) {
       const x = 70 + ((i * 73) % 340),
         y = -210 + ((i * 29 + t * 12) % 230);
@@ -1018,6 +1036,10 @@ function frame(now) {
   const previousRegroup = game.party.regroup;
   const steering = input();
   step(game, dt, steering);
+  advanceAudienceAmbience(game, dt, {
+    active: !document.hidden && document.hasFocus(),
+    reducedMotion: reducedMotion.matches,
+  });
   if (game.party.regroup < 0.1) game.party.chimed = false;
   if (
     game.party.members.length &&
@@ -1090,7 +1112,10 @@ function frame(now) {
       const event = game.violationEvent;
       $("#notice").textContent = "信号無視 +2秒 · 赤では両押しで待とう";
       if (game.party.members.some((m) => m.id === event.memberId)) {
-        companionSpeech = { ...event, until: game.worldTime + 1.8 };
+        companionSpeech = {
+          ...event,
+          until: game.worldTime + (game.ambientTime || 0) + 1.8,
+        };
         $("#companion-bubble").textContent =
           `友だち${event.memberId}「${event.message}」`;
       }
@@ -1197,7 +1222,7 @@ function frame(now) {
   speech.hidden = link.hidden =
     !speaker ||
     game.phase !== "playing" ||
-    game.worldTime >= companionSpeech.until;
+    game.worldTime + (game.ambientTime || 0) >= companionSpeech.until;
   if (!speech.hidden) {
     const x = ox + (speaker.x + 240 - game.player.x) * scale;
     const y = oy + (speaker.y - 29 + CAMERA_Y - game.player.y) * scale;

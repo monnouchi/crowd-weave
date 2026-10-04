@@ -1,5 +1,11 @@
 import { updateTraffic, crossingTime } from "../traffic.js";
-import { createGame, step } from "../logic.js";
+import {
+  createGame,
+  step,
+  goalFor,
+  arrivalPoint,
+  setArrivalSlots,
+} from "../logic.js";
 import { moveCrowd, visiblePerson } from "../crowd.js";
 import { moveParty, partyArrived } from "../party.js";
 const copyParty = (p) => ({
@@ -21,8 +27,10 @@ function gatherSafely(head, party, crowd, model) {
     entry: { ...p.entry },
     reaction: p.reaction ? { ...p.reaction } : null,
   }));
+  const target = arrivalPoint(model.stage, head);
+  setArrivalSlots(party, model.stage, head);
   for (let tick = 0; tick < 200; tick++) {
-    const dx = 240 - head.x,
+    const dx = target.x - head.x,
       dy = 84 - head.y,
       d = Math.hypot(dx, dy),
       ratio = d ? Math.min(1, 2.5 / d) : 0;
@@ -33,7 +41,10 @@ function gatherSafely(head, party, crowd, model) {
     updateTraffic(model, 0.025);
     moveCrowd(people, 0.025, model.crossings);
     if (!safeTeam(head, party, people.filter(visiblePerson))) return null;
-    if (partyArrived(party) && Math.hypot(head.x - 240, head.y - 84) < 0.01)
+    if (
+      partyArrived(party) &&
+      Math.hypot(head.x - target.x, head.y - 84) < 0.01
+    )
       return (tick + 1) * 0.025;
   }
   return null;
@@ -43,6 +54,7 @@ function gatherSafely(head, party, crowd, model) {
 export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
   const model = createGame(stage, seed),
     crowd = model.crowd,
+    goal = goalFor(stage),
     startY = model.startY,
     maxProgress = Math.ceil((startY - 85) / 7.5),
     rowWidth = maxProgress + 2;
@@ -100,7 +112,11 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
             y: startY - 7.5 * node.f + dy * fraction,
           };
           const previousY = startY - 7.5 * node.f + dy * (k / substeps);
-          if (head.y < 107 && (head.x < 174 || head.x > 306)) {
+          if (stage !== 4 && head.y < 107 && (head.x < 174 || head.x > 306)) {
+            safe = false;
+            break;
+          }
+          if (stage === 4 && head.y < 650 && (head.x < 48 || head.x > 432)) {
             safe = false;
             break;
           }
@@ -144,9 +160,13 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
           }
           if (!safe) break;
           const arriving =
-            head.y <= 85 + 0.000001 && head.x >= 175 && head.x <= 305;
+            head.y <= 85 + 0.000001 &&
+            head.x >= goal.x &&
+            head.x <= goal.x + goal.w;
+          const target = arrivalPoint(stage, head);
+          if (arriving) setArrivalSlots(party, stage, head);
           if (arriving && party.members.length) {
-            const ax = 240 - head.x,
+            const ax = target.x - head.x,
               ay = 84 - head.y,
               d = Math.hypot(ax, ay),
               r = d ? Math.min(1, 2.5 / d) : 0;
@@ -158,7 +178,7 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
         }
         if (!safe) continue;
         const path = node.path + action;
-        if (y <= 85 && x >= 175 && x <= 305) {
+        if (y <= 85 && x >= goal.x && x <= goal.x + goal.w) {
           const settle = party.members.length
             ? gatherSafely(head, party, crowd, {
                 ...model,
