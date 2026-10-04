@@ -41,6 +41,17 @@ export function setArrivalSlots(party, stage, player) {
     );
   }
 }
+// Entropy is sampled once per playthrough, never in the simulation loop.
+export function nextRunSeed(previous, entropy) {
+  const candidate = entropy >>> 0;
+  return candidate === previous ? (candidate + 1) >>> 0 : candidate;
+}
+export function seedForRun(runSeed, stage) {
+  let value = (runSeed + Math.imul(stage + 1, 0x9e3779b9)) >>> 0;
+  value = Math.imul(value ^ (value >>> 16), 0x85ebca6b);
+  value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35);
+  return (value ^ (value >>> 16)) >>> 0;
+}
 export const MEETING_PARTNER = Object.freeze({
   x: 240,
   y: 54,

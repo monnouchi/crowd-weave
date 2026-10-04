@@ -23,6 +23,8 @@ import {
   H,
   GOAL,
   advanceAudienceAmbience,
+  nextRunSeed,
+  seedForRun,
   STAGES,
   SCENES,
 } from "./logic.js";
@@ -52,6 +54,44 @@ function resizeDrawingSurface() {
     canvas.height = height;
   }
   renderRatio = ratio;
+  const compactFinal =
+    overlay.classList.contains("finale") &&
+    (rect.width < 600 || (rect.height <= 500 && rect.width <= 950));
+  if (compactFinal) {
+    // Fit the entire stage-to-front-row composition above the collapsed result.
+    const card = document.querySelector(".card");
+    const summary = card.querySelector(".start-actions");
+    const summaryBottom = summary.getBoundingClientRect().bottom;
+    const cardTop = card.getBoundingClientRect().top;
+    const collapsedHeight = summaryBottom - cardTop + 12;
+    const availableBottom =
+      rect.height -
+      Math.max(12, rect.height - card.getBoundingClientRect().bottom) -
+      collapsedHeight -
+      12;
+    const top = Math.max(
+      12,
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--result-safe-top",
+        ),
+      ) || 0,
+    );
+    const sceneHeight = 430;
+    const scale = Math.min(
+      (rect.width - 24) / W,
+      Math.max(1, availableBottom - top) / sceneHeight,
+    );
+    projection = {
+      scale,
+      ox: rect.width / 2 - 240 * scale,
+      oy: top,
+      width: rect.width,
+      height: rect.height,
+      finalCameraY: game.player.y + 220,
+    };
+    return;
+  }
   const portrait = rect.width < 600 && rect.height > rect.width;
   const top = portrait
     ? document.querySelector(".hud").getBoundingClientRect().bottom + 8
@@ -112,6 +152,40 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const $ = (s) => document.querySelector(s);
 document.title = PAGE_TITLE;
 document.querySelector("#game-name").textContent = GAME_NAME;
+const compactResult = window.matchMedia(
+  "(max-width: 599px), (max-height: 500px) and (max-width: 950px)",
+);
+const fixedSeedText = new URLSearchParams(location.search).get("seed");
+const fixedRunSeed =
+  fixedSeedText !== null &&
+  /^\d{1,10}$/.test(fixedSeedText) &&
+  Number(fixedSeedText) <= 0xffffffff
+    ? Number(fixedSeedText)
+    : null;
+let runSeed;
+function chooseRunSeed() {
+  if (fixedRunSeed !== null) return fixedRunSeed;
+  const entropy = new Uint32Array(1);
+  crypto.getRandomValues(entropy);
+  return nextRunSeed(runSeed, entropy[0]);
+}
+function showResultDetails(open) {
+  $("#result-details").hidden = !open;
+  $("#result-toggle").setAttribute("aria-expanded", String(open));
+  $("#result-toggle").textContent = open ? "詳細を閉じる" : "詳細・共有";
+  overlay.classList.toggle("result-expanded", open && compactResult.matches);
+}
+$("#result-toggle").addEventListener("click", () =>
+  showResultDetails($("#result-details").hidden),
+);
+$("#close-result-details").addEventListener("click", () => {
+  showResultDetails(false);
+  $("#result-toggle").focus({ preventScroll: true });
+});
+compactResult.addEventListener("change", () => {
+  if (game.stage === 4 && game.phase === "finished")
+    showResultDetails(!compactResult.matches);
+});
 function clearInput() {
   pointerControls.clear();
   buttons.clear();
@@ -129,6 +203,10 @@ function panel(title, message, button, label = "CROWD WEAVE") {
   );
   $("#title").textContent = title;
   $("#message").textContent = message;
+  $("#result-detail-message").textContent = message;
+  const final = game.phase === "finished" && game.stage === 4;
+  $("#result-toggle").hidden = !final;
+  showResultDetails(final && !compactResult.matches);
   action.textContent = button;
   $("#label").textContent = label;
   $("#enter-hint").textContent =
@@ -144,6 +222,8 @@ function panel(title, message, button, label = "CROWD WEAVE") {
 function start(stage = 0) {
   $("#result-score").hidden = true;
   $("#share-actions").hidden = true;
+  $("#result-toggle").hidden = true;
+  showResultDetails(false);
   $("#start-sound").hidden = true;
   $("#sound").disabled = false;
   $("#restart").disabled = false;
@@ -151,7 +231,9 @@ function start(stage = 0) {
   clearInput();
   audio.reset();
   if (stage === 0) records = [];
-  game = createGame(stage);
+  if (stage === 0 || runSeed === undefined) runSeed = chooseRunSeed();
+  game = createGame(stage, seedForRun(runSeed, stage));
+  game.runSeed = runSeed;
   $("main").classList.toggle("with-traffic", !!game.traffic);
   playerPose = { lean: 0 };
   walkingPoses.clear();
@@ -221,6 +303,14 @@ window.addEventListener("keydown", (e) => {
     );
   if (e.key === "Enter") {
     if (editable || e.isComposing) return;
+    if (
+      game.phase === "finished" &&
+      e.target instanceof Element &&
+      e.target.closest(
+        "#result-toggle,#close-result-details,#share,#copy-result",
+      )
+    )
+      return;
     e.preventDefault();
     if (
       enterLatch.press({
@@ -640,10 +730,10 @@ function draw() {
   const finale = game.stage === 4 && game.phase === "finished";
   ctx.translate(
     finale ? 0 : 240 - game.player.x,
-    (finale ? 320 : CAMERA_Y) - game.player.y,
+    (finale ? (projection.finalCameraY ?? 320) : CAMERA_Y) - game.player.y,
   );
   // Outside the playable corridor: buildings, greenery or hall walls.
-  const cameraY = finale ? 320 : CAMERA_Y;
+  const cameraY = finale ? (projection.finalCameraY ?? 320) : CAMERA_Y;
   const leftEdge =
     Math.floor((game.player.x - width / (2 * scale)) / 120) * 120;
   const rightEdge =
@@ -691,7 +781,11 @@ function draw() {
   const shareX =
     (ox + (finale ? 0 : 60 + 240 - game.player.x) * scale) * renderRatio;
   const shareY =
-    (oy + (-195 + (finale ? 320 : CAMERA_Y) - game.player.y) * scale) *
+    (oy +
+      (-195 +
+        (finale ? (projection.finalCameraY ?? 320) : CAMERA_Y) -
+        game.player.y) *
+        scale) *
     renderRatio;
   canvas.weaveResultRegion = {
     x: shareX,
@@ -1188,7 +1282,7 @@ function frame(now) {
       game.stage === 4
         ? `全5区間を完走。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
         : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
-      game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
+      game.stage < 4 ? "次のステージへ →" : "もう一度遊ぶ →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
   }

@@ -97,6 +97,10 @@ export function makeCrowd(
 ) {
   if (environment === "party") return makeAudience(count, speed, seed);
   const profile = FLOW_PROFILES[environment] || FLOW_PROFILES.station;
+  const visitorOffset = seed % 2 ? 0 : 2;
+  const visitorIndex = (id) => (id - 20) % 6;
+  const isVisitor = (id) =>
+    id >= 20 && [visitorOffset, visitorOffset + 1].includes(visitorIndex(id));
   const queueY = traffic ? 175 : 370,
     readerY = traffic ? 175 : 320;
   const rand = random(seed),
@@ -204,8 +208,8 @@ export function makeCrowd(
           : 140 + rand() * 405;
       if (
         (environment === "venue" || environment === "party") &&
-        id >= 20 &&
-        id % 6 === 3
+        isVisitor(id) &&
+        visitorIndex(id) === visitorOffset + 1
       ) {
         const q = crowd.at(-1),
           angle = rand() * Math.PI * 2;
@@ -328,11 +332,7 @@ export function makeCrowd(
       p.leg = 0;
       aim(p);
     }
-    if (
-      (environment === "venue" || environment === "party") &&
-      id >= 20 &&
-      (id % 6 === 2 || id % 6 === 3)
-    ) {
+    if ((environment === "venue" || environment === "party") && isVisitor(id)) {
       p.group = `visitors-${Math.floor(id / 6)}`;
       p.archetype = "visitor";
       const partner = crowd.find((q) => q.group === p.group);

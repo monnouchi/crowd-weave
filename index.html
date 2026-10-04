@@ -125,13 +125,29 @@
               <button id="action" aria-describedby="enter-hint">
                 音なしで開始
               </button>
+              <button
+                id="result-toggle"
+                class="secondary"
+                hidden
+                aria-expanded="false"
+                aria-controls="result-details"
+              >
+                詳細・共有
+              </button>
               <button id="start-sound" class="secondary">音ありで開始</button>
             </div>
-            <div id="share-actions" hidden>
-              <button id="share" class="secondary">結果画像を共有・保存</button
-              ><button id="copy-result" class="secondary">文章コピー</button>
-              <p id="share-status" role="status"></p>
-            </div>
+            <section id="result-details" hidden aria-label="結果の詳細と共有">
+              <p id="result-detail-message"></p>
+              <div id="share-actions" hidden>
+                <button id="share" class="secondary">
+                  結果画像を共有・保存</button
+                ><button id="copy-result" class="secondary">文章コピー</button>
+                <p id="share-status" role="status"></p>
+              </div>
+              <button id="close-result-details" class="secondary">
+                詳細を閉じる
+              </button>
+            </section>
             <p id="enter-hint" class="enter-hint">
               Enter：音なし開始 · Tabで音あり
             </p>

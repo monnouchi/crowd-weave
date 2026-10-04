@@ -1034,3 +1034,91 @@ main:has(.overlay.finale:not([hidden])) .hud {
     bottom: calc(204px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* A small result dock leaves the concert visible on phones. */
+:root {
+  --result-safe-top: env(safe-area-inset-top, 0px);
+}
+#result-details[hidden],
+#result-toggle[hidden] {
+  display: none;
+}
+#result-detail-message,
+#close-result-details {
+  display: none;
+}
+.finale #result-toggle {
+  display: none;
+}
+@media (max-width: 599px), (max-height: 500px) and (max-width: 950px) {
+  .overlay.finale {
+    padding: max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    place-items: end center;
+    background: none;
+  }
+  .finale .card {
+    max-width: 520px;
+    max-height: calc(
+      100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    padding: 10px 12px;
+    border-radius: 16px;
+    overflow: auto;
+  }
+  .finale #label,
+  .finale #message,
+  .finale .enter-hint {
+    display: none;
+  }
+  .finale h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+  }
+  .finale #result-score {
+    margin: 4px 0 8px;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 8px;
+  }
+  .finale #result-score dt {
+    font-size: 10px;
+  }
+  .finale #result-score dd,
+  .finale #result-score div:first-child dd {
+    font-size: 25px;
+    line-height: 1.15;
+  }
+  .finale .start-actions {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 8px;
+  }
+  .finale .start-actions button {
+    margin: 0;
+    min-height: 44px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .finale #result-toggle {
+    display: block;
+  }
+  .finale #result-details {
+    border-top: 1px solid #ffffff3d;
+    margin-top: 10px;
+    padding-top: 4px;
+  }
+  .finale #result-detail-message {
+    display: block;
+    font-size: 12px;
+    margin: 8px 0;
+  }
+  .finale #close-result-details {
+    display: block;
+    min-height: 44px;
+  }
+  .finale #share-actions button {
+    min-height: 44px;
+  }
+}

@@ -16,7 +16,7 @@ const copyParty = (p) => ({
 function safeTeam(head, party, people) {
   return ![{ ...head, r: 12 }, ...party.members].some((m) =>
     people.some(
-      (p) => (p.x - m.x) ** 2 + (p.y - m.y) ** 2 < (m.r + 13 + 1.5) ** 2,
+      (p) => (p.x - m.x) ** 2 + (p.y - m.y) ** 2 < (m.r + 13 + 2.5) ** 2,
     ),
   );
 }
