@@ -1,5 +1,5 @@
 import { updateTraffic, crossingTime } from "../traffic.js";
-import { createGame } from "../logic.js";
+import { createGame, step } from "../logic.js";
 import { moveCrowd, visiblePerson } from "../crowd.js";
 import { moveParty, partyArrived } from "../party.js";
 const copyParty = (p) => ({
@@ -40,16 +40,26 @@ function gatherSafely(head, party, crowd, model) {
 }
 // Time-expanded search replays all followers against the actual seeded pedestrians.
 // No crowd removal, position edits, or collision suppression is used to find routes.
-export function planRoute(stage, seed, maxSeconds = 25) {
+export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
   const model = createGame(stage, seed),
     crowd = model.crowd,
     startY = model.startY,
     maxProgress = Math.ceil((startY - 85) / 7.5),
     rowWidth = maxProgress + 2;
+  for (let n = 0; n < Math.round(initialWait / 0.025); n++) {
+    model.phase = "playing";
+    step(model, 0.025, { left: true, right: true });
+  }
   let nodes = new Map([
     [
       21 * rowWidth,
-      { x: 240, f: 0, path: "", party: model.party, reserved: 0 },
+      {
+        x: 240,
+        f: 0,
+        path: "B".repeat(Math.round(initialWait / 0.1)),
+        party: model.party,
+        reserved: 0,
+      },
     ],
   ]);
   const dt = 0.1,
@@ -162,7 +172,7 @@ export function planRoute(stage, seed, maxSeconds = 25) {
           if (settle !== null)
             return {
               path: path + "B".repeat(Math.ceil(settle / dt)),
-              seconds: (tick + 1) * dt + settle,
+              seconds: initialWait + (tick + 1) * dt + settle,
             };
           continue;
         }

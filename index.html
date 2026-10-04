@@ -53,32 +53,36 @@
   </head>
   <body>
     <main>
-      <header>
-        <div>
-          <span class="eyebrow" id="scene-label">HOME / 01</span>
-          <h1>
-            <b id="game-name">ライブへ行こう！</b
-            ><span id="scene-purpose">家を出て、住宅街の角で友だちと合流</span>
-          </h1>
+      <div class="hud">
+        <header>
+          <div>
+            <span class="eyebrow" id="scene-label">HOME / 01</span>
+            <h1>
+              <b id="game-name">ライブへ行こう！</b
+              ><span id="scene-purpose"
+                >家を出て、住宅街の角で友だちと合流</span
+              >
+            </h1>
+          </div>
+          <span class="badge" id="stage">STAGE 1 / 5 · ひとりで出発</span>
+        </header>
+        <section class="stats" aria-label="記録">
+          <div>
+            到着タイム<strong id="time">0.0<span>秒</span></strong>
+          </div>
+          <div>
+            接触<strong id="hits">0<span>回</span></strong>
+          </div>
+          <div>
+            目的地まで<strong id="distance">100<span>%</span></strong>
+          </div>
+        </section>
+        <div class="party-strip">
+          <strong id="party-count">自分 + 仲間0人</strong
+          ><span id="party-roster">ひとりで出発</span>
         </div>
-        <span class="badge" id="stage">STAGE 1 / 5 · ひとりで出発</span>
-      </header>
-      <section class="stats" aria-label="記録">
-        <div>
-          到着タイム<strong id="time">0.0<span>秒</span></strong>
-        </div>
-        <div>
-          接触<strong id="hits">0<span>回</span></strong>
-        </div>
-        <div>
-          目的地まで<strong id="distance">100<span>%</span></strong>
-        </div>
-      </section>
-      <div class="party-strip">
-        <strong id="party-count">自分 + 仲間0人</strong
-        ><span id="party-roster">ひとりで出発</span>
+        <div id="traffic-status" hidden aria-label="横断歩道の信号"></div>
       </div>
-      <div id="traffic-status" hidden aria-label="横断歩道の信号"></div>
       <div id="notice" role="status" aria-live="polite"></div>
       <div class="stage">
         <canvas
@@ -99,6 +103,20 @@
           <div class="card">
             <span class="eyebrow" id="label"></span>
             <h2 id="title">ライブへ行こう！</h2>
+            <dl id="result-score" hidden>
+              <div>
+                <dt>到着タイム（加算込み）</dt>
+                <dd id="result-time"></dd>
+              </div>
+              <div>
+                <dt>接触</dt>
+                <dd id="result-hits"></dd>
+              </div>
+              <div>
+                <dt>信号無視</dt>
+                <dd id="result-violations"></dd>
+              </div>
+            </dl>
             <p id="next-purpose" hidden></p>
             <p id="message">
               仲間全員をライブ最前列へ！<br />自動で前進、左右でよけ、両押しで停止。仲間は同じ道を歩き、誰かが接触すると＋2秒。慣れたら全員で接触ゼロに挑戦。
@@ -133,40 +151,43 @@
         ><span id="motion">自動で前進 · 両押しで停止</span
         ><button id="right" aria-label="右へ移動">右へ →</button>
       </div>
-      <section class="input-modes" aria-label="スマホの操作方法">
-        <div>
-          <button id="mode-buttons" class="secondary" aria-pressed="true">
-            左右ボタン</button
-          ><button id="mode-tilt" class="secondary" aria-pressed="false">
-            傾きで操作
-          </button>
-        </div>
-        <div id="tilt-controls" hidden>
-          <button id="recenter" class="secondary">正面合わせ</button
-          ><button id="brake">押している間ブレーキ</button>
-        </div>
-        <p id="tilt-status" role="status">
-          操作方法を選べます。傾き操作は対応したスマホで利用できます。
-        </p>
-      </section>
-      <footer>
-        <p id="keyboard-help">
-          PC：← → / A D · Enterで次へ · Escで停止
-          <span>スマホ：左右のボタン · 両方を押すと停止</span>
-        </p>
-        <div>
-          <button
-            id="sound"
-            disabled
-            class="secondary"
-            aria-label="ミュート切り替え"
-            aria-pressed="true"
-          >
-            音：OFF</button
-          ><button id="pause" class="secondary" disabled>一時停止</button
-          ><button id="restart" class="secondary" disabled>やり直す</button>
-        </div>
-      </footer>
+      <div id="tilt-controls" hidden>
+        <button id="recenter" class="secondary">正面合わせ</button
+        ><button id="brake">押している間ブレーキ</button>
+      </div>
+      <div class="toolbar">
+        <button
+          id="sound"
+          disabled
+          class="secondary"
+          aria-label="ミュート切り替え"
+          aria-pressed="true"
+        >
+          音：OFF</button
+        ><button id="pause" class="secondary" disabled>一時停止</button
+        ><button id="restart" class="secondary" disabled>やり直す</button>
+      </div>
+      <details class="settings">
+        <summary>操作ガイド・設定</summary>
+        <section class="input-modes" aria-label="スマホの操作方法">
+          <div>
+            <button id="mode-buttons" class="secondary" aria-pressed="true">
+              左右ボタン</button
+            ><button id="mode-tilt" class="secondary" aria-pressed="false">
+              傾きで操作
+            </button>
+          </div>
+          <p id="tilt-status" role="status">
+            操作方法を選べます。傾き操作は対応したスマホで利用できます。
+          </p>
+        </section>
+        <footer>
+          <p id="keyboard-help">
+            PC：← → / A D · Enterで次へ · Escで停止
+            <span>スマホ：左右のボタン · 両方を押すと停止</span>
+          </p>
+        </footer>
+      </details>
       <p class="license">
         <a href="./LICENSE">MIT License</a> · © 2026 monnouchi
       </p>

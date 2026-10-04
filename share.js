@@ -26,12 +26,18 @@ export function drawResultCard(records, scene) {
   x.fillStyle = "#edf0e4";
   x.fillRect(0, 0, 720, 520);
   const ratio = scene.width / 480;
+  const region = scene.weaveResultRegion || {
+    x: 95 * ratio,
+    y: 20 * ratio,
+    width: 300 * ratio,
+    height: 215 * ratio,
+  };
   x.drawImage(
     scene,
-    95 * ratio,
-    20 * ratio,
-    300 * ratio,
-    215 * ratio,
+    region.x,
+    region.y,
+    region.width,
+    region.height,
     330,
     145,
     350,

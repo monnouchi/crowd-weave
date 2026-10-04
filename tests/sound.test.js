@@ -71,7 +71,9 @@ test("one cue per result; final fanfare is longer and richer; retry cancels queu
   assert.equal(f.voices.length, ordinary);
   a.goal(4, {});
   assert.ok(f.voices.length - ordinary > ordinary);
-  assert.ok(Math.max(...f.voices.map((v) => v.stopAt)) > end + 1);
+  assert.ok(
+    Math.max(...f.voices.slice(ordinary).map((v) => v.stopAt)) > end + 1,
+  );
   a.update(true, false, 0);
   assert.ok(f.voices.slice(0, -1).every((v) => v.stops >= 2));
 });
@@ -167,8 +169,8 @@ test("lobby music is quiet and muffled, door gain rises smoothly without exceedi
   a.context = f.context;
   a.muted = false;
   a.update(true, false, 4, false);
-  assert.equal(a.musicBus.gain.value, 0.28);
-  assert.equal(a.musicFilter.frequency.value, 750);
+  assert.equal(a.musicBus.gain.value, 0.65);
+  assert.equal(a.musicFilter.frequency.value, 2400);
   f.context.currentTime = 2;
   a.update(true, false, 4, true);
   assert.equal(a.musicBus.gain.value, 1);
@@ -184,16 +186,43 @@ test("lobby music is quiet and muffled, door gain rises smoothly without exceedi
   a.reset();
   a.update(false, false, 4, false);
   assert.notEqual(a.musicBus, previousBus);
-  assert.equal(a.musicBus.gain.value, 0.28);
-  assert.equal(a.musicFilter.frequency.value, 750);
+  assert.equal(a.musicBus.gain.value, 0.65);
+  assert.equal(a.musicFilter.frequency.value, 2400);
   assert.ok(ramps.filter((r) => r.v <= 1).every((r) => r.v <= 1));
   f.context.state = "running";
   a.muted = false;
   a.update(true, false, 4, false);
-  assert.equal(a.musicBus.gain.value, 0.28);
+  assert.equal(a.musicBus.gain.value, 0.65);
   assert.ok(a.voices.size > 0);
   a.suspend();
   assert.equal(a.voices.size, 0);
   a.update(false, false, 4, true);
   assert.equal(a.musicBus.gain.value, 1);
+});
+
+test("arrival resolves I–V–I, final band ends after a finite phrase, and travel keeps a clear beat", () => {
+  const a = new GameAudio(),
+    f = fakeContext();
+  a.context = f.context;
+  a.muted = false;
+  a.goal(0, {});
+  const ordinary = f.voices.length,
+    notes = f.voices.map((v) => v.frequency.value);
+  assert.ok(notes.includes(196));
+  assert.ok(notes.includes(196 * 2 ** (7 / 12)));
+  assert.ok(notes.includes(784));
+  assert.ok(Math.max(...f.voices.map((v) => v.stopAt)) >= 4);
+  a.goal(4, {});
+  assert.ok(Math.max(...f.voices.slice(ordinary).map((v) => v.stopAt)) >= 9);
+  for (let stage = 0; stage < 4; stage++) {
+    a.reset();
+    for (let n = 0; n < 8; n++) {
+      f.context.currentTime = a.nextNote + 0.001;
+      a.update(true, false, stage);
+      assert.ok(
+        Math.abs(a.nextNote - f.context.currentTime - MUSIC[stage].beat) < 1e-8,
+      );
+    }
+    assert.ok(MUSIC[stage].notes[0] >= 784);
+  }
 });

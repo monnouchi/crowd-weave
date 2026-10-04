@@ -32,21 +32,51 @@ const canvas = document.querySelector("canvas"),
   action = document.querySelector("#action"),
   pause = document.querySelector("#pause");
 let renderRatio = 1;
+let projection = { scale: 1, ox: 0, oy: 0, width: W, height: H };
 function resizeDrawingSurface() {
-  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  if (
-    ratio === renderRatio &&
-    canvas.width === Math.round(W * ratio) &&
-    canvas.height === Math.round(H * ratio)
-  )
-    return;
+  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1)),
+    rect = canvas.getBoundingClientRect();
+  const width = Math.round(rect.width * ratio),
+    height = Math.round(rect.height * ratio);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
   renderRatio = ratio;
-  canvas.width = Math.round(W * ratio);
-  canvas.height = Math.round(H * ratio);
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const portrait = rect.width < 600 && rect.height > rect.width;
+  const top = portrait
+    ? document.querySelector(".hud").getBoundingClientRect().bottom + 8
+    : 0;
+  const bottomControls = [
+    ...document.querySelectorAll(
+      ".toolbar,.steering,.settings summary,#tilt-controls:not([hidden])",
+    ),
+  ];
+  const bottom = portrait
+    ? rect.height -
+      Math.min(
+        ...bottomControls.map((element) => element.getBoundingClientRect().top),
+      ) +
+      8
+    : 0;
+  const usableWidth = portrait
+    ? rect.width
+    : Math.max(160, rect.width - (rect.height <= 500 ? 360 : 470));
+  const scale = Math.min(
+    usableWidth / W,
+    Math.max(1, rect.height - top - bottom) / H,
+  );
+  projection = {
+    scale,
+    ox: rect.width / 2 - 240 * scale,
+    oy: top + Math.max(0, (rect.height - top - bottom - H * scale) / 2),
+    width: rect.width,
+    height: rect.height,
+  };
 }
 resizeDrawingSurface();
 window.addEventListener("resize", resizeDrawingSurface);
+window.visualViewport?.addEventListener("resize", resizeDrawingSurface);
 let game = createGame(),
   last = performance.now(),
   buttons = new TwoButtons(),
@@ -81,6 +111,7 @@ function clearInput() {
 }
 function panel(title, message, button, label = "CROWD WEAVE") {
   overlay.hidden = false;
+  $("#result-score").hidden = game.phase !== "finished";
   overlay.classList.toggle("paused", game.phase === "paused");
   overlay.classList.remove("initial");
   overlay.classList.toggle(
@@ -102,6 +133,7 @@ function panel(title, message, button, label = "CROWD WEAVE") {
   action.focus({ preventScroll: true });
 }
 function start(stage = 0) {
+  $("#result-score").hidden = true;
   $("#share-actions").hidden = true;
   $("#start-sound").hidden = true;
   $("#sound").disabled = false;
@@ -497,39 +529,43 @@ function drawTraffic(t) {
   ]) {
     const green = t.nominalGreen,
       proceed = t.canEnter || t.reserved;
-    rounded(x - 22, y - 45, 44, 90, 7, "#0d1c25");
-    ctx.strokeStyle = "#f9fcf5";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x - 19, y - 42, 38, 84);
-    for (const [dy, lit, color] of [
-      [-24, !green, "#ff4356"],
-      [8, green, "#2df4b7"],
+    rounded(x - 3, y - 2, 6, 32, 2, "#58666c");
+    rounded(x - 14, y - 52, 28, 51, 5, "#15222b");
+    ctx.strokeStyle = "#a6b7bf";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 12, y - 50, 24, 47);
+    for (const [dy, lit, color, walking] of [
+      [-38, !green, "#ff526b", false],
+      [-16, green, "#43f0b3", true],
     ]) {
       ctx.beginPath();
-      ctx.arc(x, y + dy, 14, 0, Math.PI * 2);
-      ctx.fillStyle = lit ? color : "#26333d";
+      ctx.arc(x, y + dy, 9, 0, Math.PI * 2);
+      ctx.fillStyle = lit ? color : "#303e49";
       ctx.fill();
       if (!lit) continue;
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
+      ctx.fillStyle = ctx.strokeStyle = "#10202c";
+      ctx.beginPath();
+      ctx.arc(x, y + dy - 4, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x, y + dy - 1);
+      ctx.lineTo(x, y + dy + 3);
+      ctx.moveTo(x - 3, y + dy + 1);
+      ctx.lineTo(x, y + dy);
+      ctx.lineTo(x + 3, y + dy + (walking ? -1 : 1));
+      ctx.moveTo(x - 2, y + dy + 6);
+      ctx.lineTo(x, y + dy + 3);
+      ctx.lineTo(x + 3, y + dy + (walking ? 5 : 6));
       ctx.stroke();
-      ctx.fillStyle = ctx.strokeStyle = "#0a1820";
-      if (proceed && green) {
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(x, y + dy + 7);
-        ctx.lineTo(x, y + dy - 7);
-        ctx.moveTo(x - 5, y + dy - 2);
-        ctx.lineTo(x, y + dy - 7);
-        ctx.lineTo(x + 5, y + dy - 2);
-        ctx.stroke();
-      } else ctx.fillRect(x - 5, y + dy - 5, 10, 10);
     }
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 13px system-ui";
-    ctx.font = `bold ${t.reserved ? 11 : 13}px system-ui`;
-    ctx.fillText(t.reserved ? "横断中" : proceed ? "進む" : "待つ", x, y + 37);
+    rounded(x - 26, y + 24, 52, 20, 4, proceed ? "#d4fff0" : "#ffe7ec");
+    ctx.fillStyle = proceed ? "#075343" : "#802033";
+    ctx.font = "bold 12px system-ui";
+    ctx.fillText(t.reserved ? "横断中" : proceed ? "進む" : "待つ", x, y + 38);
   }
+
   const v = t.vehicle;
   if (!v.active || v.x < -50 || v.x > 530) return;
   ctx.save();
@@ -581,12 +617,73 @@ function drawTraffic(t) {
   ctx.restore();
 }
 function draw() {
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "#d4dfcf";
-  ctx.fillRect(0, 0, W, H);
+  resizeDrawingSurface();
+  const { scale, ox, oy, width, height } = projection;
+  ctx.setTransform(renderRatio, 0, 0, renderRatio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = game.stage === 4 ? "#37374d" : game.scene.floor;
+  ctx.fillRect(0, 0, width, height);
   ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
   const finale = game.stage === 4 && game.phase === "finished";
   ctx.translate(240 - game.player.x, (finale ? 320 : CAMERA_Y) - game.player.y);
+  // Outside the playable corridor: buildings, greenery or hall walls.
+  const cameraY = finale ? 320 : CAMERA_Y;
+  const leftEdge =
+    Math.floor((game.player.x - width / (2 * scale)) / 120) * 120;
+  const rightEdge =
+    Math.ceil((game.player.x + width / (2 * scale)) / 120) * 120;
+  const topEdge =
+    Math.floor((game.player.y - cameraY - oy / scale) / 150) * 150;
+  const bottomEdge = topEdge + height / scale + 150;
+  for (let x = leftEdge; x < rightEdge; x += 120) {
+    if (x >= 0 && x < W) continue;
+    for (let y = topEdge; y < bottomEdge; y += 150) {
+      rounded(
+        x + 10,
+        y + 10,
+        100,
+        130,
+        6,
+        game.stage === 4 ? "#46455e" : game.stage === 3 ? "#889b9b" : "#c3ceb7",
+      );
+      rounded(
+        x + 22,
+        y + 25,
+        30,
+        34,
+        3,
+        game.stage === 4 ? "#6b607c" : "#e4e1cc",
+      );
+      rounded(
+        x + 64,
+        y + 25,
+        30,
+        34,
+        3,
+        game.stage === 4 ? "#6b607c" : "#d4e7e0",
+      );
+      rounded(
+        x + 20,
+        y + 90,
+        76,
+        12,
+        3,
+        game.stage === 4 ? "#57546f" : "#a7b693",
+      );
+    }
+  }
+  const shareX = (ox + (60 + 240 - game.player.x) * scale) * renderRatio;
+  const shareY =
+    (oy + (-195 + (finale ? 320 : CAMERA_Y) - game.player.y) * scale) *
+    renderRatio;
+  canvas.weaveResultRegion = {
+    x: shareX,
+    y: shareY,
+    width: 360 * scale * renderRatio,
+    height: 258 * scale * renderRatio,
+  };
   ctx.fillStyle = game.scene.floor;
   ctx.fillRect(0, -800, W, H + 1000);
   ctx.fillStyle = "#d4dfcf";
@@ -628,7 +725,11 @@ function draw() {
   );
   rounded(28, -230, 90, 35, 5, "#839781");
   rounded(350, -230, 90, 35, 5, "#839781");
-  for (let i = 0; i < game.scene.backgroundCount; i++) {
+  for (
+    let i = 0;
+    i < (game.stage === 4 ? 0 : game.scene.backgroundCount);
+    i++
+  ) {
     const y =
       -100 - ((i * 63 + game.worldTime * (i % 2 ? 20 : -18) + 1200) % 350);
     person({
@@ -833,6 +934,16 @@ function draw() {
     displayPlayer,
   ].sort((a, b) => a.y - b.y))
     person(p, p.player);
+  if (finale && !reducedMotion.matches) {
+    // Sparse warm confetti, no flashes and no change to the recorded clock.
+    const t = performance.now() / 1000;
+    for (let i = 0; i < 24; i++) {
+      const x = 70 + ((i * 73) % 340),
+        y = -210 + ((i * 29 + t * 12) % 230);
+      ctx.fillStyle = ["#e6c46f", "#e9acc7", "#a8dccd"][i % 3];
+      ctx.fillRect(x, y, 3, 5);
+    }
+  }
   if (!finale && game.cooldown > 0 && game.lastContactMember === 0) {
     ctx.strokeStyle = "#d37a46";
     ctx.lineWidth = 3;
@@ -1031,6 +1142,19 @@ function frame(now) {
       violations: trafficViolations(game),
     };
     const totals = resultTotals(records);
+    $("#result-score dt").textContent =
+      game.stage === 4 ? "全5区間の合計タイム" : "到着タイム（加算込み）";
+    const score =
+      game.stage === 4
+        ? totals
+        : {
+            time: game.elapsed,
+            hits: game.hits,
+            violations: trafficViolations(game),
+          };
+    $("#result-time").innerHTML = `${score.time.toFixed(1)}<small>秒</small>`;
+    $("#result-hits").innerHTML = `${score.hits}<small>回</small>`;
+    $("#result-violations").innerHTML = `${score.violations}<small>回</small>`;
     const cleanStage = game.hits === 0 && !trafficViolations(game);
     $("#share-actions").hidden = game.stage !== 4;
     if (game.stage < 4)
@@ -1041,10 +1165,10 @@ function frame(now) {
           : "");
     $("#next-purpose").hidden = game.stage === 4;
     panel(
-      game.stage === 4 ? "仲間全員、ライブ最前列へ！" : game.scene.arrival,
+      game.stage === 4 ? "全員、最前列へ！" : game.scene.arrival,
       game.stage === 4
-        ? `全5区間を完走。合計 ${totals.time.toFixed(1)}秒 / 接触 ${totals.hits}回 / 信号無視 ${totals.violations}回。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
-        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。タイム ${game.elapsed.toFixed(1)}秒（加算を含む） / 接触 ${game.hits}回${game.traffic ? ` / 信号無視 ${trafficViolations(game)}回` : ""}。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
+        ? `全5区間を完走。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
+        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
       game.stage < 4 ? "次のステージへ →" : "最初からもう一度 →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
@@ -1056,9 +1180,7 @@ function frame(now) {
       : game.scene.bubble;
   const callout = $("#goal-callout"),
     rect = canvas.getBoundingClientRect();
-  const scale = Math.min(rect.width / W, rect.height / H),
-    ox = (rect.width - W * scale) / 2,
-    oy = (rect.height - H * scale) / 2;
+  const { scale, ox, oy } = projection;
   const px = ox + (game.meetingPartner.x + 240 - game.player.x) * scale,
     py = oy + (game.meetingPartner.y + CAMERA_Y - game.player.y) * scale;
   callout.hidden = game.phase !== "playing" || game.player.y > 500 || py < 55;
@@ -1084,7 +1206,7 @@ function frame(now) {
     game.worldTime >= companionSpeech.until;
   if (!speech.hidden) {
     const x = ox + (speaker.x + 240 - game.player.x) * scale;
-    const y = oy + (speaker.y - 18 + CAMERA_Y - game.player.y) * scale;
+    const y = oy + (speaker.y - 29 + CAMERA_Y - game.player.y) * scale;
     const width = speech.offsetWidth,
       height = speech.offsetHeight;
     const obstacles = game.crossings.flatMap((t) =>
@@ -1098,6 +1220,17 @@ function frame(now) {
         bottom: oy + (sy + 48 + CAMERA_Y - game.player.y) * scale,
       })),
     );
+    for (const element of document.querySelectorAll(
+      ".hud,.toolbar,.steering,.settings",
+    )) {
+      const box = element.getBoundingClientRect();
+      obstacles.push({
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+      });
+    }
     obstacles.push({
       left: ox + (240 - 21) * scale,
       right: ox + (240 + 21) * scale,

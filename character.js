@@ -121,10 +121,10 @@ export function umbrellaRig(pose, width, stride = 0) {
   const view = facingView(pose),
     back = view.startsWith("back");
   const side = pose.uy < -0.3 ? 1 : pose.uy > 0.3 ? -1 : pose.ux < 0 ? -1 : 1;
-  const shoulder = { x: side * (width / 2 - 1), y: back ? -2 : 0 };
+  const shoulder = { x: side * (width / 2 - 1), y: -7 };
   const grip = {
     x: side * (width / 2 + 4) + stride * 0.15,
-    y: -5 + pose.uy * 2,
+    y: -10 + pose.uy * 2,
   };
   const canopy = { x: grip.x - side * 10 + stride * 0.12, y: grip.y - 25 };
   return { shoulder, grip, canopy, side, behind: back || view === "left" };
@@ -217,19 +217,23 @@ export function drawCharacter(
   if (p.partner) c.scale(p.visualScale ?? 1, p.visualScale ?? 1);
   c.fillStyle = "#173d3c20";
   c.beginPath();
-  c.ellipse(2, 11, 14, 7, 0, 0, Math.PI * 2);
+  c.ellipse(0, 19, 11, 3, 0, 0, Math.PI * 2);
   c.fill();
-  for (const sign of [-1, 1])
-    foot(
-      c,
-      sign * r * 0.42 + pose.ux * stride * sign,
-      14 + pose.uy * stride * sign,
-      pose.ux,
-      pose.uy,
-    );
+  for (const sign of [-1, 1]) {
+    const fx = sign * r * 0.36 + pose.ux * stride * sign,
+      fy = 17 + pose.uy * stride * sign;
+    c.strokeStyle = "#465269";
+    c.lineWidth = 4;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(sign * r * 0.28, 7);
+    c.lineTo(fx, fy);
+    c.stroke();
+    foot(c, fx, fy, pose.ux, pose.uy);
+  }
   c.save();
   if (player) c.rotate(lean);
-  const width = r * (side ? 1.45 : diagonal ? 1.8 : 2) * appearance.width;
+  const width = r * (side ? 1 : diagonal ? 1.2 : 1.3) * appearance.width;
   const rig = umbrellaRig(pose, width, stride);
   const canopyColor = ["#507f9b", "#a96d6b", "#7d8c6b"][p.id % 3];
   if (p.umbrella && rig.behind) {
@@ -238,23 +242,29 @@ export function drawCharacter(
     circle(c, rig.grip.x, rig.grip.y, 2.6, skin);
   }
   if (["long", "bob"].includes(appearance.style))
-    rounded(c, -7, -11, 14, appearance.style === "long" ? 18 : 13, 6, hair);
-  // Actual travel drives counter-swing; a stationary pose plants both feet.
-  for (const sign of [-1, 1])
-    circle(
-      c,
-      sign * (width / 2 + 1) - pose.ux * stride * sign * 0.4,
-      4 - pose.uy * stride * sign * 0.55,
-      2.5,
-      skin,
-    );
-  rounded(c, -width / 2, -5, width, 20, 8, shirt);
+    rounded(c, -7, -22, 14, appearance.style === "long" ? 18 : 13, 6, hair);
+  // Connected shoulder, elbow and hand; planted feet stop the counter-swing.
+  for (const sign of [-1, 1]) {
+    const hx = sign * (width / 2 + 4) - pose.ux * stride * sign * 0.4,
+      hy = 3 - pose.uy * stride * sign * 0.8;
+    c.strokeStyle = shirt;
+    c.lineWidth = 4;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(sign * (width / 2 - 1), -7);
+    c.lineTo(sign * (width / 2 + 3), -2);
+    c.lineTo(hx, hy);
+    c.stroke();
+    circle(c, hx, hy, 2.3, skin);
+  }
+  rounded(c, -width / 2, -9, width, 19, 3, shirt);
+  rounded(c, -2, -14, 4, 6, 1, skin);
   if (appearance.outfit === "skirt" && !player) {
     c.fillStyle = shirt;
     c.beginPath();
     c.moveTo(-width * 0.32, 7);
-    c.lineTo(-width * 0.52, 16);
-    c.lineTo(width * 0.52, 16);
+    c.lineTo(-width * 0.52, 12);
+    c.lineTo(width * 0.52, 12);
     c.lineTo(width * 0.32, 7);
     c.fill();
   } else if (appearance.outfit !== "shirt" && !player) {
@@ -309,6 +319,9 @@ export function drawCharacter(
     c.stroke();
   }
   const hx = side || diagonal ? direction * 1.3 : 0;
+  c.save();
+  c.translate(0, -11);
+  c.scale(Math.min(1, r / 13) * 0.9, Math.min(1, r / 13) * 0.9);
   // Head always stays above shoulders. A back view has a nape, not front eyes.
   circle(c, hx, -8, 8, skin);
   if (back) {
@@ -394,6 +407,7 @@ export function drawCharacter(
     }
     c.stroke();
   }
+  c.restore();
   if (p.umbrella && !rig.behind) {
     umbrella(c, rig, canopyColor, "canopy");
     umbrella(c, rig, shirt, "arm");
@@ -402,9 +416,9 @@ export function drawCharacter(
   if (live && p.glowStick) {
     const swing = reducedMotion ? 0 : Math.sin(time * 1.8 + p.id) * 0.18;
     const sx = direction * (width / 2 - 1),
-      sy = 1;
+      sy = -7;
     const handX = sx + direction * 3,
-      handY = -4;
+      handY = -12;
     c.strokeStyle = shirt;
     c.lineWidth = 4;
     c.lineCap = "round";
@@ -427,6 +441,7 @@ export function drawCharacter(
     c.restore();
   }
   if (p.reaction && !back) {
+    c.save(); c.translate(0,-11); c.scale(Math.min(1,r / 13) * .9, Math.min(1,r / 13) * .9);
     c.strokeStyle = "#85432c";
     c.lineWidth = 1.5;
     c.beginPath();
@@ -437,6 +452,7 @@ export function drawCharacter(
       c.lineTo(hx + 5, -9);
     }
     c.stroke();
+    c.restore();
   }
   if (p.suitcase) {
     rounded(c, 14, 8, 12, 20, 3, "#775f4b");
@@ -447,9 +463,19 @@ export function drawCharacter(
     c.lineTo(20, 10);
     c.stroke();
   }
-  if (p.targetKind === "clerk") rounded(c, hx - 9, -16, 18, 5, 2, "#496c64");
-  if (waving)
-    circle(c, -width / 2 - 3, -3 + (reducedMotion ? 0 : wave), 3, skin);
+  if (p.targetKind === "clerk") rounded(c, hx - 9, -27, 18, 5, 2, "#496c64");
+  if (waving || p.state === "celebrating") {
+    const handY = -25 + (reducedMotion ? 0 : wave);
+    c.strokeStyle = shirt;
+    c.lineWidth = 4;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(-width / 2 + 1, -7);
+    c.lineTo(-width / 2 - 5, -15);
+    c.lineTo(-width / 2 - 8, handY);
+    c.stroke();
+    circle(c, -width / 2 - 8, handY, 2.5, skin);
+  }
   c.restore();
   if (player) {
     c.strokeStyle = "#fff";

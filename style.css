@@ -176,34 +176,6 @@ footer > div {
   visibility: visible;
 }
 
-@media (max-width: 420px) {
-  main {
-    width: calc(100% - 20px);
-    margin: 14px auto;
-  }
-  h1 {
-    font-size: 26px;
-  }
-  .badge {
-    font-size: 9px;
-  }
-  .card {
-    padding: 22px;
-  }
-  h2 {
-    font-size: 23px;
-  }
-  footer {
-    align-items: flex-start;
-  }
-  footer p {
-    max-width: 190px;
-  }
-  canvas {
-    max-height: 62vh;
-  }
-}
-
 .steering {
   display: flex;
   align-items: center;
@@ -244,11 +216,6 @@ footer > div {
 }
 canvas {
   max-height: 55vh;
-}
-@media (max-width: 420px) {
-  canvas {
-    max-height: 50vh;
-  }
 }
 
 .license {
@@ -344,63 +311,6 @@ canvas:focus-visible {
 }
 
 /* Keep the full-width playfield readable beside controls on larger screens. */
-@media (min-width: 850px) {
-  main {
-    width: min(calc(100% - 48px), 920px);
-    margin: 24px auto;
-    display: grid;
-    grid-template-columns: minmax(380px, 480px) minmax(280px, 1fr);
-    grid-template-rows: repeat(8, min-content);
-    gap: 12px 24px;
-    align-items: start;
-  }
-  main > :not(.stage) {
-    grid-column: 2;
-  }
-  .stage {
-    grid-column: 1;
-    grid-row: 1 / span 8;
-    border-radius: 18px;
-  }
-  canvas {
-    max-height: none;
-    width: 100%;
-  }
-  header {
-    flex-wrap: wrap;
-  }
-  h1 {
-    margin-bottom: 8px;
-  }
-  .stats {
-    border-radius: 14px;
-  }
-  .party-strip {
-    border-radius: 10px;
-  }
-  #notice {
-    border-radius: 10px;
-    min-height: 38px;
-  }
-  .steering {
-    margin: 0;
-  }
-  .input-modes {
-    margin-top: 0;
-  }
-  footer {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-  footer p {
-    font-size: 12px;
-    margin: 0 0 8px;
-  }
-  .license {
-    margin: 0;
-  }
-}
 
 #traffic-status {
   display: flex;
@@ -447,67 +357,6 @@ canvas:focus-visible {
   color: #78531a;
   background: #f5e6bd;
   border-color: #85611d;
-}
-@media (max-width: 849px) and (min-height: 501px) {
-  .with-traffic #game {
-    max-height: min(
-      52svh,
-      calc(100svh - 380px - env(safe-area-inset-bottom, 0px))
-    );
-  }
-}
-@media (min-width: 850px) {
-  .stage {
-    grid-row: 1 / span 9;
-  }
-  #traffic-status {
-    margin: 0;
-  }
-}
-
-@media (max-width: 849px) {
-  main {
-    margin: 8px auto;
-  }
-  h1 {
-    margin: 3px 0 9px;
-    font-size: 25px;
-  }
-  h1 span {
-    font-size: 11px;
-    line-height: 1.5;
-  }
-  .stats {
-    padding: 9px 14px;
-  }
-  .stats strong {
-    font-size: 23px;
-  }
-  .party-strip {
-    padding: 6px 14px;
-  }
-  #notice {
-    min-height: 22px;
-    padding: 2px 10px;
-  }
-  #traffic-status {
-    padding: 6px 10px;
-    font-size: 14px;
-    margin: 4px 0;
-  }
-  canvas {
-    max-height: min(
-      52svh,
-      calc(100svh - 348px - env(safe-area-inset-bottom, 0px))
-    );
-  }
-  .steering {
-    margin: 8px 0;
-  }
-  .steering button {
-    padding: 15px 10px;
-    min-height: 54px;
-  }
 }
 
 .overlay.finale {
@@ -563,15 +412,6 @@ canvas:focus-visible {
   max-height: calc(100svh - 32px);
   overflow-y: auto;
 }
-@media (max-width: 849px) and (max-height: 740px) {
-  .overlay.finale {
-    position: fixed;
-    z-index: 10;
-    place-items: center;
-    background: #183d3c66;
-    pointer-events: none;
-  }
-}
 
 /* Reserve two lines so a contact notification never moves the touch controls. */
 #notice {
@@ -580,85 +420,6 @@ canvas:focus-visible {
 }
 
 /* In phone landscape, put controls beside the road instead of shrinking it. */
-@media (min-width: 600px) and (max-height: 500px) {
-  main {
-    width: calc(100% - 24px);
-    margin: 12px auto;
-    display: grid;
-    grid-template-columns: minmax(230px, calc(70.58svh - 17px)) minmax(
-        280px,
-        1fr
-      );
-    grid-template-rows: repeat(9, min-content);
-    gap: 8px 16px;
-    align-items: start;
-  }
-  main > :not(.stage) {
-    grid-column: 2;
-  }
-  .stage {
-    grid-column: 1;
-    grid-row: 1 / span 9;
-    border-radius: 14px;
-    position: sticky;
-    top: 12px;
-  }
-  canvas {
-    max-height: calc(100svh - 24px);
-  }
-  header {
-    gap: 8px;
-  }
-  h1 {
-    font-size: 20px;
-    margin: 2px 0 0;
-  }
-  h1 span {
-    font-size: 10px;
-  }
-  .badge {
-    font-size: 9px;
-    padding: 7px;
-    max-width: 170px;
-  }
-  .stats {
-    border-radius: 12px;
-    padding: 6px 12px;
-  }
-  .stats strong {
-    font-size: 20px;
-  }
-  .party-strip {
-    border-radius: 8px;
-    padding: 6px 12px;
-  }
-  #notice,
-  #traffic-status {
-    margin: 0;
-    border-radius: 8px;
-  }
-  .steering {
-    margin: 0;
-  }
-  .input-modes {
-    margin: 0;
-  }
-  #tilt-status {
-    margin: 4px 0;
-    font-size: 10px;
-  }
-  footer {
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  footer p {
-    margin: 0;
-    font-size: 10px;
-  }
-  .license {
-    margin: 4px 0;
-  }
-}
 
 .initial #action,
 .initial #start-sound {
@@ -675,69 +436,7 @@ canvas:focus-visible {
 .start-actions #action {
   flex: 1;
 }
-@media (min-width: 600px) and (max-height: 500px) {
-  .overlay:not(.paused) .card {
-    max-width: 620px;
-    padding: 16px 20px;
-  }
-  .card h2 {
-    font-size: 22px;
-    margin: 6px 0;
-  }
-  .card h2 br {
-    display: none;
-  }
-  .card #message {
-    font-size: 12px;
-    line-height: 1.6;
-    margin: 8px 0;
-  }
-  .card .enter-hint {
-    font-size: 11px;
-  }
-  .overlay.paused {
-    position: fixed;
-    inset: auto;
-    top: 12px;
-    left: 12px;
-    width: max(230px, calc(70.58svh - 17px));
-    height: calc(100svh - 24px);
-    padding: 10px;
-  }
-  .overlay.paused .card {
-    padding: 14px;
-    max-height: 100%;
-  }
-}
-@media (min-width: 600px) and (max-height: 500px) {
-  header {
-    grid-row: 1;
-  }
-  .stats {
-    grid-row: 2;
-  }
-  #traffic-status {
-    grid-row: 3;
-  }
-  .steering {
-    grid-row: 4;
-  }
-  .party-strip {
-    grid-row: 5;
-  }
-  #notice {
-    grid-row: 6;
-  }
-  .input-modes {
-    grid-row: 7;
-  }
-  footer {
-    grid-row: 8;
-  }
-  .license {
-    grid-row: 9;
-  }
-}
+
 #companion-bubble {
   position: absolute;
   z-index: 2;
@@ -782,4 +481,556 @@ main:has(.overlay.initial:not([hidden])) #game-name {
 .overlay.initial #title {
   font-size: clamp(22px, 6vw, 27px);
   white-space: nowrap;
+}
+
+/* The road keeps its complete 500-unit warning view; excess viewport is scenery. */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+main {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  display: block;
+}
+.stage {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+#game {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: fill;
+}
+.hud {
+  position: absolute;
+  z-index: 3;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  width: 220px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fffdf5ed;
+  box-shadow: 0 4px 20px #173d3c18;
+  pointer-events: none;
+}
+header {
+  display: block;
+}
+h1 {
+  font-size: 22px;
+  margin: 3px 0 7px;
+  letter-spacing: -0.5px;
+}
+h1 span {
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.45;
+}
+.badge {
+  display: block;
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+}
+.stats {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  gap: 8px;
+}
+.stats strong {
+  font-size: 25px;
+}
+.party-strip {
+  background: transparent;
+  padding: 4px 0;
+  font-size: 12px;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+#traffic-status {
+  padding: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 6px 0 0;
+}
+#traffic-status::before {
+  flex-basis: 28px;
+  width: 28px;
+  height: 46px;
+  background:
+    radial-gradient(circle at 12px 11px, #ff4356 8px, transparent 8.5px),
+    radial-gradient(circle at 12px 33px, #26333d 8px, transparent 8.5px),
+    #0d1c25;
+}
+#traffic-status.green::before,
+#traffic-status.warning::before {
+  background:
+    radial-gradient(circle at 12px 11px, #26333d 8px, transparent 8.5px),
+    radial-gradient(circle at 12px 33px, #2df4b7 8px, transparent 8.5px),
+    #0d1c25;
+}
+.toolbar {
+  position: absolute;
+  z-index: 4;
+  right: max(12px, env(safe-area-inset-right));
+  top: max(12px, env(safe-area-inset-top));
+  display: flex;
+  gap: 6px;
+}
+.toolbar button {
+  min-height: 44px;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: #fffdf5ed;
+}
+.steering {
+  position: absolute;
+  z-index: 4;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  margin: 0;
+  pointer-events: none;
+}
+.steering button {
+  width: 108px;
+  min-height: 60px;
+  font-size: 16px;
+  background: #245c56ed;
+  pointer-events: auto;
+}
+.steering span {
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #fffdf5ed;
+  color: #245c56;
+  font-size: 12px;
+}
+#tilt-controls {
+  position: absolute;
+  z-index: 4;
+  bottom: 84px;
+  right: 12px;
+  width: 210px;
+  display: flex;
+  gap: 5px;
+}
+#tilt-controls[hidden] {
+  display: none;
+}
+#brake {
+  min-height: 58px;
+  padding: 8px;
+  font-size: 12px;
+}
+.settings {
+  position: absolute;
+  z-index: 5;
+  right: max(12px, env(safe-area-inset-right));
+  top: 66px;
+  width: 240px;
+  font-size: 12px;
+}
+.settings summary {
+  cursor: pointer;
+  margin-left: auto;
+  width: max-content;
+  padding: 10px 12px;
+  min-height: 44px;
+  background: #fffdf5ed;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.settings[open] {
+  padding: 12px;
+  background: #fffdf5;
+  border-radius: 14px;
+  max-height: calc(100dvh - 180px);
+  overflow: auto;
+  box-shadow: 0 12px 30px #183d3c30;
+}
+.settings footer {
+  display: block;
+}
+.settings #keyboard-help {
+  max-width: none;
+  font-size: 12px;
+}
+.input-modes {
+  margin: 10px 0 0;
+}
+.license {
+  position: absolute;
+  z-index: 3;
+  bottom: 3px;
+  right: 12px;
+  font-size: 9px;
+  margin: 0;
+  opacity: 0.65;
+}
+#notice {
+  position: absolute;
+  z-index: 4;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(330px, calc(100% - 24px));
+  height: 40px;
+  border-radius: 8px;
+}
+.overlay,
+.overlay.finale,
+.overlay.paused {
+  position: fixed;
+  z-index: 6;
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: 16px;
+  place-items: center;
+  pointer-events: none;
+  background: #183d3c66;
+}
+.overlay.finale {
+  background: linear-gradient(transparent 30%, #2524428c);
+  place-items: end center;
+}
+.card,
+.finale .card {
+  max-width: 380px;
+  padding: 22px;
+  max-height: calc(100dvh - 32px);
+}
+.finale .card {
+  background: #28283df2;
+  color: #fff3cf;
+  border: 1px solid #eed5a1;
+}
+.finale .eyebrow,
+.finale .enter-hint {
+  color: #e6d2ac;
+}
+#result-score {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+  font-variant-numeric: tabular-nums;
+}
+#result-score[hidden] {
+  display: none;
+}
+#result-score div:first-child {
+  grid-column: 1 / -1;
+}
+#result-score dt {
+  font-size: 12px;
+}
+#result-score dd {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 2px 0;
+}
+#result-score div:first-child dd {
+  font-size: 48px;
+  line-height: 1.1;
+}
+#result-score dd small {
+  font-size: 14px;
+  margin-left: 4px;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .hud {
+    top: max(6px, env(safe-area-inset-top));
+    left: 8px;
+    width: calc(100% - 16px);
+    padding: 7px 10px;
+    border-radius: 12px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+  }
+  #scene-purpose {
+    font-size: 11px;
+  }
+  #scene-label {
+    font-size: 9px;
+  }
+  .badge {
+    max-width: 92px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .stats {
+    padding: 4px 0;
+  }
+  .stats strong {
+    font-size: 24px;
+  }
+  .party-strip {
+    padding: 0;
+    font-size: 11px;
+  }
+  #traffic-status {
+    font-size: 12px;
+    padding: 4px 7px;
+    margin: 4px 0 0;
+  }
+  #traffic-status::before {
+    height: 28px;
+    flex-basis: 48px;
+    background:
+      radial-gradient(circle at 11px 12px, #ff4356 8px, transparent 8.5px),
+      radial-gradient(circle at 35px 12px, #26333d 8px, transparent 8.5px),
+      #0d1c25;
+  }
+  #traffic-status.green::before,
+  #traffic-status.warning::before {
+    background:
+      radial-gradient(circle at 11px 12px, #26333d 8px, transparent 8.5px),
+      radial-gradient(circle at 35px 12px, #2df4b7 8px, transparent 8.5px),
+      #0d1c25;
+  }
+  .toolbar {
+    top: auto;
+    bottom: 84px;
+    right: 10px;
+    gap: 4px;
+  }
+  .toolbar button {
+    font-size: 11px;
+    padding: 6px 9px;
+    min-height: 40px;
+  }
+  .settings {
+    top: auto;
+    bottom: 84px;
+    left: 10px;
+    right: auto;
+    width: calc(100% - 20px);
+    pointer-events: none;
+  }
+  .settings summary {
+    pointer-events: auto;
+    margin-left: 0;
+    padding: 9px;
+    font-size: 11px;
+    min-height: 40px;
+  }
+  .settings[open] {
+    pointer-events: auto;
+    bottom: 132px;
+    max-height: calc(100dvh - 190px);
+  }
+  .steering button {
+    width: 90px;
+  }
+  .steering span {
+    font-size: 10px;
+    max-width: 112px;
+  }
+  #notice {
+    bottom: 132px;
+  }
+  #tilt-controls {
+    bottom: 132px;
+  }
+  .overlay.finale {
+    place-items: center;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .hud {
+    width: 170px;
+    padding: 8px;
+  }
+  h1 {
+    font-size: 16px;
+  }
+  h1 span,
+  .badge {
+    font-size: 10px;
+  }
+  .stats strong {
+    font-size: 20px;
+  }
+  .stats {
+    font-size: 9px;
+  }
+  .party-strip {
+    font-size: 10px;
+  }
+  #traffic-status {
+    font-size: 11px;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .settings {
+    top: 160px;
+    width: 175px;
+  }
+  .steering button {
+    width: 100px;
+    min-height: 54px;
+  }
+  .steering span {
+    display: none;
+  }
+  .overlay.finale {
+    place-items: center;
+  }
+  #result-score {
+    margin: 8px 0;
+  }
+  #result-score div:first-child dd {
+    font-size: 38px;
+  }
+  .finale .card {
+    max-width: 570px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
+
+main .stage #game {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+}
+
+.hud #game-name {
+  display: none;
+}
+.hud h1 {
+  margin: 0;
+}
+.hud #scene-purpose {
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.hud header > div {
+  min-width: 0;
+}
+.hud .stats {
+  padding: 4px 0;
+}
+.hud .stats strong {
+  font-size: 24px;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .hud #scene-purpose {
+    font-size: 11px;
+  }
+  .hud #traffic-status {
+    line-height: 1.35;
+  }
+}
+
+/* Final totals leave the band and the complete celebrating group visible. */
+.overlay.finale {
+  place-items: end right;
+}
+.finale .card {
+  max-width: 350px;
+  padding: 16px 20px;
+}
+.finale #result-score {
+  grid-template-columns: 1.6fr 0.7fr 0.7fr;
+  gap: 6px;
+  margin: 12px 0;
+  align-items: end;
+}
+.finale #result-score div:first-child {
+  grid-column: auto;
+}
+.finale #result-score dt {
+  font-size: 10px;
+}
+.finale #result-score div:first-child dd {
+  font-size: 42px;
+}
+.finale #result-score dd {
+  font-size: 25px;
+}
+.finale h2 {
+  font-size: 20px;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .overlay.finale {
+    place-items: end center;
+  }
+  .finale .card {
+    max-height: calc(100dvh - 330px);
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .overlay.finale {
+    place-items: end center;
+  }
+  .finale .card {
+    max-width: 570px;
+    max-height: 180px;
+  }
+}
+.settings {
+  z-index: 7;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  main:has(#tilt-controls:not([hidden])) .settings[open] {
+    bottom: 204px;
+    max-height: calc(100dvh - 260px);
+  }
+}
+
+.stage .overlay {
+  z-index: 6;
+}
+.settings {
+  z-index: 7;
+}
+
+main:has(#result-score:not([hidden])) .settings,
+main:has(#result-score:not([hidden])) .toolbar,
+main:has(#result-score:not([hidden])) .steering,
+main:has(#result-score:not([hidden])) #tilt-controls {
+  visibility: hidden;
+}
+main:has(.overlay.finale:not([hidden])) .hud {
+  visibility: hidden;
+}
+
+@media (max-width: 599px) and (orientation: portrait) {
+  .toolbar,
+  .settings {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  .settings[open],
+  #tilt-controls {
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+  main:has(#tilt-controls:not([hidden])) .settings[open] {
+    bottom: calc(204px + env(safe-area-inset-bottom, 0px));
+  }
 }

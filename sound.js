@@ -6,7 +6,7 @@ export const MUSIC = [
     beat: 0.48,
     type: "triangle",
     volume: 0.007,
-    duration: 0.22,
+    duration: 0.41,
     mood: "軽い出発",
   },
   {
@@ -14,15 +14,15 @@ export const MUSIC = [
     beat: 0.33,
     type: "triangle",
     volume: 0.009,
-    duration: 0.14,
+    duration: 0.28,
     mood: "駅へ急ぐリズム",
   },
   {
     root: 196,
     beat: 0.56,
-    type: "sine",
-    volume: 0.006,
-    duration: 0.3,
+    type: "triangle",
+    volume: 0.008,
+    duration: 0.47,
     mood: "カフェのひと休み",
   },
   {
@@ -30,7 +30,7 @@ export const MUSIC = [
     beat: 0.37,
     type: "triangle",
     volume: 0.009,
-    duration: 0.18,
+    duration: 0.31,
     mood: "会場への期待",
   },
   {
@@ -41,10 +41,48 @@ export const MUSIC = [
     duration: 0.16,
     mood: "パーティーの高揚",
   },
-].map((m) => ({
+].map((m, stage) => ({
   ...m,
-  notes: MOTIF.map((semitone) => m.root * 2 ** (semitone / 12)),
+  notes: MOTIF.map(
+    (semitone) => m.root * (stage < 4 ? 4 : 1) * 2 ** (semitone / 12),
+  ),
 }));
+// Original V6 arrival phrase: G major, I–V–I. Times are musical ticks.
+export const ARRIVAL = [
+  [0, 0, 0.75, 100],
+  [1, 4, 0.45, 78],
+  [2, 7, 1.25, 90],
+  [4, 11, 1.5, 100],
+  [6, 14, 0.6, 90],
+  [7, 11, 0.6, 78],
+  [8, 12, 0.75, 100],
+  [10, 12, 3, 94],
+];
+export const FINALE = [
+  [0, 0, 1.25, 100],
+  [2, 4, 0.65, 90],
+  [3, 7, 0.65, 78],
+  [4, 12, 2.5, 100],
+  [7, 7, 0.65, 82],
+  [8, 11, 1.5, 100],
+  [10, 14, 0.65, 90],
+  [11, 7, 0.65, 78],
+  [12, 14, 1.8, 100],
+  [14, 11, 0.65, 88],
+  [15, 11, 0.65, 78],
+  [16, 12, 0.65, 100],
+  [17, 7, 0.65, 78],
+  [18, 4, 1.5, 90],
+  [20, 7, 1.5, 100],
+  [22, 12, 0.65, 90],
+  [23, 4, 0.65, 78],
+  [24, 7, 1.5, 100],
+  [26, 2, 0.65, 88],
+  [27, 7, 0.65, 78],
+  [28, 11, 1.25, 94],
+  [30, 11, 1.75, 90],
+  [32, 12, 5, 100],
+];
 // Original synthesized notes; no recordings or third-party music.
 export class GameAudio {
   constructor() {
@@ -126,6 +164,9 @@ export class GameAudio {
   goal(stage, run) {
     if (this.seenGoals.has(run)) return;
     this.seenGoals.add(run);
+    this.stopVoices();
+    this.active = false;
+    this.nextNote = 0;
     this.effect(stage === 4 ? "final" : "goal", stage);
   }
   effect(kind, stage = 0) {
@@ -138,17 +179,46 @@ export class GameAudio {
       this.tone(440, 0.22, 0.014, 0.11, "sine");
     }
     if (kind === "brake") this.tone(220, 0.08, 0.012);
-    if (kind === "goal")
-      [392, 494, 587, 784].forEach((n, i) =>
-        this.tone(n * (1 + stage * 0.035), 0.22, 0.035, i * 0.1),
-      );
-    if (kind === "final") {
-      [392, 494, 587, 784, 659, 784, 988, 1175].forEach((n, i) =>
-        this.tone(n, 0.3, 0.026, i * 0.14, "triangle"),
-      );
-      [587, 784, 1175].forEach((n) => this.tone(n, 0.75, 0.018, 1.25, "sine"));
+    if (kind === "goal" || kind === "final") {
+      const band = kind === "final",
+        tick = band ? 0.25 : 0.3;
+      const phrase = band ? FINALE : ARRIVAL;
+      for (const [at, semitone, length, accent] of phrase)
+        this.tone(
+          392 * 2 ** (semitone / 12),
+          length * tick + (at === (band ? 32 : 10) ? 0.45 : 0.06),
+          (0.023 * accent) / 100,
+          at * tick,
+          "triangle",
+        );
+      const end = band ? 32 : 10;
+      for (let n = 0; n <= end; n++) {
+        const dominant = band
+          ? (n >= 8 && n < 16) || (n >= 24 && n < 32)
+          : n >= 4 && n < 8;
+        const root = 196 * 2 ** ((dominant ? 7 : 0) / 12),
+          ending = n === end;
+        if (band) {
+          this.tone(root / 2, ending ? 1.2 : 0.22, 0.009, n * tick, "triangle");
+          if (!ending && n % 4 === 0)
+            this.tone(100, 0.12, 0.012, n * tick, "sine", false, 45);
+          if (!ending && n % 4 === 2)
+            this.tone(180, 0.08, 0.005, n * tick, "triangle");
+          if (!ending) this.tone(3300, 0.025, 0.0015, n * tick, "triangle");
+        }
+        if (n % 4 === 0 || ending)
+          for (const interval of [0, 4, 7])
+            this.tone(
+              root * 2 ** (interval / 12),
+              ending ? 1.5 : band ? 0.48 : 0.65,
+              0.007,
+              n * tick,
+              "sine",
+            );
+      }
     }
   }
+
   space(stage, inside) {
     const c = this.context;
     const hall = stage !== 4 || inside;
@@ -164,21 +234,21 @@ export class GameAudio {
         this.musicBus.connect(this.musicFilter);
         this.musicFilter.connect(c.destination);
       } else this.musicBus.connect(c.destination);
-      this.musicBus.gain.setValueAtTime(hall ? 1 : 0.28, c.currentTime);
+      this.musicBus.gain.setValueAtTime(hall ? 1 : 0.65, c.currentTime);
       this.musicFilter?.frequency.setValueAtTime(
-        hall ? 6500 : 750,
+        hall ? 6500 : 2400,
         c.currentTime,
       );
     } else if (hall !== this.hall) {
       const gain = this.musicBus.gain;
       gain.cancelScheduledValues?.(c.currentTime);
-      gain.setValueAtTime(gain.value ?? (this.hall ? 1 : 0.28), c.currentTime);
-      gain.linearRampToValueAtTime(hall ? 1 : 0.28, c.currentTime + 0.35);
+      gain.setValueAtTime(gain.value ?? (this.hall ? 1 : 0.65), c.currentTime);
+      gain.linearRampToValueAtTime(hall ? 1 : 0.65, c.currentTime + 0.35);
       if (this.musicFilter) {
         const f = this.musicFilter.frequency;
         f.cancelScheduledValues(c.currentTime);
         f.setValueAtTime(f.value, c.currentTime);
-        f.linearRampToValueAtTime(hall ? 6500 : 750, c.currentTime + 0.35);
+        f.linearRampToValueAtTime(hall ? 6500 : 2400, c.currentTime + 0.35);
       }
     }
     this.hall = hall;
@@ -217,7 +287,14 @@ export class GameAudio {
         note = this.note++;
       // Each companion brings a quiet original part into the shared motif.
       if (stage >= 1 && note % 4 === 0)
-        this.tone(music.root / 2, 0.35, 0.004, 0, "sine", true);
+        this.tone(
+          music.root * (stage < 4 ? 2 : 0.5),
+          0.35,
+          0.004,
+          0,
+          "sine",
+          true,
+        );
       if (stage >= 2 && note % 2 === 1)
         this.tone(
           music.notes[(note + 2) % 8] / 2,
@@ -228,8 +305,22 @@ export class GameAudio {
           true,
         );
       if (stage >= 3 && note % 4 === 2) {
-        this.tone(music.root * 2 ** (4 / 12), 0.4, 0.0015, 0, "sine", true);
-        this.tone(music.root * 2 ** (7 / 12), 0.4, 0.0015, 0, "sine", true);
+        this.tone(
+          music.root * (stage < 4 ? 4 : 1) * 2 ** (4 / 12),
+          0.4,
+          0.0015,
+          0,
+          "sine",
+          true,
+        );
+        this.tone(
+          music.root * (stage < 4 ? 4 : 1) * 2 ** (7 / 12),
+          0.4,
+          0.0015,
+          0,
+          "sine",
+          true,
+        );
       }
       if (stage === 4) {
         // An original 120-BPM eighth-note groove: kick, backbeat, hats and bass.
@@ -258,9 +349,7 @@ export class GameAudio {
         music.type,
         true,
       );
-      this.nextNote =
-        c.currentTime +
-        music.beat * (stage === 4 ? 1 : note % 4 === 3 ? 1.5 : 1);
+      this.nextNote = c.currentTime + music.beat;
     }
   }
   suspend() {

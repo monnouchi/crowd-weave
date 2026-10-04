@@ -36,7 +36,7 @@ test("umbrella arm, hand, shaft and canopy form one rig in all eight directions;
     assert.ok(
       Math.hypot(rig.grip.x - rig.shoulder.x, rig.grip.y - rig.shoulder.y) < 10,
     );
-    assert.equal(rig.grip.y - rig.canopy.y, 25);
+    assert.ok(Math.abs(rig.grip.y - rig.canopy.y - 25) < 1e-10);
     assert.ok(Math.abs(rig.canopy.x) < 10);
     assert.ok(
       Math.hypot(sway.canopy.x - rig.canopy.x, sway.canopy.y - rig.canopy.y) <

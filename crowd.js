@@ -507,7 +507,8 @@ export function moveCrowd(crowd, dt, traffic = null) {
       ) {
         p.x = p.entry.x;
         p.y = p.entry.y;
-        p.leg = 0;
+        p.leg = p.environment === "party" ? 3 : 0;
+        if (p.environment === "party") p.viewingRounds = 0;
         p.state = "walking";
         p.active = true;
         aim(p);
@@ -536,6 +537,16 @@ export function moveCrowd(crowd, dt, traffic = null) {
         return;
       p.wait -= dt;
       if (p.wait <= 0) {
+        if (p.environment === "party") {
+          if (p.leg === 0) p.leg = 1;
+          else {
+            p.viewingRounds++;
+            p.leg = p.viewingRounds < 3 ? 0 : 2;
+          }
+          p.state = "walking";
+          aim(p);
+          return;
+        }
         if (
           p.state !== "queuing" ||
           Math.hypot(p.x - p.route[0].x, p.y - p.route[0].y) < 8
@@ -555,8 +566,36 @@ export function moveCrowd(crowd, dt, traffic = null) {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.walk += Math.hypot(p.vx, p.vy) * dt;
+    if (p.environment === "party") {
+      p.y = Math.max(145, p.y);
+      p.x = Math.max(
+        p.y < 600 ? 55 : -24,
+        Math.min(p.y < 600 ? 425 : 504, p.x),
+      );
+    }
     const target = p.route[p.leg];
     if (Math.hypot(target.x - p.x, target.y - p.y) < 8) {
+      if (p.environment === "party") {
+        if (p.leg === 3) {
+          p.leg = 0;
+          aim(p);
+        } else if (p.leg === 2) {
+          p.active = false;
+          p.state = "entry";
+          p.cycle++;
+          p.wait = 1;
+          audienceShift(p);
+        } else {
+          p.state = "watching";
+          p.ux = 0; p.uy = -1;
+          p.wait =
+            p.leg === 0
+              ? (p.spot.y < 310 ? 18 : 8) + ((p.id * 7 + p.cycle * 11) % 12)
+              : 3 + ((p.id + p.cycle) % 5);
+          p.vx = p.vy = 0;
+        }
+        return;
+      }
       if (p.leg < p.route.length - 1) {
         p.state = p.habit;
         p.wait = p.pauseDuration;
@@ -572,32 +611,72 @@ export function moveCrowd(crowd, dt, traffic = null) {
   });
 }
 // The concert has its own destination layout; other scene movement stays shared.
+function audienceShift(p) {
+  const rand = random(p.seed + p.id * 101 + p.cycle * 7919);
+  p.route[1] = {
+    x: Math.max(65, Math.min(415, p.spot.x + (rand() - 0.5) * 100)),
+    y: Math.max(155, Math.min(590, p.spot.y + (rand() - 0.5) * 65)),
+  };
+}
 export function makeAudience(count, speed, seed) {
   const rand = random(seed),
     crowd = [];
   for (let id = 0; id < count; id++) {
-    const row = Math.floor(id / 5),
-      col = id % 5;
-    const watching = id < 20;
-    const x = watching
-      ? 50 + col * 85 + (row % 2) * 40
-      : 65 + col * 80 + (rand() - 0.5) * 10;
-    const y = watching
-      ? 135 + row * 70
-      : 395 + (row - 4) * 75 + (rand() - 0.5) * 10;
-    const spot = {
-      x: 50 + col * 85 + ((row + 1) % 2) * 40,
-      y: 135 + (id % 4) * 70,
-    };
-    const entry = { x: 65 + col * 80, y: 760 };
-    const pace = speed * 0.55 * (0.8 + rand() * 0.28);
+    const left = id % 2 === 0,
+      watching = id < 24;
+    // Poisson-like placement across the complete floor; keep the best candidate
+    // if a dense front region requires a little more depth, never an overlap.
+    let spot,
+      bestDistance = -1;
+    for (let attempt = 0; attempt < 2000; attempt++) {
+      const candidate = {
+        x: 65 + rand() * 350,
+        y:
+          (id < 24 ? 165 : id < 34 ? 325 : 460) +
+          rand() *
+            (id < 24 ? (attempt < 1000 ? 205 : 260) : id < 34 ? 115 : 120),
+      };
+      const distance = Math.min(
+        ...crowd.map((p) =>
+          Math.hypot(p.spot.x - candidate.x, p.spot.y - candidate.y),
+        ),
+      );
+      if (distance > bestDistance) {
+        spot = candidate;
+        bestDistance = distance;
+      }
+      if (distance > (id < 24 ? 48 : 40)) break;
+    }
+    let x = spot.x,
+      y = spot.y;
+    if (!watching) {
+      let best = -1;
+      for (let attempt = 0; attempt < 2000; attempt++) {
+        const cx = 65 + rand() * 350,
+          cy = 350 + rand() * 260;
+        const distance = Math.min(
+          ...crowd.map((p) => Math.hypot(p.x - cx, p.y - cy)),
+        );
+        if (distance > best) {
+          x = cx;
+          y = cy;
+          best = distance;
+        }
+        if (distance > 38) break;
+      }
+    }
+    const entry = { x: left ? -24 : 504, y: 620 + rand() * 55 },
+      pace = speed * 0.55 * (0.8 + rand() * 0.28);
     const p = {
       id,
+      seed,
+      viewingRounds: 0,
+      spot,
       environment: "party",
       role: "ライブの観客",
       origin: "south",
       destination: "north",
-      originName: "会場入口",
+      originName: "会場後方の出入口",
       destinationName: "ステージ前",
       flow: "along",
       urgency: "relaxed",
@@ -606,14 +685,14 @@ export function makeAudience(count, speed, seed) {
       x,
       y,
       entry,
-      route: [watching ? { x, y } : spot, { x: spot.x, y: -80 }],
+      route: [spot, { ...spot }, entry, { x: left ? 70 : 410, y: entry.y }],
       leg: 0,
       pace,
       personalSpace: 35 + rand() * 10,
       yielding: 1,
       acceleration: 3,
-      pauseDuration: 8 + (id % 5),
-      wait: watching ? 8 + (id % 5) : 0,
+      pauseDuration: 12,
+      wait: watching ? 6 + rand() * 20 : 0,
       state: watching ? "watching" : "walking",
       active: true,
       cycle: 0,
@@ -627,6 +706,8 @@ export function makeAudience(count, speed, seed) {
       vx: 0,
       vy: watching ? 0 : -pace,
     };
+    audienceShift(p);
+    if (!watching) aim(p);
     crowd.push(p);
   }
   return crowd;
