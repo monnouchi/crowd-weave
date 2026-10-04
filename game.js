@@ -393,6 +393,7 @@ function person(p, player = false) {
   drawCharacter(ctx, p, {
     pose,
     player,
+    contact: player && game.cooldown > 0 && game.lastContactMember === 0,
     lean: player ? playerPose.lean : 0,
     reducedMotion: reducedMotion.matches,
     opacity,
@@ -943,13 +944,6 @@ function draw() {
       ctx.fillStyle = ["#e6c46f", "#e9acc7", "#a8dccd"][i % 3];
       ctx.fillRect(x, y, 3, 5);
     }
-  }
-  if (!finale && game.cooldown > 0 && game.lastContactMember === 0) {
-    ctx.strokeStyle = "#d37a46";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(game.player.x, game.player.y, 22, 0, Math.PI * 2);
-    ctx.stroke();
   }
   for (const m of displayMembers) {
     ctx.save();

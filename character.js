@@ -177,6 +177,7 @@ export function drawCharacter(
   {
     pose,
     player = false,
+    contact = false,
     lean = 0,
     reducedMotion = false,
     opacity = 1,
@@ -215,6 +216,23 @@ export function drawCharacter(
   c.globalAlpha *= opacity;
   if (p.archetype === "curious-child") c.scale(0.9, 0.9);
   if (p.partner) c.scale(p.visualScale ?? 1, p.visualScale ?? 1);
+  if (player) {
+    c.save();
+    c.translate(0, 19);
+    c.scale(1, 0.42);
+    const spot = c.createRadialGradient?.(0, 0, 1, 0, 0, 27);
+    if (spot) {
+      spot.addColorStop(0, contact ? "#ffd295a0" : "#fff8d199");
+      spot.addColorStop(0.5, contact ? "#ec985466" : "#fff4c45c");
+      spot.addColorStop(0.8, "#65bad82b");
+      spot.addColorStop(1, "#65bad800");
+    }
+    c.fillStyle = spot || "#fff4c45c";
+    c.beginPath();
+    c.arc(0, 0, 27, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  }
   c.fillStyle = "#173d3c20";
   c.beginPath();
   c.ellipse(0, 19, 11, 3, 0, 0, Math.PI * 2);
@@ -235,6 +253,15 @@ export function drawCharacter(
   if (player) c.rotate(lean);
   const width = r * (side ? 1 : diagonal ? 1.2 : 1.3) * appearance.width;
   const rig = umbrellaRig(pose, width, stride);
+  // Each shoulder owns one arm pose. A held prop or wave replaces that arm.
+  const umbrellaSide = p.umbrella ? rig.side : null;
+  const glowSide =
+    live && p.glowStick ? (p.umbrella ? -rig.side : direction) : null;
+  const waveSide =
+    waving || p.state === "celebrating"
+      ? ([-1, 1].find((sign) => sign !== umbrellaSide && sign !== glowSide) ??
+        null)
+      : null;
   const canopyColor = ["#507f9b", "#a96d6b", "#7d8c6b"][p.id % 3];
   if (p.umbrella && rig.behind) {
     umbrella(c, rig, canopyColor, "canopy");
@@ -245,6 +272,8 @@ export function drawCharacter(
     rounded(c, -7, -22, 14, appearance.style === "long" ? 18 : 13, 6, hair);
   // Connected shoulder, elbow and hand; planted feet stop the counter-swing.
   for (const sign of [-1, 1]) {
+    if (sign === umbrellaSide || sign === glowSide || sign === waveSide)
+      continue;
     const hx = sign * (width / 2 + 4) - pose.ux * stride * sign * 0.4,
       hy = 3 - pose.uy * stride * sign * 0.8;
     c.strokeStyle = shirt;
@@ -267,16 +296,22 @@ export function drawCharacter(
     c.lineTo(width * 0.52, 12);
     c.lineTo(width * 0.32, 7);
     c.fill();
-  } else if (appearance.outfit !== "shirt" && !player) {
-    rounded(c, -2, -3, 4, 17, 1, "#f3e6c3");
-    c.strokeStyle = "#36495d";
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(-width * 0.25, -3);
-    c.lineTo(-3, 4);
-    c.moveTo(width * 0.25, -3);
-    c.lineTo(3, 4);
-    c.stroke();
+  } else {
+    // The shirt opening ends above the waist, with fabric instead of a
+    // background-colored strip. Back views show a seam, not an open coat.
+    if (appearance.outfit !== "shirt" && !player && !back) {
+      rounded(c, -2, -5, 4, 11, 1, "#51616e");
+      c.strokeStyle = "#36495d";
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(-width * 0.25, -3);
+      c.lineTo(-3, 4);
+      c.moveTo(width * 0.25, -3);
+      c.lineTo(3, 4);
+      c.stroke();
+    }
+    // A continuous waistband joins both legs; the split starts below it.
+    rounded(c, -width * 0.36, 8, width * 0.72, 4, 1, "#465269");
   }
   if (live && !player && !p.friend && !p.partner) {
     rounded(c, -5, 1, 10, 7, 2, "#f3dbb1");
@@ -415,9 +450,9 @@ export function drawCharacter(
   }
   if (live && p.glowStick) {
     const swing = reducedMotion ? 0 : Math.sin(time * 1.8 + p.id) * 0.18;
-    const sx = direction * (width / 2 - 1),
+    const sx = glowSide * (width / 2 - 1),
       sy = -7;
-    const handX = sx + direction * 3,
+    const handX = sx + glowSide * 3,
       handY = -12;
     c.strokeStyle = shirt;
     c.lineWidth = 4;
@@ -429,7 +464,7 @@ export function drawCharacter(
     circle(c, handX, handY, 2.5, skin);
     c.save();
     c.translate(handX, handY - 1);
-    c.rotate(direction * 0.25 + swing);
+    c.rotate(glowSide * 0.25 + swing);
     c.strokeStyle = ["#83efd8", "#f6a2dc", "#f9e493"][p.id % 3];
     c.lineWidth = 2.4;
     c.shadowColor = c.strokeStyle;
@@ -441,7 +476,9 @@ export function drawCharacter(
     c.restore();
   }
   if (p.reaction && !back) {
-    c.save(); c.translate(0,-11); c.scale(Math.min(1,r / 13) * .9, Math.min(1,r / 13) * .9);
+    c.save();
+    c.translate(0, -11);
+    c.scale(Math.min(1, r / 13) * 0.9, Math.min(1, r / 13) * 0.9);
     c.strokeStyle = "#85432c";
     c.lineWidth = 1.5;
     c.beginPath();
@@ -464,26 +501,21 @@ export function drawCharacter(
     c.stroke();
   }
   if (p.targetKind === "clerk") rounded(c, hx - 9, -27, 18, 5, 2, "#496c64");
-  if (waving || p.state === "celebrating") {
+  if (waveSide !== null) {
     const handY = -25 + (reducedMotion ? 0 : wave);
     c.strokeStyle = shirt;
     c.lineWidth = 4;
     c.lineCap = "round";
     c.beginPath();
-    c.moveTo(-width / 2 + 1, -7);
-    c.lineTo(-width / 2 - 5, -15);
-    c.lineTo(-width / 2 - 8, handY);
+    c.moveTo(waveSide * (width / 2 - 1), -7);
+    c.lineTo(waveSide * (width / 2 + 5), -15);
+    c.lineTo(waveSide * (width / 2 + 8), handY);
     c.stroke();
-    circle(c, -width / 2 - 8, handY, 2.5, skin);
+    circle(c, waveSide * (width / 2 + 8), handY, 2.5, skin);
   }
   c.restore();
   if (player) {
-    c.strokeStyle = "#fff";
-    c.lineWidth = 2;
-    c.beginPath();
-    c.arc(0, 2, 19, 0, Math.PI * 2);
-    c.stroke();
-    c.fillStyle = "#245c56";
+    c.fillStyle = live ? "#fff4ce" : "#245c56";
     c.font = "bold 11px system-ui";
     c.textAlign = "center";
     c.fillText("YOU", 0, 34);
