@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { GameAudio, MUSIC } from "../sound.js";
+import { GameAudio, MUSIC, OUTPUT_GAIN } from "../sound.js";
 function fakeContext() {
   const voices = [];
   const context = {
@@ -10,7 +10,9 @@ function fakeContext() {
     createOscillator() {
       const o = {
         frequency: {},
-        connect() {},
+        connect(target) {
+          this.connected = target;
+        },
         disconnect() {},
         start(t) {
           this.startAt = t;
@@ -26,13 +28,17 @@ function fakeContext() {
     createGain() {
       return {
         gain: {
-          setValueAtTime() {},
+          setValueAtTime(v) {
+            this.value = v;
+          },
           linearRampToValueAtTime(v) {
             assert.ok(v <= 0.04);
           },
           exponentialRampToValueAtTime() {},
         },
-        connect() {},
+        connect(target) {
+          this.connected = target;
+        },
         disconnect() {},
       };
     },
@@ -42,7 +48,7 @@ function fakeContext() {
   };
   return { context, voices };
 }
-test("five stage music patterns have distinct rhythm or tone and quiet headroom", () => {
+test("five stage music patterns retain distinct rhythm and original voice balance", () => {
   assert.equal(new Set(MUSIC.map((m) => JSON.stringify(m))).size, 5);
   const a = new GameAudio(),
     f = fakeContext();
@@ -57,6 +63,59 @@ test("five stage music patterns have distinct rhythm or tone and quiet headroom"
   assert.ok(
     f.voices.filter((v) => !a.voices.has(v)).every((v) => v.stops >= 2),
   );
+});
+
+test("music and effects share one calibrated output and peak guard across mute and restart", () => {
+  const a = new GameAudio(),
+    f = fakeContext();
+  let guards = 0;
+  f.context.createDynamicsCompressor = () => {
+    guards++;
+    return {
+      threshold: {},
+      knee: {},
+      ratio: {},
+      attack: {},
+      release: {},
+      connect(target) {
+        this.connected = target;
+      },
+    };
+  };
+  f.context.createBiquadFilter = () => ({
+    frequency: { setValueAtTime() {} },
+    connect(target) {
+      this.connected = target;
+    },
+    disconnect() {},
+  });
+  a.context = f.context;
+  a.muted = false;
+  a.update(true, false, 4, false);
+  const bus = a.outputBus,
+    guard = a.peakGuard;
+  assert.equal(bus.gain.value, OUTPUT_GAIN);
+  assert.ok(bus.gain.value > 1);
+  assert.equal(a.musicBus.connected, a.musicFilter);
+  assert.equal(a.musicFilter.connected, bus);
+  assert.equal(bus.connected, guard);
+  assert.equal(guard.connected, f.context.destination);
+  assert.ok(guard.threshold.value < 0 && guard.ratio.value >= 10);
+  assert.ok(guard.attack.value > 0 && guard.attack.value <= 0.005);
+  a.effect("contact");
+  assert.equal(f.voices.at(-1).connected.connected, bus);
+  a.toggle();
+  assert.equal(a.voices.size, 0);
+  const count = f.voices.length;
+  a.effect("final");
+  assert.equal(f.voices.length, count);
+  a.reset();
+  f.context.state = "running";
+  a.muted = false;
+  a.update(true, false, 4, false);
+  assert.equal(a.outputBus, bus);
+  assert.equal(a.musicFilter.connected, bus);
+  assert.equal(guards, 1);
 });
 test("one cue per result; final fanfare is longer and richer; retry cancels queued voices", () => {
   const a = new GameAudio(),

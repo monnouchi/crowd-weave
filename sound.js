@@ -1,5 +1,7 @@
 // One original motif, arranged for each part of the journey.
 export const MOTIF = [0, 7, 2, 5, 0, 9, 5, 2];
+// Calibrated against rendered browser output, including effects and arrival music.
+export const OUTPUT_GAIN = 11;
 export const MUSIC = [
   {
     root: 220,
@@ -98,6 +100,25 @@ export class GameAudio {
     this.hall = true;
     this.musicBus = null;
     this.musicFilter = null;
+    this.outputBus = null;
+    this.peakGuard = null;
+  }
+  output() {
+    if (this.outputBus) return this.outputBus;
+    const c = this.context;
+    this.outputBus = c.createGain();
+    this.outputBus.gain.setValueAtTime(OUTPUT_GAIN, c.currentTime);
+    if (c.createDynamicsCompressor) {
+      this.peakGuard = c.createDynamicsCompressor();
+      this.peakGuard.threshold.value = -6;
+      this.peakGuard.knee.value = 0;
+      this.peakGuard.ratio.value = 20;
+      this.peakGuard.attack.value = 0.002;
+      this.peakGuard.release.value = 0.08;
+      this.outputBus.connect(this.peakGuard);
+      this.peakGuard.connect(c.destination);
+    } else this.outputBus.connect(c.destination);
+    return this.outputBus;
   }
   unlock() {
     if (this.muted) return;
@@ -142,7 +163,7 @@ export class GameAudio {
         pan.connect(this.musicBus);
         o.panner = pan;
       } else g.connect(this.musicBus);
-    } else g.connect(c.destination);
+    } else g.connect(this.output());
     this.voices.add(o);
     o.onended = () => {
       this.voices.delete(o);
@@ -232,8 +253,8 @@ export class GameAudio {
       if (this.musicFilter) {
         this.musicFilter.type = "lowpass";
         this.musicBus.connect(this.musicFilter);
-        this.musicFilter.connect(c.destination);
-      } else this.musicBus.connect(c.destination);
+        this.musicFilter.connect(this.output());
+      } else this.musicBus.connect(this.output());
       this.musicBus.gain.setValueAtTime(hall ? 1 : 0.65, c.currentTime);
       this.musicFilter?.frequency.setValueAtTime(
         hall ? 6500 : 2400,
