@@ -1,0 +1,12 @@
+{
+  "name": "zatto-toppa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 4175 --bind 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "build:pages": "node scripts/build-pages.js"
+  },
+  "license": "MIT",
+  "description": "ライブへ行こう！ — 人混みをよけ、友だちと合流しながら自宅からライブ会場へ向かうゲーム"
+}

@@ -1,0 +1,15 @@
+node_modules/
+output/
+.playwright-cli/
+.DS_Store
+_site/
+validation/browser-*.js
+.env
+.env.*
+*.pem
+*.key
+
+# Local development notes and manual checks
+/docs/development.md
+/validation/backport-check.js
+/validation/replay-check.js

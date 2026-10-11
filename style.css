@@ -1,0 +1,1139 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: #193b3c;
+  background: #f3f1e8;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.control-gesture,
+.control-gesture * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+main {
+  width: min(100% - 32px, 600px);
+  margin: 28px auto;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 800;
+  color: #567777;
+}
+h1 {
+  font-size: 30px;
+  margin: 6px 0 20px;
+  letter-spacing: -1px;
+}
+h1 span {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.badge {
+  font-size: 11px;
+  background: #e2e9de;
+  padding: 10px;
+  border-radius: 30px;
+}
+.stats {
+  display: flex;
+  padding: 14px 20px;
+  background: #fffdf7;
+  border: 1px solid #dadfd5;
+  border-radius: 14px 14px 0 0;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #567777;
+}
+.stats strong {
+  display: block;
+  font-size: 26px;
+  color: #193b3c;
+  font-variant-numeric: tabular-nums;
+}
+.stats strong span {
+  font-size: 11px;
+  margin-left: 4px;
+}
+.stage {
+  position: relative;
+  background: #e7eadf;
+  overflow: hidden;
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 12px 35px #193b3c10;
+}
+canvas {
+  display: block;
+  width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  touch-action: none;
+  user-select: none;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: #183d3c66;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+.overlay[hidden] {
+  display: none;
+}
+.card {
+  background: #fffdf5;
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 20px 60px #1234;
+}
+h2 {
+  font-size: 27px;
+  line-height: 1.4;
+  margin: 12px 0;
+}
+p {
+  font-size: 12px;
+  line-height: 1.9;
+}
+button {
+  border: 0;
+  background: #245c56;
+  color: white;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.card button {
+  width: 100%;
+  margin-top: 12px;
+}
+button:focus-visible {
+  outline: 3px solid #e9ac54;
+  outline-offset: 3px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.secondary {
+  background: #e2e7dc;
+  color: #245c56;
+  padding: 9px 12px;
+}
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+footer p {
+  color: #567777;
+  font-size: 10px;
+}
+footer p span {
+  display: block;
+}
+footer > div {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+#notice {
+  min-height: 28px;
+  padding: 5px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #9a482d;
+  background: #fff3e7;
+  visibility: hidden;
+}
+#notice.active {
+  visibility: visible;
+}
+
+.steering {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+}
+.steering button {
+  width: 30%;
+  padding: 18px 12px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.steering button.held {
+  background: #e6b25d;
+  color: #193b3c;
+}
+/* Hold controls and the live game surface do not participate in selection.
+   Instructions, dialogs and sharing text retain normal browser behavior. */
+#game,
+.steering,
+#brake,
+#goal-callout,
+.stats,
+.party-strip,
+#notice,
+#traffic-status {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+.steering span {
+  font-size: 10px;
+  text-align: center;
+  color: #567777;
+}
+canvas {
+  max-height: 55vh;
+}
+
+.license {
+  font-size: 10px;
+  color: #567777;
+  text-align: center;
+  margin: 14px 0;
+}
+.license a {
+  color: inherit;
+}
+h1 b {
+  font-weight: inherit;
+  white-space: nowrap;
+}
+
+#goal-callout {
+  position: absolute;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+  background: #fffaf0;
+  color: #285d55;
+  border: 1px solid #b6c7b0;
+  border-radius: 13px;
+  padding: 8px 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px #193b3c18;
+}
+#goal-callout::after {
+  content: "";
+  position: absolute;
+  left: var(--tail, 50%);
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  background: #fffaf0;
+  border-right: 1px solid #b6c7b0;
+  border-bottom: 1px solid #b6c7b0;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.enter-hint {
+  font-size: 12px;
+  text-align: center;
+  color: #567777;
+  margin: 10px 0 0;
+}
+canvas:focus-visible {
+  outline: 2px solid #e9ac54;
+  outline-offset: -3px;
+}
+
+.input-modes {
+  margin-top: 12px;
+}
+.input-modes > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.input-modes [hidden] {
+  display: none;
+}
+#tilt-status {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #55796c;
+}
+#brake {
+  min-height: 58px;
+  flex: 1;
+  touch-action: none;
+  background: #d99852;
+}
+.input-modes button[aria-pressed="true"] {
+  outline: 2px solid #245c56;
+  outline-offset: 2px;
+}
+
+.party-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #dfe9df;
+  font-size: 11px;
+  color: #245c56;
+}
+.party-strip span {
+  letter-spacing: 2px;
+}
+
+/* Keep the full-width playfield readable beside controls on larger screens. */
+
+#traffic-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 700;
+  margin: 6px 0;
+  color: #802033;
+  background: #ffe7ec;
+  border: 2px solid #a72b40;
+}
+#traffic-status::before {
+  content: "";
+  flex: 0 0 52px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px #0d1c25;
+  background:
+    radial-gradient(circle at 13px 13px, #ff4356 9px, transparent 9.5px),
+    radial-gradient(circle at 39px 13px, #26333d 9px, transparent 9.5px),
+    #0d1c25;
+}
+#traffic-status[hidden] {
+  display: none;
+}
+#traffic-status.green {
+  color: #075343;
+  background: #d4fff0;
+  border-color: #08775d;
+}
+#traffic-status.green::before,
+#traffic-status.warning::before {
+  background:
+    radial-gradient(circle at 13px 13px, #26333d 9px, transparent 9.5px),
+    radial-gradient(circle at 39px 13px, #2df4b7 9px, transparent 9.5px),
+    #0d1c25;
+}
+#traffic-status.warning {
+  color: #78531a;
+  background: #f5e6bd;
+  border-color: #85611d;
+}
+
+.overlay.finale {
+  background: linear-gradient(to bottom, transparent 28%, #183d3c38 100%);
+  backdrop-filter: none;
+  place-items: end center;
+  padding: 14px;
+}
+.finale .card {
+  padding: 16px 20px;
+  max-width: 350px;
+  background: #fffdf5f5;
+}
+.finale h2 {
+  font-size: 20px;
+  margin: 8px 0;
+}
+.finale #message {
+  font-size: 11px;
+  line-height: 1.65;
+  margin: 8px 0;
+}
+.finale .card button {
+  padding: 11px 10px;
+  margin-top: 8px;
+}
+.finale #share-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.finale #share-actions button {
+  flex: 1;
+  font-size: 11px;
+}
+.finale #share-status {
+  width: 100%;
+  margin: 0;
+}
+.finale .enter-hint {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* Dialogs stay readable on short screens; settings remain usable while paused. */
+.overlay:not(.finale) {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+}
+.card {
+  pointer-events: auto;
+  max-height: calc(100svh - 32px);
+  overflow-y: auto;
+}
+
+/* Reserve two lines so a contact notification never moves the touch controls. */
+#notice {
+  height: 40px;
+  overflow: hidden;
+}
+
+/* In phone landscape, put controls beside the road instead of shrinking it. */
+
+.initial #action,
+.initial #start-sound {
+  flex: 1;
+  width: auto;
+  padding: 14px 8px;
+  min-height: 48px;
+  font-size: 12px;
+}
+.start-actions {
+  display: flex;
+  gap: 8px;
+}
+.start-actions #action {
+  flex: 1;
+}
+
+#companion-bubble {
+  position: absolute;
+  z-index: 2;
+  width: 132px;
+  padding: 7px 9px;
+  background: #fffdf5;
+  color: #193b3c;
+  border: 1.5px solid #426f69;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#companion-link {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+#companion-link path {
+  stroke: #426f69;
+  stroke-width: 1.5;
+  fill: none;
+}
+#companion-bubble[hidden],
+#companion-link[hidden] {
+  display: none;
+}
+
+#label:empty {
+  display: none;
+}
+
+main:has(.overlay.initial:not([hidden])) #game-name {
+  display: none;
+}
+.overlay.initial #title {
+  font-size: clamp(22px, 6vw, 27px);
+  white-space: nowrap;
+}
+
+/* The road keeps its complete 500-unit warning view; excess viewport is scenery. */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+main {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  display: block;
+}
+.stage {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+#game {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: fill;
+}
+.hud {
+  position: absolute;
+  z-index: 3;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  width: 220px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fffdf5ed;
+  box-shadow: 0 4px 20px #173d3c18;
+  pointer-events: none;
+}
+header {
+  display: block;
+}
+h1 {
+  font-size: 22px;
+  margin: 3px 0 7px;
+  letter-spacing: -0.5px;
+}
+h1 span {
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.45;
+}
+.badge {
+  display: block;
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+}
+.stats {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  gap: 8px;
+}
+.stats strong {
+  font-size: 25px;
+}
+.party-strip {
+  background: transparent;
+  padding: 4px 0;
+  font-size: 12px;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+#traffic-status {
+  padding: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 6px 0 0;
+}
+#traffic-status::before {
+  flex-basis: 28px;
+  width: 28px;
+  height: 46px;
+  background:
+    radial-gradient(circle at 12px 11px, #ff4356 8px, transparent 8.5px),
+    radial-gradient(circle at 12px 33px, #26333d 8px, transparent 8.5px),
+    #0d1c25;
+}
+#traffic-status.green::before,
+#traffic-status.warning::before {
+  background:
+    radial-gradient(circle at 12px 11px, #26333d 8px, transparent 8.5px),
+    radial-gradient(circle at 12px 33px, #2df4b7 8px, transparent 8.5px),
+    #0d1c25;
+}
+.toolbar {
+  position: absolute;
+  z-index: 4;
+  right: max(12px, env(safe-area-inset-right));
+  top: max(12px, env(safe-area-inset-top));
+  display: flex;
+  gap: 6px;
+}
+.toolbar button {
+  min-height: 44px;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: #fffdf5ed;
+}
+.steering {
+  position: absolute;
+  z-index: 4;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  margin: 0;
+  pointer-events: none;
+}
+.steering button {
+  width: 108px;
+  min-height: 60px;
+  font-size: 16px;
+  background: #245c56ed;
+  pointer-events: auto;
+}
+.steering span {
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #fffdf5ed;
+  color: #245c56;
+  font-size: 12px;
+}
+#tilt-controls {
+  position: absolute;
+  z-index: 4;
+  bottom: 84px;
+  right: 12px;
+  width: 210px;
+  display: flex;
+  gap: 5px;
+}
+#tilt-controls[hidden] {
+  display: none;
+}
+#brake {
+  min-height: 58px;
+  padding: 8px;
+  font-size: 12px;
+}
+.settings {
+  position: absolute;
+  z-index: 5;
+  right: max(12px, env(safe-area-inset-right));
+  top: 66px;
+  width: 240px;
+  font-size: 12px;
+}
+.settings summary {
+  cursor: pointer;
+  margin-left: auto;
+  width: max-content;
+  padding: 10px 12px;
+  min-height: 44px;
+  background: #fffdf5ed;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.settings[open] {
+  padding: 12px;
+  background: #fffdf5;
+  border-radius: 14px;
+  max-height: calc(100dvh - 180px);
+  overflow: auto;
+  box-shadow: 0 12px 30px #183d3c30;
+}
+.settings footer {
+  display: block;
+}
+.settings #keyboard-help {
+  max-width: none;
+  font-size: 12px;
+}
+.input-modes {
+  margin: 10px 0 0;
+}
+.license {
+  position: absolute;
+  z-index: 3;
+  bottom: 3px;
+  right: 12px;
+  font-size: 9px;
+  margin: 0;
+  opacity: 0.65;
+}
+#notice {
+  position: absolute;
+  z-index: 4;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(330px, calc(100% - 24px));
+  height: 40px;
+  border-radius: 8px;
+}
+.overlay,
+.overlay.finale,
+.overlay.paused {
+  position: fixed;
+  z-index: 6;
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: 16px;
+  place-items: center;
+  pointer-events: none;
+  background: #183d3c66;
+}
+.overlay.finale {
+  background: linear-gradient(transparent 30%, #2524428c);
+  place-items: end center;
+}
+.card,
+.finale .card {
+  max-width: 380px;
+  padding: 22px;
+  max-height: calc(100dvh - 32px);
+}
+.finale .card {
+  background: #28283df2;
+  color: #fff3cf;
+  border: 1px solid #eed5a1;
+}
+.finale .eyebrow,
+.finale .enter-hint {
+  color: #e6d2ac;
+}
+#result-score {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+  font-variant-numeric: tabular-nums;
+}
+#result-score[hidden] {
+  display: none;
+}
+#result-score div:first-child {
+  grid-column: 1 / -1;
+}
+#result-score dt {
+  font-size: 12px;
+}
+#result-score dd {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 2px 0;
+}
+#result-score div:first-child dd {
+  font-size: 48px;
+  line-height: 1.1;
+}
+#result-score dd small {
+  font-size: 14px;
+  margin-left: 4px;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .hud {
+    top: max(6px, env(safe-area-inset-top));
+    left: 8px;
+    width: calc(100% - 16px);
+    padding: 7px 10px;
+    border-radius: 12px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+  }
+  #scene-purpose {
+    font-size: 11px;
+  }
+  #scene-label {
+    font-size: 9px;
+  }
+  .badge {
+    max-width: 92px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .stats {
+    padding: 4px 0;
+  }
+  .stats strong {
+    font-size: 24px;
+  }
+  .party-strip {
+    padding: 0;
+    font-size: 11px;
+  }
+  #traffic-status {
+    font-size: 12px;
+    padding: 4px 7px;
+    margin: 4px 0 0;
+  }
+  #traffic-status::before {
+    height: 28px;
+    flex-basis: 48px;
+    background:
+      radial-gradient(circle at 11px 12px, #ff4356 8px, transparent 8.5px),
+      radial-gradient(circle at 35px 12px, #26333d 8px, transparent 8.5px),
+      #0d1c25;
+  }
+  #traffic-status.green::before,
+  #traffic-status.warning::before {
+    background:
+      radial-gradient(circle at 11px 12px, #26333d 8px, transparent 8.5px),
+      radial-gradient(circle at 35px 12px, #2df4b7 8px, transparent 8.5px),
+      #0d1c25;
+  }
+  .toolbar {
+    top: auto;
+    bottom: 84px;
+    right: 10px;
+    gap: 4px;
+  }
+  .toolbar button {
+    font-size: 11px;
+    padding: 6px 9px;
+    min-height: 40px;
+  }
+  .settings {
+    top: auto;
+    bottom: 84px;
+    left: 10px;
+    right: auto;
+    width: calc(100% - 20px);
+    pointer-events: none;
+  }
+  .settings summary {
+    pointer-events: auto;
+    margin-left: 0;
+    padding: 9px;
+    font-size: 11px;
+    min-height: 40px;
+  }
+  .settings[open] {
+    pointer-events: auto;
+    bottom: 132px;
+    max-height: calc(100dvh - 190px);
+  }
+  .steering button {
+    width: 90px;
+  }
+  .steering span {
+    font-size: 10px;
+    max-width: 112px;
+  }
+  #notice {
+    bottom: 132px;
+  }
+  #tilt-controls {
+    bottom: 132px;
+  }
+  .overlay.finale {
+    place-items: center;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .hud {
+    width: 170px;
+    padding: 8px;
+  }
+  h1 {
+    font-size: 16px;
+  }
+  h1 span,
+  .badge {
+    font-size: 10px;
+  }
+  .stats strong {
+    font-size: 20px;
+  }
+  .stats {
+    font-size: 9px;
+  }
+  .party-strip {
+    font-size: 10px;
+  }
+  #traffic-status {
+    font-size: 11px;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .settings {
+    top: 160px;
+    width: 175px;
+  }
+  .steering button {
+    width: 100px;
+    min-height: 54px;
+  }
+  .steering span {
+    display: none;
+  }
+  .overlay.finale {
+    place-items: center;
+  }
+  #result-score {
+    margin: 8px 0;
+  }
+  #result-score div:first-child dd {
+    font-size: 38px;
+  }
+  .finale .card {
+    max-width: 570px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
+
+main .stage #game {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+}
+
+.hud #game-name {
+  display: none;
+}
+.hud h1 {
+  margin: 0;
+}
+.hud #scene-purpose {
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.hud header > div {
+  min-width: 0;
+}
+.hud .stats {
+  padding: 4px 0;
+}
+.hud .stats strong {
+  font-size: 24px;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .hud #scene-purpose {
+    font-size: 11px;
+  }
+  .hud #traffic-status {
+    line-height: 1.35;
+  }
+}
+
+/* Final totals leave the band and the complete celebrating group visible. */
+.overlay.finale {
+  place-items: end right;
+}
+.finale .card {
+  max-width: 350px;
+  padding: 16px 20px;
+}
+.finale #result-score {
+  grid-template-columns: 1.6fr 0.7fr 0.7fr;
+  gap: 6px;
+  margin: 12px 0;
+  align-items: end;
+}
+.finale #result-score div:first-child {
+  grid-column: auto;
+}
+.finale #result-score dt {
+  font-size: 10px;
+}
+.finale #result-score div:first-child dd {
+  font-size: 42px;
+}
+.finale #result-score dd {
+  font-size: 25px;
+}
+.finale h2 {
+  font-size: 20px;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .overlay.finale {
+    place-items: end center;
+  }
+  .finale .card {
+    max-height: calc(100dvh - 330px);
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .overlay.finale {
+    place-items: end center;
+  }
+  .finale .card {
+    max-width: 570px;
+    max-height: 180px;
+  }
+}
+.settings {
+  z-index: 7;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  main:has(#tilt-controls:not([hidden])) .settings[open] {
+    bottom: 204px;
+    max-height: calc(100dvh - 260px);
+  }
+}
+
+.stage .overlay {
+  z-index: 6;
+}
+.settings {
+  z-index: 7;
+}
+
+main:has(#result-score:not([hidden])) .settings,
+main:has(#result-score:not([hidden])) .toolbar,
+main:has(#result-score:not([hidden])) .steering,
+main:has(#result-score:not([hidden])) #tilt-controls {
+  visibility: hidden;
+}
+main:has(.overlay.finale:not([hidden])) .hud {
+  visibility: hidden;
+}
+
+@media (max-width: 599px) and (orientation: portrait) {
+  .toolbar,
+  .settings {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  .settings[open],
+  #tilt-controls {
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+  main:has(#tilt-controls:not([hidden])) .settings[open] {
+    bottom: calc(204px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* A small result dock leaves the concert visible on phones. */
+:root {
+  --result-safe-top: env(safe-area-inset-top, 0px);
+}
+#result-details[hidden],
+#result-toggle[hidden] {
+  display: none;
+}
+#result-detail-message,
+#close-result-details {
+  display: none;
+}
+.finale #result-toggle {
+  display: none;
+}
+@media (max-width: 599px), (max-height: 500px) and (max-width: 950px) {
+  .overlay.finale {
+    padding: max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    place-items: end center;
+    background: none;
+  }
+  .finale .card {
+    max-width: 520px;
+    max-height: calc(
+      100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    padding: 10px 12px;
+    border-radius: 16px;
+    overflow: auto;
+  }
+  .finale #label,
+  .finale #message,
+  .finale .enter-hint {
+    display: none;
+  }
+  .finale h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+  }
+  .finale #result-score {
+    margin: 4px 0 8px;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 8px;
+  }
+  .finale #result-score dt {
+    font-size: 10px;
+  }
+  .finale #result-score dd,
+  .finale #result-score div:first-child dd {
+    font-size: 25px;
+    line-height: 1.15;
+  }
+  .finale .start-actions {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 8px;
+  }
+  .finale .start-actions button {
+    margin: 0;
+    min-height: 44px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .finale #result-toggle {
+    display: block;
+  }
+  .finale #result-details {
+    border-top: 1px solid #ffffff3d;
+    margin-top: 10px;
+    padding-top: 4px;
+  }
+  .finale #result-detail-message {
+    display: block;
+    font-size: 12px;
+    margin: 8px 0;
+  }
+  .finale #close-result-details {
+    display: block;
+    min-height: 44px;
+  }
+  .finale #share-actions button {
+    min-height: 44px;
+  }
+}
+
+#result-party[hidden] {
+  display: none;
+}
+#result-roster {
+  width: 100%;
+  height: 82px;
+  max-height: none;
+}
+#result-party-label {
+  text-align: center;
+  font-weight: 700;
+  margin: 0 0 6px;
+  font-size: 12px;
+}
