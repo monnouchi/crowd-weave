@@ -324,7 +324,7 @@ test("bounded signal waiting and all-member clean routes remain achievable acros
       assert.equal(clean.phase, "finished");
       assert.equal(clean.hits, 0);
       assert.equal(trafficViolations(clean), 0);
-      assert.ok(["finished", "gameover"].includes(direct.phase));
+      assert.notEqual(direct.phase, "finished");
       assert.ok(
         clean.elapsed < 32,
         `${stage}/${seed}: bounded clean arrival ${clean.elapsed}`,

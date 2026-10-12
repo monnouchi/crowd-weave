@@ -198,10 +198,10 @@ test("all stages have a verified clean route, including the full-party signal wi
     const careless = playing(stage);
     for (let n = 0; n < 4000 && careless.phase === "playing"; n++)
       step(careless, 0.025, {});
-    assert.ok(
-      g.traffic
-        ? ["finished", "gameover"].includes(careless.phase)
-        : careless.phase === "finished",
+    assert.notEqual(
+      careless.phase,
+      "finished",
+      `stage ${stage + 1} must require steering around people`,
     );
     if (g.traffic) {
       assert.equal(g.traffic.violations, 0);

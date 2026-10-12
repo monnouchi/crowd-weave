@@ -436,7 +436,28 @@ export function makeCrowd(
   }
   return crowd;
 }
+export function makeRoomForFollower(p, player) {
+  if (p.anchor) return;
+  if (p.environment === "party" && p.state === "watching") {
+    // A stationary spectator makes visible room after a bump instead of
+    // becoming a permanent wall across the follower's recorded route.
+    let side = p.x < player.x ? -1 : 1;
+    if (p.x + side * 55 < 55 || p.x + side * 55 > 425) side *= -1;
+    p.route[1] = {
+      x: Math.max(55, Math.min(425, p.x + side * 55)),
+      y: Math.max(54, Math.min(590, p.y + 16)),
+    };
+    p.leg = 1;
+    p.state = "walking";
+    p.wait = 0;
+    aim(p);
+  } else if (player.friend && p.state !== "walking")
+    p.wait = Math.min(p.wait, 0.8);
+}
 export function reactToContact(p, player) {
+  // A blocked friend can receive help even when a previous contact still
+  // owns the score cooldown. Scoring remains one event per touch.
+  makeRoomForFollower(p, player);
   if (p.reaction) return;
   const dx = player.x - p.x,
     dy = player.y - p.y,
@@ -453,7 +474,8 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
   const crossings = traffic;
   const velocities = crowd.map((p) => {
     const traffic = walkerTraffic(p, p.route[p.leg], crossings);
-    if (!p.active || p.state !== "walking" || p.reaction) return null;
+    if (!p.active || p.anchor || p.state !== "walking" || p.reaction)
+      return null;
     const target = trafficWaypoint(p, p.route[p.leg], traffic),
       dx = target.x - p.x,
       dy = target.y - p.y,
@@ -599,6 +621,7 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
       if (p.reaction.remaining === 0) p.reaction = null;
       return;
     }
+    if (p.anchor) return;
     if (p.state !== "walking") {
       if (
         p.state === "queuing" &&

@@ -7,11 +7,13 @@ import {
   vehicleContact,
 } from "./traffic.js";
 import { createParty, moveParty, partyArrived } from "./party.js";
+import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
   moveCrowd,
   visiblePerson,
   reactToContact,
+  makeRoomForFollower,
 } from "./crowd.js";
 export const W = 480,
   H = 680,
@@ -217,6 +219,85 @@ function extendVenue(crowd, crossings) {
     p.vy = p.state === "walking" ? p.uy * p.pace : 0;
   }
 }
+const PASSING_PEOPLE = [
+  { ids: [4, 5], preferredY: 455, minY: 220, maxY: 550 },
+  { ids: [9, 10], preferredY: 500, minY: 395, maxY: 560 },
+  { ids: [26, 27], preferredY: 545, minY: 480, maxY: 610 },
+  { ids: [18, 19], preferredY: 1010, minY: 955, maxY: 1060 },
+  { ids: [33, 34], preferredY: 630, minY: 590, maxY: 650 },
+];
+function placePassingPair(crowd, stage) {
+  const { ids, preferredY, minY, maxY } = PASSING_PEOPLE[stage],
+    people = ids.map((id) => crowd[id]),
+    centers = [220, 260],
+    others = crowd.filter((p) => !people.includes(p) && p.active),
+    nearPair = (p, y, limit) =>
+      centers.some((x) => Math.hypot(p.x - x, p.y - y) < limit),
+    clearance = (y) =>
+      Math.min(
+        ...others.flatMap((p) =>
+          centers.map((x) => Math.hypot(p.x - x, p.y - y)),
+        ),
+      ),
+    candidates = Array.from(
+      { length: Math.floor((maxY - minY) / 4) + 1 },
+      (_, i) => minY + i * 4,
+    ).sort((a, b) => Math.abs(a - preferredY) - Math.abs(b - preferredY)),
+    clearY = candidates.find((value) => clearance(value) >= 39),
+    y =
+      clearY ??
+      [...candidates].sort(
+        (a, b) =>
+          others.filter((p) => nearPair(p, a, 39)).length -
+            others.filter((p) => nearPair(p, b, 39)).length ||
+          clearance(b) - clearance(a),
+      )[0];
+  // A rare seed can fill every central starting slot. Move only the few
+  // conflicting walkers to open space near the edge before the run begins.
+  for (const q of others.filter((p) => nearPair(p, y, 39))) {
+    const options = [];
+    for (let cy = minY; cy <= maxY; cy += 12)
+      for (const x of [60, 420, 80, 400, 100, 380, 120, 360, 140, 340])
+        options.push({ x, y: cy });
+    options.sort(
+      (a, b) =>
+        Math.hypot(a.x - q.x, a.y - q.y) -
+        Math.hypot(b.x - q.x, b.y - q.y),
+    );
+    const spot = options.find(
+      ({ x, y: cy }) =>
+        centers.every((center) => Math.hypot(x - center, cy - y) >= 44) &&
+        crowd.every(
+          (other) =>
+            other === q ||
+            people.includes(other) ||
+            !other.active ||
+            Math.hypot(other.x - x, other.y - cy) >= 39,
+        ),
+    );
+    if (!spot) throw new Error("No space beside passing person");
+    Object.assign(q, spot);
+  }
+  people.forEach((person, index) => {
+    const x = centers[index];
+    Object.assign(person, {
+      x,
+      y,
+      anchor: true,
+      habit: "meeting",
+      state: "meeting",
+      pauseDuration: 0,
+      wait: 0,
+      route: [{ x, y }],
+      leg: 0,
+      vx: 0,
+      vy: 0,
+      ux: index ? -1 : 1,
+      uy: 0,
+    });
+    if (person.spot) person.spot = { x, y };
+  });
+}
 export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   const config = STAGES[stage];
   const scene = SCENES[stage];
@@ -239,6 +320,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     trafficSpec(stage),
   );
   if (stage === 3) extendVenue(crowd, crossings);
+  placePassingPair(crowd, stage);
   return {
     stage,
     phase: "ready",
@@ -278,6 +360,9 @@ export function step(g, dt, input) {
   g.worldTime += dt;
   const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
+  moveCrowd(g.crowd, dt, g.crossings);
+  const people = g.crowd.filter(visiblePerson),
+    blockedContacts = new Map();
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
   g.stun = Math.max(0, g.stun - dt);
@@ -293,7 +378,6 @@ export function step(g, dt, input) {
       g.player.y -= 75 * dt;
     }
   }
-  constrainTraffic(g, previousPlayer, input);
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
   g.player.y = Math.max(
     g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
@@ -323,6 +407,22 @@ export function step(g, dt, input) {
     }
     if (!g.ticketChecked && g.player.y < 790) g.ticketChecked = true;
   }
+  if (!g.arriving) {
+    const result = resolvePlayerMove(
+      previousPlayer,
+      g.player,
+      g.player.r,
+      people,
+    );
+    Object.assign(g.player, result.point);
+    for (const id of result.contacts) blockedContacts.set(id, 0);
+  }
+  constrainTraffic(g, previousPlayer, input);
+  g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
+  g.player.y = Math.max(
+    g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
+    Math.min(g.worldHeight - 25, g.player.y),
+  );
   const goal = goalFor(g.stage);
   if (
     !g.arriving &&
@@ -346,8 +446,22 @@ export function step(g, dt, input) {
     braking: !!(input.left && input.right),
     stunned: g.stun > 0,
     arriving: g.arriving,
+    resolveFollower: g.arriving
+      ? undefined
+      : (member, next) => {
+          const result = followerProgress(member, next, member.r, people);
+          for (const id of result.contacts)
+            if (!blockedContacts.has(id) || blockedContacts.get(id) === 0)
+              blockedContacts.set(id, member.id);
+          return result.fraction;
+        },
   });
-  moveCrowd(g.crowd, dt, g.crossings);
+  for (const [id, memberId] of blockedContacts) {
+    if (!memberId) continue;
+    const person = people.find((p) => p.id === id),
+      friend = g.party.members.find((m) => m.id === memberId);
+    if (person && friend) makeRoomForFollower(person, friend);
+  }
   const crash = vehicleContact(g, previousTeam);
   if (crash) {
     g.phase = "gameover";
@@ -359,12 +473,14 @@ export function step(g, dt, input) {
     nearest = Infinity;
   const touching = [];
   const team = [{ ...g.player, id: 0 }, ...g.party.members];
-  for (const p of g.crowd) {
-    if (!visiblePerson(p)) continue;
+  for (const p of people) {
     let overlaps = false;
     for (const member of team) {
       const distance = Math.hypot(p.x - member.x, p.y - member.y);
-      if (distance < p.r + member.r) {
+      if (
+        distance < p.r + member.r + BODY_GAP + 0.3 ||
+        blockedContacts.get(p.id) === member.id
+      ) {
         overlaps = true;
         if (
           !g.cooldown &&

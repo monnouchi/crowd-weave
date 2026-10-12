@@ -19,6 +19,7 @@ const expected = [
   ".nojekyll",
   "LICENSE",
   "art.js",
+  "bodies.js",
   "branding.js",
   "character.js",
   "crowd.js",
@@ -96,6 +97,7 @@ test("Browser asset references stay within a GitHub Pages project base path", as
   for (const file of [
     "game.js",
     "logic.js",
+    "bodies.js",
     "pose.js",
     "party.js",
     "sound.js",

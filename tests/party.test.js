@@ -167,5 +167,7 @@ test("full four-friend simulation has a bounded update budget and no unbounded t
     `40 pedestrians + 4 followers / 3600 updates: ${ms.toFixed(1)} ms; max trail ${points} points on this Node runtime`,
   );
   assert.ok(ms < 5000);
-  assert.ok(points < 128);
+  // Solid spectators can delay a friend briefly while the leader keeps
+  // walking; the trail still sheds old turns once the spectator yields.
+  assert.ok(points < 256);
 });
