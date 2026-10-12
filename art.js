@@ -1,4 +1,4 @@
-// Original oblique map illustration. All geometry is decoration; the simulation
+// Original scene illustration; residential proof uses a unified overhead projection. All geometry is decoration; the simulation
 // remains the only source of walking space, signals, contact and score.
 import { drawCharacter } from "./character.js";
 const INK = "#293c40",
@@ -38,7 +38,7 @@ const PALETTES = {
   },
 };
 export function scenePalette(scene) {
-  return PALETTES[scene.landmark] || PALETTES.home;
+  return SPATIAL[scene.landmark] || PALETTES.home;
 }
 function rect(c, x, y, w, h, color, outline = false) {
   c.fillStyle = color;
@@ -85,1096 +85,1046 @@ function text(
   c.textAlign = align;
   c.fillText(words, x, y);
 }
-function sign(c, words, x, y, w, color = TEAL, size = 11) {
-  rect(c, x, y, w, 23, color, true);
-  text(c, words, x + w / 2, y + 16, size, PAPER);
-}
-function windowPane(c, x, y, w, h, dark = false) {
-  rect(c, x, y, w, h, dark ? "#48666c" : "#a9c5c0", true);
-  polygon(
+function overheadHouse(c, x, y, w, h, index = 0, shadowX = 4, shadowY = 5) {
+  const roofs = [
+    ["#829491", "#647a7c"],
+    ["#a39980", "#827a67"],
+    ["#8a929a", "#6b7786"],
+    ["#899577", "#6d7d63"],
+  ];
+  const [light, dark] = roofs[index % roofs.length];
+  const entry = y + h * (index % 2 ? 0.63 : 0.38);
+  rect(c, x + shadowX, y + shadowY, w, h, "#243c3e18");
+  rect(c, x, y, w, h, "#eee7d5", true);
+  rect(c, x + 3, y + 3, w - 6, h - 6, dark);
+  const horizontal = index % 4 === 1;
+  if (index % 4 === 2) {
+    polygon(
+      c,
+      [
+        [x + 3, y + 3],
+        [x + w * 0.46, y + 20],
+        [x + w * 0.46, y + h - 20],
+        [x + 3, y + h - 3],
+      ],
+      light,
+    );
+  } else
+    rect(
+      c,
+      x + 3,
+      y + 3,
+      horizontal ? w - 6 : w / 2 - 3,
+      horizontal ? h / 2 - 3 : h - 6,
+      light,
+    );
+  line(
+    c,
+    horizontal
+      ? [
+          [x + 3, y + h / 2],
+          [x + w - 3, y + h / 2],
+        ]
+      : [
+          [x + w / 2, y + 3],
+          [x + w / 2, y + h - 3],
+        ],
+    "#46595e",
+    1.8,
+  );
+  // No vertical window is drawn on a roof. One skylight and a chimney sit on it.
+  rect(c, x + w * 0.66, y + h * 0.2, 22, 28, "#b7ccd0", true);
+  line(
     c,
     [
-      [x + 2, y + 2],
-      [x + w - 2, y + 2],
-      [x + 2, y + h - 2],
+      [x + w * 0.66 + 2, y + h * 0.2 + 2],
+      [x + w * 0.66 + 20, y + h * 0.2 + 26],
     ],
-    dark ? "#648086" : "#c8d8cd",
+    "#e4eded",
+    1,
+  );
+  rect(c, x + w * 0.3, y + h * 0.77, 12, 14, "#d0c5ac", true);
+  // Cutaway vestibule: wall opening, inward door leaf, threshold and paving.
+  rect(c, x, entry - 20, 34, 40, "#eee7d5");
+  line(
+    c,
+    [
+      [x + 34, entry - 20],
+      [x + 34, entry + 20],
+    ],
+    "#576a68",
+    2,
   );
   line(
     c,
     [
-      [x + w / 2, y],
-      [x + w / 2, y + h],
+      [x, entry - 20],
+      [x + 34, entry - 20],
     ],
-    INK,
-    1,
+    "#576a68",
+    2,
   );
+  line(
+    c,
+    [
+      [x, entry + 20],
+      [x + 34, entry + 20],
+    ],
+    "#576a68",
+    2,
+  );
+  rect(c, x - 8, entry - 15, 10, 30, "#b3a188");
+  line(
+    c,
+    [
+      [x + 1, entry + 14],
+      [x + 22, entry + 14],
+    ],
+    "#856b50",
+    3,
+  );
+  return entry;
 }
-function tree(c, x, y, r = 19, seed = 0) {
+function residentialLot(c, side, y, index) {
   c.save();
-  c.translate(x, y);
-  polygon(
+  c.translate(side < 0 ? 0 : 480, y);
+  c.scale(side < 0 ? -1 : 1, 1);
+  const front = [50, 73, 101, 63][index % 4],
+    h = [170, 148, 184, 155][index % 4],
+    houseWidth = [216, 186, 157, 225][index % 4];
+  rect(c, 0, 0, 304, 234, index % 2 ? "#c4cead" : "#b8c5a3");
+  const entry = 25 + h * (index % 2 ? 0.63 : 0.38);
+  rect(c, 0, entry - 17, front + 3, 34, "#e3d9c3");
+  line(
     c,
     [
-      [-r + 4, 7],
-      [r + 6, 7],
-      [r + 8, 16],
-      [-r + 6, 16],
+      [0, entry - 17],
+      [front, entry - 17],
     ],
-    "#293c4020",
-  );
-  const pts = Array.from({ length: 10 }, (_, i) => {
-    const a = (i * Math.PI) / 5,
-      rr = r * (i % 2 ? 0.84 : 1);
-    return [Math.cos(a) * rr, Math.sin(a) * rr * 0.75];
-  });
-  polygon(c, pts, seed % 2 ? "#738965" : "#55785f", true);
-  polygon(
-    c,
-    [
-      [-r * 0.65, -3],
-      [-r * 0.3, -r * 0.55],
-      [r * 0.3, -r * 0.4],
-      [r * 0.55, 1],
-      [0, 3],
-    ],
-    "#8b9e72",
+    "#bfb69f",
+    1,
   );
   line(
     c,
     [
-      [-4, -4],
-      [0, 6],
-      [6, 0],
+      [0, entry + 17],
+      [front, entry + 17],
     ],
-    "#3e6051",
+    "#bfb69f",
     1,
   );
+  overheadHouse(c, front, 25, houseWidth, h, index, side < 0 ? -4 : 4);
+  // Both fence sections terminate before the same path, leaving an open gate.
+  line(
+    c,
+    [
+      [8, 0],
+      [8, entry - 20],
+    ],
+    "#71856b",
+    4,
+  );
+  line(
+    c,
+    [
+      [8, entry + 20],
+      [8, 234],
+    ],
+    "#71856b",
+    4,
+  );
+  line(
+    c,
+    [
+      [8, 234],
+      [304, 234],
+    ],
+    "#8b9b79",
+    2,
+  );
+  for (const yy of [entry - 22, entry + 22])
+    rect(c, 4, yy - 3, 8, 6, "#60735b");
+  // Small garden features stay wholly outside the simulated walking corridor.
+  rect(c, 21, entry > 100 ? 34 : 174, 24, 28, "#8aa174");
+  for (const dx of [27, 36]) {
+    c.fillStyle = index % 2 ? "#e3ba87" : "#d7d8b3";
+    c.beginPath();
+    c.arc(dx, entry > 100 ? 47 : 187, 3, 0, Math.PI * 2);
+    c.fill();
+  }
   c.restore();
 }
-function bench(c, x, y, w = 42) {
-  rect(c, x + 3, y + 9, w, 5, "#293c4020");
-  rect(c, x, y, w, 10, "#9e7d52", true);
-  line(
-    c,
-    [
-      [x + 1, y + 4],
-      [x + w - 1, y + 4],
-    ],
-    "#d1b78c",
-    1,
-  );
-  rect(c, x + 5, y + 10, 3, 4, INK);
-  rect(c, x + w - 8, y + 10, 3, 4, INK);
+function residentialSurroundings(c, bounds) {
+  const { left, right, top, bottom } = bounds;
+  rect(c, left, top, right - left, bottom - top, "#b8c5a3");
+  for (const side of [-1, 1]) {
+    for (let y = Math.floor(top / 234) * 234; y < bottom; y += 234) {
+      const row = Math.floor(y / 234);
+      residentialLot(c, side, y, (((row + (side > 0 ? 2 : 0)) % 4) + 4) % 4);
+    }
+  }
 }
-function poster(c, x, y, w = 25, h = 38, kind = "live") {
-  rect(c, x, y, w, h, PAPER, true);
-  rect(c, x + 3, y + 3, w - 6, 6, kind === "menu" ? "#a2643f" : RED);
-  text(
-    c,
-    kind === "menu" ? "MENU" : "LIVE",
-    x + w / 2,
-    y + 8,
-    Math.max(4, w / 5),
-    PAPER,
-    "center",
-    800,
-  );
-  if (kind === "menu") {
-    rect(c, x + 5, y + 14, w * 0.42, 8, TEAL, true);
+function residentialFloor(c, height) {
+  rect(c, 0, -800, 480, height + 1000, "#e7e3d8");
+  rect(c, 94, -800, 292, height + 1000, "#d2d6d1");
+  // Material seams, not barriers: every part of this ground remains walkable.
+  for (const x of [94, 386])
     line(
       c,
       [
-        [x + w * 0.65, y + 15],
-        [x + w * 0.75, y + 15],
-        [x + w * 0.75, y + 20],
-        [x + w * 0.65, y + 20],
+        [x, -800],
+        [x, height + 200],
       ],
-      TEAL,
-      1,
+      "#b4beb5",
+      2,
     );
-    for (let row = 0; row < 3; row++)
+  for (let y = -720; y < height + 200; y += 88) {
+    line(
+      c,
+      [
+        [0, y],
+        [94, y],
+      ],
+      "#cfcfc1",
+      0.8,
+    );
+    line(
+      c,
+      [
+        [386, y + 44],
+        [480, y + 44],
+      ],
+      "#cfcfc1",
+      0.8,
+    );
+  }
+  // Each side branch reaches the gate opening of its own lot.
+  for (let y = Math.floor(-800 / 234) * 234; y < height + 200; y += 234) {
+    const row = Math.floor(y / 234);
+    for (const side of [-1, 1]) {
+      const index = (((row + (side > 0 ? 2 : 0)) % 4) + 4) % 4;
+      const h = [170, 148, 184, 155][index];
+      const entry = y + 25 + h * (index % 2 ? 0.63 : 0.38);
+      rect(c, side < 0 ? 0 : 386, entry - 17, 94, 34, "#e3d9c3");
       line(
         c,
         [
-          [x + 5, y + h - 13 + row * 3],
-          [x + w - 5, y + h - 13 + row * 3],
+          [side < 0 ? 0 : 386, entry - 17],
+          [side < 0 ? 94 : 480, entry - 17],
         ],
-        "#93816a",
-        0.7,
+        "#c3b9a5",
+        1,
+      );
+      line(
+        c,
+        [
+          [side < 0 ? 0 : 386, entry + 17],
+          [side < 0 ? 94 : 480, entry + 17],
+        ],
+        "#c3b9a5",
+        1,
+      );
+    }
+  }
+}
+function residentialCorner(c) {
+  // Two inward-facing homes terminate at the same continuous corner court.
+  rect(c, 18, -210, 444, 305, "#dce2ce");
+  rect(c, 154, -210, 172, 305, "#e7e3d8");
+  for (const side of [-1, 1]) {
+    c.save();
+    c.translate(side < 0 ? 154 : 326, -182);
+    c.scale(side < 0 ? -1 : 1, 1);
+    const entry = 170 * (side < 0 ? 0.38 : 0.63);
+    rect(c, -22, entry - 17, 31, 34, "#e3d9c3");
+    overheadHouse(c, 0, 0, 128, 170, side < 0 ? 0 : 1, side < 0 ? -4 : 4);
+    c.restore();
+  }
+  // A cross street explains the corner instead of a freestanding direction sign.
+  rect(c, -300, -260, 1080, 50, "#d2d6d1");
+  line(
+    c,
+    [
+      [-300, -210],
+      [154, -210],
+    ],
+    "#b4beb5",
+    2,
+  );
+  line(
+    c,
+    [
+      [326, -210],
+      [780, -210],
+    ],
+    "#b4beb5",
+    2,
+  );
+  // The third entrance faces that cross street, rather than the screen by default.
+  c.save();
+  c.translate(170, -276);
+  c.rotate(-Math.PI / 2);
+  overheadHouse(c, 0, 0, 117, 140, 2, -5, 4);
+  c.restore();
+  rect(c, 206, -276, 34, 16, "#e3d9c3");
+  text(c, "駅へ →", 240, -224, 12, "#526e65");
+}
+
+// Physical boundaries follow the unchanged simulation coordinates.
+export function surroundings(
+  c,
+  scene,
+  bounds = { left: -600, right: 1080, top: -800, bottom: 1400 },
+) {
+  if (scene.landmark === "home") residentialSurroundings(c, bounds);
+  else spatialSurroundings(c, scene, bounds);
+}
+export function paintFloor(c, scene, height = 680) {
+  if (scene.landmark === "home") residentialFloor(c, height);
+  else spatialFloor(c, scene, height);
+}
+export function floorDetails(c, scene) {
+  if (scene.landmark !== "home") spatialDetails(c, scene);
+}
+export function goalBoundary(c, scene) {
+  if (scene.landmark !== "home") return spatialBoundary(c, scene);
+  c.save();
+  for (const [x, w] of [
+    [0, 162],
+    [318, 162],
+  ]) {
+    rect(c, x, 87, w, 7, "#759065");
+    rect(c, x, 91, w, 3, "#617b56");
+  }
+  c.restore();
+}
+export function architecture(c, scene, opts = {}) {
+  if (scene.landmark === "home") residentialCorner(c);
+  else spatialArchitecture(c, scene, opts);
+}
+export function concert(c, opts = {}) {
+  sPartyGoal(c, opts);
+}
+export function rainShelters(c, opts = {}) {
+  spatialRain(c, opts);
+}
+export function venueJourney(c) {
+  spatialJourney(c);
+}
+export function hallInterior(c) {
+  spatialHall(c);
+}
+export function streetFurniture(c, scene, { startY = 625 } = {}) {
+  if (scene.landmark === "home")
+    text(c, "出発", 240, startY + 45, 10, "#657d73");
+  else spatialFurniture(c, scene, startY);
+}
+export function goalMark(c, scene) {
+  if (scene.landmark !== "home") return spatialGoal(c, scene);
+  c.save();
+  rect(c, 175, 20, 130, 65, "#ded9bc");
+  for (const x of [175, 305])
+    line(
+      c,
+      [
+        [x, 21],
+        [x, 85],
+      ],
+      "#56877a",
+      2,
+    );
+  text(c, "待ち合わせ", 240, 81, 10, "#476b62");
+  c.restore();
+}
+
+const SPATIAL = {
+  station: {
+    ground: "#e5e9e7",
+    outer: "#abbfbe",
+    edge: "#b8cac7",
+    tint: "#315d68",
+  },
+  cafe: {
+    ground: "#eee7d9",
+    outer: "#c7c9b9",
+    edge: "#d6c9b1",
+    tint: "#866247",
+  },
+  venue: {
+    ground: "#d6dfdb",
+    outer: "#93ada4",
+    edge: "#b7c9c0",
+    tint: "#32635e",
+  },
+  party: {
+    ground: "#708580",
+    outer: "#23363b",
+    edge: "#516863",
+    tint: "#d9ae69",
+  },
+};
+function sCircle(c, x, y, r, color, stroke = null) {
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fillStyle = color;
+  c.fill();
+  if (stroke) {
+    c.strokeStyle = stroke;
+    c.lineWidth = 1;
+    c.stroke();
+  }
+}
+function sPath(c, x, y, w, h, color = "#dedacb") {
+  rect(c, x, y, w, h, color);
+  line(
+    c,
+    [
+      [x, y],
+      [x + w, y],
+    ],
+    "#b9bdaf",
+    1,
+  );
+  line(
+    c,
+    [
+      [x, y + h],
+      [x + w, y + h],
+    ],
+    "#b9bdaf",
+    1,
+  );
+}
+function sPaving(c, x, top, w, bottom, size, color) {
+  for (let y = Math.floor(top / size) * size; y < bottom; y += size)
+    line(
+      c,
+      [
+        [x, y],
+        [x + w, y],
+      ],
+      color,
+      0.75,
+    );
+  for (let xx = x; xx < x + w; xx += size)
+    line(
+      c,
+      [
+        [xx, top],
+        [xx, bottom],
+      ],
+      color,
+      0.75,
+    );
+}
+function sTree(c, x, y, r = 26) {
+  sCircle(c, x + 3, y + 4, r, "#253e3e25");
+  sCircle(c, x, y, r, "#5c806e", "#365f56");
+  sCircle(c, x - r * 0.25, y - r * 0.27, r * 0.56, "#81a083");
+  sCircle(c, x + r * 0.32, y + r * 0.2, r * 0.36, "#739575");
+}
+function sBench(c, x, y, w = 48) {
+  rect(c, x + 2, y + 3, w, 16, "#2c41401c");
+  rect(c, x, y, w, 16, "#997b59", true);
+  for (const yy of [4, 8, 12])
+    line(
+      c,
+      [
+        [x + 4, y + yy],
+        [x + w - 4, y + yy],
+      ],
+      "#d5b88b",
+      1,
+    );
+}
+function sSideBuilding(c, side, y, kind, index = 0) {
+  c.save();
+  c.translate(side < 0 ? 0 : 480, y);
+  c.scale(side < 0 ? -1 : 1, 1);
+  const h = kind === "station" ? 142 : kind === "cafe" ? 180 : 156;
+  const front = kind === "station" ? 32 + index * 8 : 23;
+  const roof =
+    kind === "station"
+      ? ["#708f93", "#7a9996", "#66818a"][index % 3]
+      : kind === "cafe"
+        ? "#ada998"
+        : "#73928b";
+  rect(c, 0, 0, 250, h + 23, kind === "cafe" ? "#d4ccba" : "#b5c9c3");
+  const door = 24 + h * (index % 2 ? 0.6 : 0.35);
+  sPath(c, 0, door - 17, front + 3, 34, "#e7dfcf");
+  rect(c, front + 4, 14, 203, h, "#29424425");
+  rect(c, front, 10, 203, h, roof, true);
+  rect(c, front + 13, 22, 176, h - 24, kind === "cafe" ? "#bcb7a5" : "#88a6a7");
+  if (kind === "station") {
+    rect(c, front + 28, 34, 115, 20, "#abc5c0", true);
+    for (const xx of [front + 40, front + 67, front + 94])
+      line(
+        c,
+        [
+          [xx, 35],
+          [xx, 53],
+        ],
+        "#e2eeee",
+        1,
       );
   } else {
-    c.fillStyle = "#c4a36c";
+    rect(c, front + 65, 48, 48, 43, "#d7cabb", true);
+    rect(c, front + 71, 54, 36, 31, "#b6c5b7");
+  }
+  // Vestibule faces the public walkway. Its roof is cut away only here.
+  rect(c, front - 1, door - 20, 38, 40, "#eee7d9");
+  line(
+    c,
+    [
+      [front + 37, door - 20],
+      [front + 37, door + 20],
+    ],
+    "#496363",
+    2,
+  );
+  line(
+    c,
+    [
+      [front, door - 20],
+      [front + 37, door - 20],
+    ],
+    "#496363",
+    2,
+  );
+  line(
+    c,
+    [
+      [front, door + 20],
+      [front + 37, door + 20],
+    ],
+    "#496363",
+    2,
+  );
+  rect(c, front - 7, door - 15, 8, 30, "#b6aa92");
+  c.restore();
+}
+function sStationExterior(c, { left, right, top, bottom }) {
+  rect(c, left, top, right - left, bottom - top, "#b7c9c6");
+  for (const side of [-1, 1]) {
+    sSideBuilding(c, side, 505, "station", side < 0 ? 0 : 1);
+    sSideBuilding(c, side, 118, "station", side < 0 ? 2 : 0);
+    if (side < 0) {
+      sTree(c, -93, 426, 26);
+      sBench(c, -110, 469, 48);
+    } else {
+      sTree(c, 550, 460, 28);
+      rect(c, 510, 561, 62, 31, "#567883", true);
+    }
+  }
+  rect(c, -192, -250, 864, 346, "#647f82");
+}
+function sCafeExterior(c, { left, right, top, bottom }) {
+  rect(c, left, top, right - left, bottom - top, "#c4c2b3");
+  // West connects to platforms, east to a waiting room. All fixtures are
+  // behind the vertical edge of the playable concourse.
+  rect(c, -244, top, 244, bottom - top, "#b9c3ba");
+  for (const y of [235, 440, 620]) {
+    rect(c, -220, y, 212, 80, "#718c8a", true);
+    for (let xx = -207; xx < -25; xx += 30)
+      line(
+        c,
+        [
+          [xx, y + 17],
+          [xx, y + 63],
+        ],
+        "#c8d6ce",
+        2,
+      );
+    sPath(c, -10, y + 19, 10, 42);
+  }
+  for (const y of [165, 475]) {
+    rect(c, 490, y, 181, 136, "#e0d1ba", true);
+    sBench(c, 513, y + 22, 56);
+    sBench(c, 594, y + 77, 56);
+    rect(c, 492, y + 50, 18, 40, "#d8bd8d");
+  }
+}
+function sVenueExterior(c, { left, right, top, bottom }) {
+  rect(c, left, top, right - left, bottom - top, "#9db4aa");
+  for (const side of [-1, 1]) {
+    const sx = side < 0 ? -125 : 515;
+    for (const y of [450, 586, 705])
+      sTree(c, sx + ((y / 10) % 2 ? 11 : -8), y, 29);
+    sBench(c, side < 0 ? -75 : 503, 505, 54);
+    if (side < 0) sSideBuilding(c, side, 1015, "venue", 1);
+    else sSideBuilding(c, side, 1015, "venue", 2);
+    sSideBuilding(c, side, 125, "venue", side < 0 ? 1 : 2);
+  }
+}
+function sHallExterior(c, { left, right, top, bottom }) {
+  rect(c, left, top, right - left, bottom - top, "#26383c");
+  for (const side of [-1, 1]) {
+    const x = side < 0 ? -180 : 480;
+    rect(c, x, -200, 180, 900, "#34494a");
+    // Audience aisles are outlined, while seats remain outside the playfield.
+    for (let y = -40; y < 635; y += 92) {
+      rect(c, x + 13, y, 154, 61, "#4b6260");
+      for (let xx = x + 27; xx < x + 160; xx += 23)
+        sCircle(c, xx, y + 30, 7, "#607874");
+    }
+    rect(c, x, 715, 180, bottom - 715, "#888d7b");
+    sBench(c, x + 37, 895, 81);
+  }
+}
+function spatialSurroundings(c, scene, bounds) {
+  c.save();
+  if (scene.landmark === "station") sStationExterior(c, bounds);
+  else if (scene.landmark === "cafe") sCafeExterior(c, bounds);
+  else if (scene.landmark === "venue") sVenueExterior(c, bounds);
+  else sHallExterior(c, bounds);
+  c.restore();
+}
+function spatialFloor(c, scene, height) {
+  const kind = scene.landmark,
+    p = SPATIAL[kind];
+  c.save();
+  rect(c, 0, -800, 480, height + 1000, p.ground);
+  if (kind === "station") {
+    sPaving(c, 0, -800, 480, height + 200, 72, "#c6d5d0");
+    rect(c, 0, -800, 23, height + 1000, "#c0d0cb");
+    rect(c, 457, -800, 23, height + 1000, "#c0d0cb");
+    // A broad plaza and a readable narrower station approach.
+    rect(c, 126, 106, 228, 194, "#d4e0dc");
+    for (const x of [126, 354])
+      line(
+        c,
+        [
+          [x, 106],
+          [x, 300],
+        ],
+        "#abbdb8",
+        1,
+      );
+  } else if (kind === "cafe") {
+    sPaving(c, 0, -800, 480, height + 200, 80, "#ddd4c4");
+    rect(c, 0, 128, 480, 82, "#e1dbc9");
+    rect(c, 0, 420, 480, 82, "#e1dbc9");
+    for (const y of [128, 210, 420, 502])
+      line(
+        c,
+        [
+          [0, y],
+          [480, y],
+        ],
+        "#cabb9f",
+        1.2,
+      );
+    rect(c, 202, 95, 76, 535, "#f0ebde");
+    for (const x of [202, 278])
+      line(
+        c,
+        [
+          [x, 95],
+          [x, 630],
+        ],
+        "#e2d9c8",
+        1,
+      );
+  } else if (kind === "venue") {
+    rect(c, 0, -800, 480, 1100, "#d5dfda");
+    rect(c, 0, 365, 480, 415, "#b6c7b8");
+    rect(c, 62, 365, 356, 415, "#d9ded0");
+    rect(c, 0, 925, 480, height - 925 + 200, "#bfd0cb");
+    rect(c, 143, 365, 194, 415, "#e4e5da");
+    // Three seams follow an actual public path, with no painted fence in it.
+    for (const x of [62, 143, 337, 418])
+      line(
+        c,
+        [
+          [x, 365],
+          [x, 780],
+        ],
+        "#9fb4a9",
+        1,
+      );
+    sPaving(c, 0, 930, 480, height + 200, 90, "#abc0b9");
+  } else {
+    rect(c, 0, -800, 480, 1480, "#627b77");
+    rect(c, 0, 685, 480, height - 685 + 200, "#c5c1aa");
+    rect(c, 196, 38, 88, 640, "#75928b");
+    for (let y = 125; y < 680; y += 94)
+      line(
+        c,
+        [
+          [0, y],
+          [480, y],
+        ],
+        "#8aa09a",
+        0.8,
+      );
+    sPaving(c, 0, 730, 480, height + 200, 84, "#aeaf9a");
+  }
+  c.restore();
+}
+function spatialDetails(c, scene) {
+  c.save();
+  if (scene.landmark === "station") {
+    // Horizontal access from the side shops into the public plaza.
+    for (const [y, side] of [
+      [172, -1],
+      [535, -1],
+      [212, 1],
+      [570, 1],
+    ])
+      sPath(c, side < 0 ? 0 : 436, y, 44, 34, "#e2ddd0");
+    for (const x of [29, 451]) {
+      rect(c, x - 3, 122, 6, 145, "#ccbb76");
+      for (let y = 132; y < 260; y += 18)
+        line(
+          c,
+          [
+            [x - 3, y],
+            [x + 3, y],
+          ],
+          "#988a56",
+          1,
+        );
+    }
+  } else if (scene.landmark === "cafe") {
+    // Thresholds to each lateral destination explain the side-to-side flows.
+    for (const y of [254, 459, 633]) sPath(c, 0, y, 50, 38, "#d2ddd4");
+    for (const y of [208, 518]) sPath(c, 430, y, 50, 36, "#e5d5bc");
+    text(c, "1・2番線", 45, 269, 10, "#637b77");
+    text(c, "待合", 434, 226, 10, "#8c7155");
+  }
+  c.restore();
+}
+function spatialBoundary(c, scene) {
+  c.save();
+  if (scene.landmark === "party") {
+    // Physical front-row barrier remains exactly at y=20.
+    rect(c, 0, 7, 480, 13, "#3a5352");
+    line(
+      c,
+      [
+        [0, 20],
+        [480, 20],
+      ],
+      "#d0d8c9",
+      4,
+    );
+    for (let x = 19; x < 480; x += 50) sCircle(c, x, 20, 4, "#23383a");
+  } else {
+    for (const [x, w] of [
+      [0, 162],
+      [318, 162],
+    ]) {
+      rect(c, x, 87, w, 7, scene.landmark === "cafe" ? "#92795e" : "#6d8181");
+      line(
+        c,
+        [
+          [x, 94],
+          [x + w, 94],
+        ],
+        "#394e50",
+        2,
+      );
+    }
+  }
+  c.restore();
+}
+function sStationGoal(c) {
+  // Outdoor plaza -> broad open threshold -> ticket gates. The entrance gap
+  // leaves 12px for the player around the x=174..306 center corridor.
+  rect(c, 0, -205, 162, 292, "#718d8d", true);
+  rect(c, 318, -205, 162, 292, "#718d8d", true);
+  rect(c, 162, -205, 156, 225, "#d5e0da");
+  for (const x of [185, 228, 271]) {
+    rect(c, x, -122, 16, 55, "#456d70", true);
+    rect(c, x + 2, -114, 12, 25, "#98bbb2");
+    rect(c, x - 3, -67, 22, 7, "#567e74");
+  }
+  for (const [x, y] of [
+    [46, -95],
+    [374, -110],
+  ]) {
+    rect(c, x, y, 68, 33, "#b6cdca", true);
+    rect(c, x + 9, y + 7, 50, 19, "#4e6f73");
+  }
+  sPath(c, 162, 15, 156, 80, "#c3d8d1");
+  rect(c, 162, 13, 156, 5, "#446d70");
+  text(c, "改札へ", 240, 5, 12, "#345d5e");
+}
+function sCafeGoal(c) {
+  rect(c, 0, -210, 162, 297, "#a99a83", true);
+  rect(c, 318, -210, 162, 297, "#a99a83", true);
+  rect(c, 162, -205, 156, 224, "#e7d8bc", true);
+  rect(c, 181, -178, 118, 49, "#ad8356", true);
+  for (const x of [194, 233, 272]) sCircle(c, x, -154, 9, "#f4e6ce", "#815f47");
+  rect(c, 182, -116, 116, 31, "#926c4e", true);
+  rect(c, 194, -105, 20, 13, "#394f4d");
+  rect(c, 243, -106, 31, 15, "#516f68");
+  for (const x of [200, 264]) {
+    sCircle(c, x, -53, 15, "#a27d59", "#755a45");
+    for (const dx of [-13, 13]) rect(c, x + dx - 4, -60, 8, 15, "#587369");
+  }
+  sPath(c, 162, 16, 156, 79, "#e8dcc7");
+  rect(c, 162, 14, 156, 4, "#795f4a");
+  text(c, "カフェ入口", 240, 3, 11, "#654c3e");
+}
+function sVenueGoal(c) {
+  // Roof planes, service fans, and a flat music emblem establish an overhead
+  // venue. The covered opening and threshold lead into its central atrium.
+  for (const [x, fan] of [[0, 82], [318, 398]]) {
+    rect(c, x, -205, 162, 292, "#63877d", true);
+    rect(c, x + 10, -193, 142, 268, "#72968b");
+    for (const seamY of [-165, -36, 65])
+      line(c, [[x + 10, seamY], [x + 152, seamY]], "#98b3a7", 1);
+    sCircle(c, fan, -106, 25, "#42675e", "#b6cbc0");
+    sCircle(c, fan, -106, 18, "#8aa99b", "#32564e");
+    for (const angle of [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2])
+      line(c, [
+        [fan + Math.cos(angle) * 5, -106 + Math.sin(angle) * 5],
+        [fan + Math.cos(angle) * 16, -106 + Math.sin(angle) * 16],
+      ], "#42675e", 3);
+  }
+  rect(c, 162, -205, 156, 228, "#c7d9ce");
+  sPath(c, 169, -200, 142, 216, "#dbe6dc");
+  sCircle(c, 240, -122, 38, "#6b9181", "#e4d9ac");
+  sCircle(c, 240, -122, 29, "#496f63");
+  text(c, "♪", 240, -109, 35, "#f0dfaa");
+  rect(c, 180, -47, 120, 25, "#476d60");
+  text(c, "LIVE", 240, -29, 13, "#f1e4b8");
+  rect(c, 162, -17, 156, 44, "#71988b");
+  for (const x of [172, 202, 232, 262, 292])
+    line(c, [[x, -13], [x + 19, 23]], "#9cb9a7", 1);
+  sPath(c, 162, 27, 156, 67, "#d9e3da");
+  rect(c, 162, 27, 156, 5, "#416a60");
+  text(c, "会場入口", 240, 53, 11, "#4c7166");
+}
+function sPartyGoal(c, opts) {
+  rect(c, 78, -205, 324, 214, "#31494b", true);
+  rect(c, 91, -190, 298, 172, "#3e5b59");
+  rect(c, 108, -180, 264, 15, "#557775");
+  // Fixtures viewed from above: instrument bodies, keys and mic stand have
+  // ground footprints. Performers use the same figure projection as crowd.
+  for (const [x, color] of [
+    [155, "#a88b61"],
+    [240, "#719c90"],
+    [325, "#a88b61"],
+  ]) {
+    sCircle(c, x, -130, 28, color + "2a");
+    sCircle(c, x, -130, 10, color + "20");
+  }
+  sCircle(c, 170, -84, 17, "#bd925b", "#694f3d");
+  line(
+    c,
+    [
+      [170, -84],
+      [200, -96],
+    ],
+    "#b18a55",
+    6,
+  );
+  rect(c, 294, -96, 54, 25, "#262e31", true);
+  for (let x = 299; x < 346; x += 7) rect(c, x, -91, 4, 10, "#ecede3");
+  sCircle(c, 240, -96, 11, "#778e8b", "#435a56");
+  line(
+    c,
+    [
+      [240, -96],
+      [240, -61],
+    ],
+    "#c4d0c4",
+    2,
+  );
+  for (const [x, y, id, shirt] of [
+    [148, -124, 5, "#c1a078"],
+    [240, -126, 1, "#8ca798"],
+    [331, -120, 4, "#b67a56"],
+  ])
+    drawCharacter(
+      c,
+      {
+        x,
+        y,
+        r: 11,
+        appearanceId: id,
+        id,
+        shirt,
+        friend: true,
+        state: "waiting",
+      },
+      {
+        pose: { ux: 0, uy: 1, distance: 0, moving: false, speed: 0 },
+        reducedMotion: true,
+        overhead: true,
+      },
+    );
+  if (opts.complete) text(c, "また一緒に来よう", 240, -46, 11, "#e4d7ac");
+}
+function spatialArchitecture(c, scene, opts) {
+  c.save();
+  if (scene.landmark === "station") sStationGoal(c);
+  else if (scene.landmark === "cafe") sCafeGoal(c);
+  else if (scene.landmark === "venue") sVenueGoal(c);
+  else sPartyGoal(c, opts);
+  c.restore();
+}
+function spatialRain(c, opts) {
+  c.save();
+  // Rain canopies are roof footprints, attached to the route's side edges.
+  for (const [x, y] of [
+    [-104, 995],
+    [478, 120],
+  ]) {
+    rect(c, x + 3, y + 4, 92, 33, "#253f411f");
+    rect(c, x, y, 92, 33, "#577e79", true);
+    for (let i = 0; i < 4; i++)
+      line(
+        c,
+        [
+          [x + i * 25, y + 2],
+          [x + i * 25 + 20, y + 30],
+        ],
+        "#91b0a5",
+        1,
+      );
+  }
+  for (const [x, y] of [
+    [33, 1030],
+    [435, 472],
+    [45, 691],
+    [421, 102],
+  ]) {
+    c.fillStyle = "#9fbdb8a0";
     c.beginPath();
-    c.arc(x + w / 2, y + h * 0.51, w * 0.24, 0, Math.PI * 2);
+    c.ellipse(x, y, 19, 5, -0.12, 0, Math.PI * 2);
     c.fill();
     line(
       c,
       [
-        [x + 5, y + h * 0.72],
-        [x + w * 0.36, y + h * 0.46],
-        [x + w * 0.62, y + h * 0.73],
-        [x + w - 5, y + h * 0.4],
+        [x - 5, y],
+        [x + 9, y],
       ],
-      TEAL,
-      2,
-    );
-    for (let sx = x + 5; sx < x + w - 5; sx += 5)
-      rect(c, sx, y + h - 6, 3, 1, INK);
-  }
-}
-const stamps = new Map();
-function stamp(c, key, x, y, w, h, paint) {
-  if (typeof OffscreenCanvas === "undefined") return false;
-  let tile = stamps.get(key);
-  if (!tile) {
-    if (stamps.size >= 48) stamps.clear();
-    tile = new OffscreenCanvas(Math.ceil(w * 2), Math.ceil(h * 2));
-    const t = tile.getContext("2d");
-    t.scale(2, 2);
-    paint(t);
-    stamps.set(key, tile);
-  }
-  c.drawImage(tile, x, y, w, h);
-  return true;
-}
-function house(c, x, y, w, h, index = 0) {
-  if (
-    stamp(c, `house:${w}:${h}:${index}`, x, y, w + 10, h + 10, (t) =>
-      houseInk(t, 0, 0, w, h, index),
-    )
-  )
-    return;
-  houseInk(c, x, y, w, h, index);
-}
-function houseInk(c, x, y, w, h, index) {
-  const roof = [
-    ["#7b8a7c", "#65766e"],
-    ["#93836d", "#7e715f"],
-    ["#819599", "#657e84"],
-  ][index % 3];
-  rect(c, x + 7, y + 9, w, h, "#293c4020");
-  rect(c, x, y + h - 44, w, 44, index % 2 ? "#cec3a5" : "#ddd3b9", true);
-  polygon(
-    c,
-    [
-      [x, y + 10],
-      [x + w / 2, y],
-      [x + w / 2, y + h - 44],
-      [x, y + h - 34],
-    ],
-    roof[0],
-    true,
-  );
-  polygon(
-    c,
-    [
-      [x + w / 2, y],
-      [x + w, y + 10],
-      [x + w, y + h - 34],
-      [x + w / 2, y + h - 44],
-    ],
-    roof[1],
-    true,
-  );
-  for (let sy = y + 16; sy < y + h - 40; sy += 12)
-    line(
-      c,
-      [
-        [x + 3, sy],
-        [x + w / 2, sy - 8],
-        [x + w - 3, sy],
-      ],
-      "#f5f0df24",
-      0.8,
-    );
-  windowPane(c, x + w * 0.17, y + 21, 23, 29);
-  rect(c, x + w * 0.72, y + 15, 12, 12, "#afb4a0", true);
-  windowPane(c, x + 10, y + h - 25, 30, 13);
-  windowPane(c, x + w - 44, y + h - 25, 30, 13);
-  rect(c, x + w / 2 - 9, y + h - 23, 18, 23, "#62786d", true);
-  rect(c, x + w / 2 + 4, y + h - 12, 2, 2, PAPER);
-  rect(c, x + 10, y + h - 8, 16, 6, "#884c3d", true);
-  text(c, String(12 + index), x + 18, y + h - 3, 5, PAPER);
-  line(
-    c,
-    [
-      [x + 5, y + h],
-      [x + w + 3, y + h],
-    ],
-    "#727b68",
-    2,
-  );
-}
-
-function shop(c, x, y, w, index, landmark) {
-  if (
-    stamp(c, `shop:${w}:${index}:${landmark}`, x, y, w + 10, 138, (t) =>
-      shopInk(t, 0, 0, w, index, landmark),
-    )
-  )
-    return;
-  shopInk(c, x, y, w, index, landmark);
-}
-function shopInk(c, x, y, w, index, landmark) {
-  rect(c, x + 6, y + 7, w, 128, "#293c4020");
-  rect(c, x, y, w, 128, "#cecbb7", true);
-  rect(c, x, y, w, 28, landmark === "cafe" ? "#738779" : "#60797d", true);
-  for (let sx = x + 7; sx < x + w; sx += 10)
-    line(
-      c,
-      [
-        [sx, y + 4],
-        [sx, y + 23],
-      ],
-      "#ffffff20",
-      1,
-    );
-  const names =
-    landmark === "cafe"
-      ? ["BOOKS", "COFFEE", "KIOSK"]
-      : ["駅前商店", "花と緑", "STORE"];
-  sign(c, names[index % 3], x + 6, y + 35, w - 12, index % 2 ? TEAL : INK, 9);
-  windowPane(c, x + 8, y + 63, w - 16, 42, true);
-  rect(c, x + 6, y + 108, w - 12, 7, "#97886e", true);
-  if (index % 2) poster(c, x + 10, y + 67, 17, 28);
-}
-export function surroundings(
-  c,
-  scene,
-  { left = -600, right = 1080, top = -800, bottom = 1400 } = {},
-) {
-  const p = scenePalette(scene);
-  c.save();
-  rect(c, left, top, right - left, bottom - top, p.outer);
-  if (scene.landmark === "party") {
-    for (const x of [-165, 480]) {
-      rect(c, x, top, 165, bottom - top, "#263b40");
-      for (let y = Math.floor(top / 150) * 150; y < bottom; y += 150) {
-        rect(c, x + 20, y + 20, 120, 102, "#30464b", true);
-        for (let i = 0; i < 5; i++)
-          line(
-            c,
-            [
-              [x + 35, y + 36 + i * 6],
-              [x + 125, y + 36 + i * 6],
-            ],
-            "#506267",
-            1,
-          );
-        rect(c, x + 28, y + 93, 26, 13, "#637777", true);
-        rect(c, x + 84, y + 93, 48, 13, "#3e5358", true);
-      }
-    }
-    c.restore();
-    return;
-  }
-  for (const side of [-1, 1]) {
-    const edge = side < 0 ? -153 : 493;
-    for (let y = Math.floor(top / 178) * 178; y < bottom; y += 178) {
-      const index = (((Math.floor(y / 178) + 11) % 7) + 7) % 7;
-      if (scene.landmark === "venue" && y > 260 && y < 790) {
-        rect(c, edge - 25, y, 190, 173, "#9dac8b");
-        tree(c, edge + 30, y + 38, 30, index);
-        tree(c, edge + 108, y + 97, 36, index + 1);
-        line(
-          c,
-          [
-            [edge + 12, y + 148],
-            [edge + 141, y + 148],
-          ],
-          "#c8c6ab",
-          8,
-        );
-      } else if (scene.landmark === "home")
-        house(
-          c,
-          edge + (index % 2 ? 12 : 0),
-          y + 14,
-          index % 2 ? 128 : 138,
-          135,
-          index,
-        );
-      else shop(c, edge + 8, y + 17, 133, index, scene.landmark);
-    }
-    // The next block has roof planes, not another stack of floating façades.
-    const far = side < 0 ? edge - 198 : edge + 185;
-    for (let y = Math.floor(top / 240) * 240; y < bottom; y += 240) {
-      rect(c, far, y + 16, 160, 174, "#929e8e", true);
-      rect(c, far + 10, y + 26, 140, 153, "#b7b9a0");
-      rect(c, far + 23, y + 45, 43, 38, "#839188", true);
-      rect(c, far + 90, y + 102, 34, 31, "#8a9589", true);
-    }
-  }
-  c.restore();
-}
-export function paintFloor(c, scene, height = 680) {
-  const p = scenePalette(scene);
-  c.save();
-  rect(c, 0, -800, 480, height + 1000, p.ground);
-  rect(c, 0, -800, 18, height + 1000, p.edge);
-  rect(c, 462, -800, 18, height + 1000, p.edge);
-  line(
-    c,
-    [
-      [18, -800],
-      [18, height + 200],
-    ],
-    "#78877a",
-    1.5,
-  );
-  line(
-    c,
-    [
-      [462, -800],
-      [462, height + 200],
-    ],
-    "#78877a",
-    1.5,
-  );
-  if (scene.landmark === "cafe" || scene.landmark === "station") {
-    c.strokeStyle = scene.landmark === "cafe" ? "#cec6af" : "#c3c9bf";
-    c.lineWidth = 0.7;
-    c.beginPath();
-    for (let y = -750; y < height + 200; y += 60) {
-      c.moveTo(18, y);
-      c.lineTo(462, y);
-    }
-    for (let x = 48; x < 462; x += 60) {
-      c.moveTo(x, -800);
-      c.lineTo(x, height + 200);
-    }
-    c.stroke();
-  } else if (scene.landmark === "home") {
-    for (let y = -650; y < height + 100; y += 108) {
-      line(
-        c,
-        [
-          [30, y],
-          [170, y],
-        ],
-        "#c9c3b0",
-        0.7,
-      );
-      line(
-        c,
-        [
-          [300, y + 54],
-          [452, y + 54],
-        ],
-        "#c9c3b0",
-        0.7,
-      );
-    }
-  }
-  c.restore();
-}
-export function floorDetails(c, scene) {
-  c.save();
-  if (scene.landmark === "home") {
-    for (const [x, y] of [
-      [7, 160],
-      [473, 265],
-      [7, 455],
-      [473, 570],
-    ])
-      tree(c, x, y, 13, y);
-    for (const [x, y] of [
-      [3, 296],
-      [464, 500],
-    ]) {
-      rect(c, x, y, 12, 30, "#697e6d", true);
-      line(
-        c,
-        [
-          [x + 3, y + 5],
-          [x + 9, y + 5],
-        ],
-        PAPER,
-        1,
-      );
-    }
-  } else if (scene.landmark === "station") {
-    for (const x of [8, 465])
-      for (let y = 120; y < 680; y += 160) {
-        rect(c, x, y, 7, 55, "#c5af63");
-        for (let i = 0; i < 5; i++)
-          line(
-            c,
-            [
-              [x + 2, y + 5 + i * 10],
-              [x + 5, y + 5 + i * 10],
-            ],
-            "#897b4c",
-            1,
-          );
-      }
-  } else if (scene.landmark === "cafe") {
-    sign(c, "← 改札", -110, 220, 103, INK, 11);
-    sign(c, "ホーム →", 487, 220, 103, INK, 11);
-    bench(c, -75, 180, 56);
-    bench(c, 498, 380, 56);
-    for (const x of [-33, 493]) {
-      rect(c, x, 520, 26, 42, TEAL, true);
-      rect(c, x + 4, 525, 18, 22, PAPER);
-      for (let i = 0; i < 3; i++)
-        rect(c, x + 6 + i * 5, 529, 3, 10, [RED, TEAL, "#c49c56"][i]);
-      rect(c, x + 8, 552, 10, 3, INK);
-    }
-  }
-  c.restore();
-}
-export function goalBoundary(c, scene) {
-  c.save();
-  if (scene.landmark === "party") {
-    rect(c, 18, -195, 18, 260, "#354e53", true);
-    rect(c, 444, -195, 18, 260, "#354e53", true);
-    rect(c, 36, 23, 408, 6, "#293c4028");
-    for (let x = 36; x <= 444; x += 51) {
-      rect(c, x - 5, 20, 10, 4, INK);
-      line(
-        c,
-        [
-          [x, -3],
-          [x, 23],
-        ],
-        "#6d878a",
-        3,
-      );
-    }
-    line(
-      c,
-      [
-        [34, -5],
-        [446, -5],
-      ],
-      "#d2d6ca",
-      4,
-    );
-    line(
-      c,
-      [
-        [34, 8],
-        [446, 8],
-      ],
-      "#698183",
-      2,
-    );
-  } else if (scene.landmark === "home") {
-    for (const x of [18, 318]) {
-      rect(c, x, 83, 144, 13, "#6d7f5f", true);
-      for (let sx = x + 5; sx < x + 144; sx += 17)
-        polygon(
-          c,
-          [
-            [sx, 77],
-            [sx + 13, 76],
-            [sx + 16, 87],
-            [sx - 2, 87],
-          ],
-          "#85916c",
-        );
-    }
-  } else {
-    for (const x of [18, 318]) {
-      rect(
-        c,
-        x,
-        -180,
-        144,
-        276,
-        scene.landmark === "cafe" ? "#cfbf9b" : "#b3c0b9",
-        true,
-      );
-      rect(
-        c,
-        x + 6,
-        -173,
-        132,
-        24,
-        scene.landmark === "venue" ? "#315e61" : "#49696b",
-        true,
-      );
-      line(
-        c,
-        [
-          [x, 89],
-          [x + 144, 89],
-        ],
-        INK,
-        3,
-      );
-      if (scene.landmark === "cafe") {
-        windowPane(c, x + 12, -103, 120, 100, true);
-        rect(c, x + 13, 31, 118, 28, "#b38c5e", true);
-        for (let sx = x + 20; sx < x + 130; sx += 24) {
-          rect(c, sx, 40, 14, 8, PAPER, true);
-          rect(c, sx + 4, 43, 6, 3, TEAL);
-        }
-        poster(c, x + 94, -91, 27, 43, "menu");
-      } else {
-        windowPane(c, x + 14, -115, 50, 95, true);
-        windowPane(c, x + 79, -115, 50, 95, true);
-        if (scene.landmark === "venue") poster(c, x + 22, -103, 35, 57);
-        else {
-          rect(c, x + 17, 24, 32, 40, INK, true);
-          rect(c, x + 21, 29, 24, 17, "#8ba891");
-          rect(c, x + 25, 52, 16, 3, "#c5ae66");
-        }
-      }
-    }
-  }
-  c.restore();
-}
-export function architecture(
-  c,
-  scene,
-  { time = 0, reducedMotion = false, complete = false } = {},
-) {
-  c.save();
-  if (scene.landmark === "home") {
-    house(c, 31, -166, 121, 135, 0);
-    house(c, 327, -184, 120, 153, 1);
-    rect(c, 180, -113, 120, 60, "#d4ceb8");
-    line(
-      c,
-      [
-        [181, -50],
-        [300, -50],
-      ],
-      "#b2b4a0",
-      1,
-    );
-    bench(c, 188, -77, 48);
-    rect(c, 266, -87, 21, 31, "#859378", true);
-    sign(c, "駅方面 →", 187, -28, 106, TEAL, 12);
-  } else if (scene.landmark === "station") {
-    rect(c, 163, -177, 154, 24, INK, true);
-    text(c, "STATION", 240, -160, 14, PAPER, "center", 800);
-    rect(c, 174, -145, 132, 134, "#b9cbc3");
-    for (const x of [189, 235, 281]) {
-      rect(c, x, -74, 10, 68, "#436569", true);
-      rect(c, x + 1, -68, 8, 13, "#b6c9b2");
-      rect(c, x - 12, -18, 12, 3, "#879d8d");
-    }
-    line(
-      c,
-      [
-        [173, -137],
-        [305, -137],
-      ],
-      PAPER,
-      2,
-    );
-    text(c, "改札", 240, -108, 11, INK);
-    sign(c, "駅入口", 178, -7, 124, TEAL, 12);
-  } else if (scene.landmark === "cafe") {
-    rect(c, 162, -181, 156, 28, "#5e5946", true);
-    text(c, "喫茶 / COFFEE", 240, -162, 13, PAPER, "center", 800);
-    rect(c, 172, -152, 136, 137, "#ddd0ad");
-    rect(c, 180, -121, 120, 21, "#a8845b", true);
-    rect(c, 192, -114, 22, 9, INK, true);
-    rect(c, 196, -111, 6, 3, PAPER);
-    rect(c, 225, -117, 27, 13, "#687d74", true);
-    for (const x of [190, 261]) {
-      rect(c, x, -71, 27, 24, "#b9a07c", true);
-      rect(c, x + 7, -67, 9, 6, PAPER, true);
-      line(
-        c,
-        [
-          [x + 2, -45],
-          [x + 25, -45],
-        ],
-        INK,
-        1,
-      );
-    }
-    sign(c, "待ち合わせ", 182, -8, 116, TEAL, 12);
-  } else if (scene.landmark === "venue") {
-    rect(c, 165, -177, 150, 162, "#b4c0b6", true);
-    rect(c, 165, -170, 150, 35, INK, true);
-    text(c, "LIVE TONIGHT", 240, -147, 15, "#e1b16b", "center", 800);
-    windowPane(c, 181, -121, 118, 105, true);
-    line(
-      c,
-      [
-        [240, -121],
-        [240, -16],
-      ],
-      PAPER,
-      2,
-    );
-    for (const x of [231, 247]) rect(c, x, -58, 2, 14, "#d8c7a1");
-    rect(c, 170, 12, 140, 13, "#416365", true);
-    line(
-      c,
-      [
-        [174, 15],
-        [306, 15],
-      ],
-      "#8ca5a0",
-      1,
-    );
-    text(c, "会場入口", 240, -1, 11, INK);
-  } else {
-    rect(c, 85, -195, 310, 150, "#344e55", true);
-    rect(c, 102, -177, 276, 100, "#20353b", true);
-    for (let x = 105; x < 378; x += 13)
-      line(
-        c,
-        [
-          [x, -175],
-          [x, -80],
-        ],
-        "#31474c",
-        1,
-      );
-    rect(c, 105, -185, 270, 8, INK, true);
-    line(
-      c,
-      [
-        [109, -181],
-        [371, -181],
-      ],
-      "#8c9d97",
-      1,
-    );
-    text(c, "CROWD WEAVE", 240, -154, 15, "#d7b677", "center", 800);
-    rect(c, 109, -101, 31, 48, INK, true);
-    rect(c, 340, -101, 31, 48, INK, true);
-    for (const x of [124, 355])
-      for (const y of [-87, -65]) {
-        c.strokeStyle = "#70868a";
-        c.lineWidth = 1;
-        c.beginPath();
-        c.arc(x, y, 7, 0, Math.PI * 2);
-        c.stroke();
-      }
-    rect(c, 103, -55, 274, 10, "#697b76", true);
-    concert(c, { time, reducedMotion, complete });
-  }
-  c.restore();
-}
-function performer(c, x, y, id, shirt) {
-  drawCharacter(
-    c,
-    {
-      x,
-      y,
-      r: 11,
-      appearanceId: id,
-      id,
-      shirt,
-      friend: true,
-      state: "waiting",
-      ux: 0,
-      uy: 1,
-    },
-    {
-      pose: { ux: 0, uy: 1, distance: 0, moving: false, speed: 0 },
-      reducedMotion: true,
-    },
-  );
-}
-export function concert(
-  c,
-  { time = 0, reducedMotion = false, complete = false } = {},
-) {
-  c.save();
-  for (const [x, color] of [
-    [139, "#d5b780"],
-    [240, "#7ba49c"],
-    [343, "#d5b780"],
-  ]) {
-    const d = reducedMotion ? 0 : Math.sin(time * 0.22 + x) * 5;
-    polygon(
-      c,
-      [
-        [x - 3, -174],
-        [x + 3, -174],
-        [x + 29 + d, -63],
-        [x - 28 + d, -63],
-      ],
-      color + "24",
-    );
-    rect(c, x - 5, -178, 10, 7, "#c4b486", true);
-  }
-  performer(c, 169, -97, 5, "#c1a078");
-  performer(c, 240, -106, 1, "#8ca798");
-  performer(c, 310, -100, 4, "#b67a56");
-  // Instrument scale follows the same figures; cable and stands have endpoints.
-  polygon(
-    c,
-    [
-      [155, -96],
-      [170, -94],
-      [178, -84],
-      [164, -76],
-      [154, -81],
-    ],
-    "#bc9150",
-    true,
-  );
-  line(
-    c,
-    [
-      [166, -85],
-      [194, -99],
-    ],
-    "#d1b78d",
-    5,
-  );
-  line(
-    c,
-    [
-      [166, -85],
-      [194, -99],
-    ],
-    INK,
-    1,
-  );
-  line(
-    c,
-    [
-      [248, -123],
-      [248, -72],
-      [239, -68],
-      [257, -68],
-    ],
-    "#a2aaa0",
-    1.5,
-  );
-  rect(c, 244, -123, 8, 4, INK);
-  rect(c, 288, -98, 48, 11, INK, true);
-  rect(c, 291, -96, 42, 6, PAPER);
-  for (let x = 296; x < 330; x += 6) rect(c, x, -96, 2, 4, INK);
-  line(
-    c,
-    [
-      [295, -87],
-      [300, -65],
-      [327, -65],
-      [330, -87],
-    ],
-    INK,
-    2,
-  );
-  line(
-    c,
-    [
-      [146, -57],
-      [190, -54],
-      [190, -49],
-    ],
-    INK,
-    1,
-  );
-  line(
-    c,
-    [
-      [258, -71],
-      [273, -64],
-      [284, -64],
-      [295, -55],
-    ],
-    INK,
-    1,
-  );
-  if (complete) text(c, "一緒に、いい夜を。", 240, -31, 10, "#596e67");
-  c.restore();
-}
-export function rainShelters(c, { time = 0, reducedMotion = false } = {}) {
-  c.save();
-  for (const [x, y, w] of [
-    [30, 935, 70],
-    [380, 205, 70],
-  ]) {
-    rect(c, x + 3, y + 12, w, 6, "#293c4020");
-    rect(c, x, y, w, 13, "#486c70", true);
-    for (let sx = x + 8; sx < x + w; sx += 12)
-      line(
-        c,
-        [
-          [sx, y + 2],
-          [sx - 3, y + 11],
-        ],
-        "#91aaa5",
-        1,
-      );
-    line(
-      c,
-      [
-        [x, y + 14],
-        [x, y + 20],
-      ],
-      INK,
-      1,
-    );
-    line(
-      c,
-      [
-        [x + w, y + 14],
-        [x + w, y + 20],
-      ],
-      INK,
+      "#d8eeea",
       1,
     );
   }
-  // Sparse wet paving and drainage stay at the edges, outside the walking line.
+  c.restore();
+}
+function spatialJourney(c) {
+  c.save();
+  // The station exit supplies the route before the first road; the park lies
+  // between two actual crossings, with its paths aligned to those crossings.
+  rect(c, -152, 1055, 152, 96, "#718f8c", true);
+  rect(c, 480, 1055, 152, 96, "#718f8c", true);
+  rect(c, 154, 1073, 172, 61, "#c9d7d0");
+  rect(c, 154, 1072, 172, 5, "#50756e");
+  text(c, "駅出口", 240, 1095, 12, "#3e6760");
   for (const [x, y] of [
-    [30, 1040],
-    [421, 300],
-    [28, 568],
-    [409, 1075],
+    [-17, 431],
+    [497, 464],
+    [-17, 625],
+    [497, 694],
   ]) {
-    polygon(
-      c,
-      [
-        [x, y],
-        [x + 25, y - 2],
-        [x + 34, y + 4],
-        [x + 12, y + 8],
-        [x - 5, y + 5],
-      ],
-      "#a3bab5",
-    );
-    line(
-      c,
-      [
-        [x + 2, y + 1],
-        [x + 21, y + 1],
-      ],
-      "#dce4d6",
-      1,
-    );
+    sCircle(c, x, y, 14, "#6c967b");
   }
-  c.strokeStyle = "#446c7780";
-  c.lineWidth = 0.8;
-  c.beginPath();
-  const d = reducedMotion ? 0 : time * 90;
-  for (let i = 0; i < 28; i++) {
-    const x = i % 2 ? 471 + ((i * 19) % 35) : -25 + ((i * 17) % 36),
-      y = -200 + ((i * 53 + d) % 1450);
-    c.moveTo(x, y);
-    c.lineTo(x - 3, y + 10);
-  }
-  c.stroke();
-  c.restore();
-}
-export function venueJourney(c) {
-  c.save();
-  rect(c, 18, 950, 444, 260, "#c8d2cd");
-  rect(c, 18, 390, 444, 360, "#d4d7be");
-  for (const x of [8, 472])
-    for (const y of [435, 550, 660, 710]) tree(c, x, y, 23, y);
-  bench(c, -48, 590, 55);
-  bench(c, 476, 486, 55);
-  sign(c, "公園の小道 / 会場へ ↑", -132, 614, 138, "#466c5b", 10);
-  sign(c, "会場最寄り駅", 164, 1090, 152, TEAL, 12);
+  sPath(c, 80, 424, 63, 42, "#e2e3cf");
+  sPath(c, 337, 663, 68, 42, "#e2e3cf");
   line(
     c,
     [
-      [18, 398],
-      [462, 398],
+      [143, 445],
+      [143, 664],
     ],
-    "#b1b79c",
+    "#b3c4b4",
     1,
   );
   line(
     c,
     [
-      [18, 742],
-      [462, 742],
+      [337, 445],
+      [337, 684],
     ],
-    "#b1b79c",
+    "#b3c4b4",
     1,
   );
+  text(c, "公園の通り道", 240, 575, 11, "#5b7d69");
   c.restore();
 }
-export function hallInterior(c, { time = 0, reducedMotion = false } = {}) {
+function spatialHall(c) {
   c.save();
-  rect(c, 18, 715, 444, 340, "#d6d0b9");
-  rect(c, 18, -800, 444, 1485, "#a7b8b6");
-  for (let y = -400; y < 685; y += 96) {
-    line(
-      c,
-      [
-        [20, y],
-        [460, y],
-      ],
-      "#8ea4a1",
-      0.6,
-    );
+  // Lobby -> ticket desk -> two physical gates -> audience. The model clamps
+  // the player's center to x=142..338; visible solids leave its 12px radius.
+  rect(c, 0, 790, 130, 30, "#947955", true);
+  rect(c, 350, 790, 130, 30, "#947955", true);
+  for (const x of [24, 370]) {
+    rect(c, x, 798, 84, 15, "#e9e0ca");
+    for (let i = 0; i < 3; i++) rect(c, x + 10 + 25 * i, 802, 14, 7, "#799590");
   }
-  for (const [x, y, color] of [
-    [110, 300, "#c3d2bf"],
-    [355, 430, "#b3c9c1"],
-    [240, 155, "#cbd0b8"],
+  for (const [top, bottom] of [
+    [790, 825],
+    [685, 720],
   ]) {
-    const d = reducedMotion ? 0 : Math.sin(time * 0.22 + x) * 5;
-    polygon(
-      c,
-      [
-        [x - 39 + d, y - 62],
-        [x + 35 + d, y - 60],
-        [x + 60 + d, y + 45],
-        [x - 61 + d, y + 46],
-      ],
-      color + "88",
-    );
-  }
-  rect(c, 18, 690, 112, 28, "#355259", true);
-  rect(c, 350, 690, 112, 28, "#355259", true);
-  rect(c, 115, 690, 18, 90, "#46645d", true);
-  rect(c, 347, 690, 18, 90, "#46645d", true);
-  line(
-    c,
-    [
-      [123, 715],
-      [123, 735],
-    ],
-    "#dfbc76",
-    2,
-  );
-  line(
-    c,
-    [
-      [355, 715],
-      [355, 735],
-    ],
-    "#dfbc76",
-    2,
-  );
-  sign(c, "HALL ↑", 180, 690, 120, INK, 12);
-  rect(c, 28, 800, 104, 24, "#a08156", true);
-  rect(c, 354, 800, 99, 24, "#a08156", true);
-  for (const x of [34, 360]) {
-    rect(c, x, 803, 38, 16, PAPER, true);
+    rect(c, 0, top, 130, bottom - top, "#496660", true);
+    rect(c, 350, top, 130, bottom - top, "#496660", true);
+    rect(c, 130, top, 220, bottom - top, "#cfd0b7");
     line(
       c,
       [
-        [x + 4, 809],
-        [x + 34, 809],
+        [130, top],
+        [130, bottom],
       ],
-      TEAL,
+      "#385952",
+      2,
+    );
+    line(
+      c,
+      [
+        [350, top],
+        [350, bottom],
+      ],
+      "#385952",
       2,
     );
   }
-  rect(c, 110, 806, 16, 9, "#d4ac62", true);
-  rect(c, 116, 807, 1, 7, INK);
-  line(
-    c,
-    [
-      [118, 832],
-      [165, 832],
-    ],
-    "#7b7963",
-    1,
-  );
-  line(
-    c,
-    [
-      [320, 832],
-      [362, 832],
-    ],
-    "#7b7963",
-    1,
-  );
-  text(c, "チケット確認", 240, 854, 12, INK);
-  text(c, "LOBBY", 240, 916, 12, "#6d786b", "center", 700);
+  sPath(c, 166, 838, 148, 45, "#d9d4b9");
+  text(c, "受付", 240, 878, 11, "#685c49");
+  text(c, "ホール", 240, 734, 12, "#42635c");
   c.restore();
 }
-export function streetFurniture(c, scene, { startY = 625 } = {}) {
+function spatialFurniture(c, scene, startY) {
   c.save();
-  const p = scenePalette(scene);
-  if (scene.landmark !== "party") {
-    bench(c, -66, 532, 45);
-    bench(c, 495, 370, 45);
-    poster(c, -39, 470, 26, 43);
-    poster(c, 488, scene.landmark === "venue" ? 1010 : 340, 26, 43);
-    sign(
-      c,
-      scene.landmark === "home"
-        ? "街のお知らせ"
-        : scene.landmark === "venue"
-          ? "公演案内"
-          : "案内",
-      -93,
-      292,
-      84,
-      p.tint,
-      10,
-    );
-    sign(
-      c,
-      scene.landmark === "home" ? "公園 →" : "WC →",
-      488,
-      scene.landmark === "venue" ? 1010 : 145,
-      73,
-      p.tint,
-      11,
-    );
+  const kind = scene.landmark;
+  if (kind === "station") {
+    text(c, "駅前広場", 240, startY + 46, 10, "#55736d");
+  } else if (kind === "cafe") {
+    text(c, "コンコース", 240, startY + 45, 10, "#927858");
+  } else if (kind === "venue") {
+    text(c, "駅から会場へ", 240, startY + 48, 10, "#547870");
   } else {
-    sign(c, "BAR", -76, 200, 64, INK, 12);
-    sign(c, "WC →", 488, 340, 76, INK, 11);
-    poster(c, -40, 470, 25, 40);
+    text(c, "ホール入口", 240, startY + 46, 10, "#645f4e");
   }
-  line(
-    c,
-    [
-      [202, startY + 30],
-      [278, startY + 30],
-    ],
-    p.tint,
-    1.2,
-  );
-  text(
-    c,
-    scene.landmark === "home"
-      ? "自宅 / 出発"
-      : scene.landmark === "party"
-        ? "会場入口"
-        : scene.landmark === "venue"
-          ? "会場最寄り駅"
-          : "START",
-    240,
-    startY + 48,
-    11,
-    p.tint,
-  );
   c.restore();
 }
-export function goalMark(c, scene) {
+function spatialGoal(c, scene) {
   c.save();
-  if (scene.landmark === "party") {
-    text(c, "FRONT ROW", 240, 43, 10, INK);
-    c.restore();
-    return;
+  if (scene.landmark === "party") text(c, "最前列", 240, 43, 11, "#e5e8d4");
+  else {
+    const color =
+      scene.landmark === "cafe"
+        ? "#e8dcc7"
+        : scene.landmark === "venue"
+          ? "#d9e3da"
+          : "#c3d8d1";
+    rect(c, 175, 20, 130, 65, color);
+    for (const x of [175, 305])
+      line(
+        c,
+        [
+          [x, 21],
+          [x, 85],
+        ],
+        "#56877a",
+        2,
+      );
+    text(c, "待ち合わせ", 240, 81, 10, "#476b62");
   }
-  rect(c, 175, 20, 130, 65, scene.landmark === "home" ? "#ded9bc" : "#d2d4bd");
-  for (const x of [175, 305]) {
-    const dir = x === 175 ? 1 : -1;
-    line(
-      c,
-      [
-        [x, 43],
-        [x, 24],
-        [x + dir * 13, 24],
-      ],
-      TEAL,
-      2,
-    );
-    line(
-      c,
-      [
-        [x, 66],
-        [x, 84],
-        [x + dir * 13, 84],
-      ],
-      TEAL,
-      2,
-    );
-  }
-  text(c, "MEET UP", 240, 82, 9, "#4f6c60", "center", 700);
   c.restore();
 }

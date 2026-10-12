@@ -259,6 +259,7 @@ function start(stage = 0) {
   if (stage === 0 || runSeed === undefined) runSeed = chooseRunSeed();
   game = createGame(stage, seedForRun(runSeed, stage));
   game.runSeed = runSeed;
+  $("main").dataset.scene = game.scene.landmark;
   $("main").classList.toggle("with-traffic", !!game.traffic);
   playerPose = { lean: 0 };
   walkingPoses.clear();
@@ -519,6 +520,7 @@ function person(p, player = false) {
   drawCharacter(ctx, p, {
     pose,
     player,
+    overhead: true,
     contact: player && game.cooldown > 0 && game.lastContactMember === 0,
     lean: player ? playerPose.lean : 0,
     reducedMotion: reducedMotion.matches,
@@ -568,47 +570,31 @@ function drawTraffic(t) {
   ctx.font = "bold 12px system-ui";
   ctx.textAlign = "center";
   ctx.fillText("停止線", 240, t.bottom + 42);
-  for (const [x, y] of [
-    [100, t.bottom + 50],
-    [380, t.top - 50],
+  for (const [x, y, labelX] of [
+    [10, t.bottom + 50, 70],
+    [470, t.top - 50, 410],
   ]) {
     const green = t.nominalGreen,
       proceed = t.canEnter || t.reserved;
-    rounded(x - 3, y - 2, 6, 32, 2, "#58666c");
-    rounded(x - 14, y - 52, 28, 51, 5, "#15222b");
-    ctx.strokeStyle = "#a6b7bf";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x - 12, y - 50, 24, 47);
-    for (const [dy, lit, color, walking] of [
-      [-38, !green, "#ff526b", false],
-      [-16, green, "#43f0b3", true],
-    ]) {
-      ctx.beginPath();
-      ctx.arc(x, y + dy, 9, 0, Math.PI * 2);
-      ctx.fillStyle = lit ? color : "#303e49";
-      ctx.fill();
-      if (!lit) continue;
-      ctx.fillStyle = ctx.strokeStyle = "#10202c";
-      ctx.beginPath();
-      ctx.arc(x, y + dy - 4, 1.7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 1.8;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(x, y + dy - 1);
-      ctx.lineTo(x, y + dy + 3);
-      ctx.moveTo(x - 3, y + dy + 1);
-      ctx.lineTo(x, y + dy);
-      ctx.lineTo(x + 3, y + dy + (walking ? -1 : 1));
-      ctx.moveTo(x - 2, y + dy + 6);
-      ctx.lineTo(x, y + dy + 3);
-      ctx.lineTo(x + 3, y + dy + (walking ? 5 : 6));
-      ctx.stroke();
-    }
-    rounded(x - 26, y + 24, 52, 20, 4, proceed ? "#d4fff0" : "#ffe7ec");
-    ctx.fillStyle = proceed ? "#075343" : "#802033";
-    ctx.font = "bold 12px system-ui";
-    ctx.fillText(t.reserved ? "横断中" : proceed ? "進む" : "待つ", x, y + 38);
+    // A recessed signal cap is seen from above and stays outside the
+    // x=30..450 walking centers. The adjacent pill is a status overlay.
+    ctx.fillStyle = "#213e41";
+    ctx.beginPath();
+    ctx.arc(x, y, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = green ? "#43d6a3" : "#ec6672";
+    ctx.beginPath();
+    ctx.arc(x, y, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    rounded(labelX - 27, y + 17, 54, 21, 6, proceed ? "#d9eee1" : "#f6e1e1");
+    ctx.fillStyle = proceed ? "#155746" : "#8e3d48";
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      t.reserved ? "横断中" : proceed ? "進む" : "待つ",
+      labelX,
+      y + 32,
+    );
   }
 
   const v = t.vehicle;

@@ -185,8 +185,21 @@ export function drawCharacter(
     wave = 0,
     live = false,
     time = 0,
+    overhead = false,
   } = {},
 ) {
+  if (overhead)
+    return drawOverheadCharacter(c, p, {
+      pose,
+      player,
+      contact,
+      reducedMotion,
+      opacity,
+      waving,
+      wave,
+      live,
+      time,
+    });
   const view = facingView(pose),
     side = view === "left" || view === "right",
     back = view.startsWith("back"),
@@ -524,6 +537,143 @@ export function drawCharacter(
   }
   c.restore();
   return { view, stride, appearance, umbrella: p.umbrella ? rig : null };
+}
+
+// Overhead figure: the same world point is the body and clearance-circle center.
+export function drawOverheadCharacter(c, p, options = {}) {
+  const {
+    pose,
+    player = false,
+    contact = false,
+    reducedMotion = false,
+    opacity = 1,
+    waving = false,
+    wave = 0,
+    live = false,
+    time = 0,
+  } = options;
+  const appearance = appearanceFor(p, player);
+  const skin = appearance.skin,
+    hair = appearance.hair;
+  const shirt = player
+    ? "#2185ae"
+    : p.partner || p.friend
+      ? p.shirt
+      : live
+        ? ["#954b43", "#537180", "#4e6961", "#a08352", "#6a6777", "#334954"][
+            p.id % 6
+          ]
+        : ["#b87255", "#687967", "#9c825d", "#6d7781"][p.color];
+  const stride =
+    pose.moving && !reducedMotion
+      ? Math.sin(pose.distance / 7 + (p.id ?? 0)) *
+        Math.min(1, pose.speed / 35) *
+        2
+      : 0;
+  const r = p.r,
+    width = Math.min(21, r * 1.55) * appearance.width;
+  c.save();
+  c.translate(p.x, p.y);
+  c.globalAlpha *= opacity;
+  circle(c, 2, 3, r * 0.8, "#223c3d20");
+  if (!player) {
+    c.strokeStyle = live ? "#dce7da70" : "#31555855";
+    c.lineWidth = 1;
+    c.beginPath();
+    c.arc(0, 0, r + 1, 0, Math.PI * 2);
+    c.stroke();
+  }
+  if (player) {
+    c.strokeStyle = contact ? "#c56743" : "#2185ae";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.arc(0, 0, r + 5, 0, Math.PI * 2);
+    c.stroke();
+  }
+  c.save();
+  c.rotate(Math.atan2(pose.ux, -pose.uy));
+  if (p.archetype === "curious-child") c.scale(0.9, 0.9);
+  for (const sign of [-1, 1]) foot(c, sign * 4, 8 + stride * sign, 0, -1);
+  rounded(c, -width / 2, -4, width, 15, 5, shirt);
+  c.strokeStyle = "#203d4459";
+  c.lineWidth = 0.8;
+  c.strokeRect(-width / 2 + 1, -3, width - 2, 13);
+  for (const sign of [-1, 1]) {
+    const held =
+      (p.umbrella && sign === 1) ||
+      (p.glowStick && sign === (p.umbrella ? -1 : 1));
+    const raised =
+      !held && sign === -1 && (waving || p.state === "celebrating");
+    const hx = sign * (width / 2 + (raised ? 5 : 3)),
+      hy = held
+        ? -5
+        : raised
+          ? -10 + (reducedMotion ? 0 : wave * 0.3)
+          : 4 + stride * sign;
+    c.strokeStyle = shirt;
+    c.lineWidth = 4;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(sign * (width / 2 - 2), -1);
+    c.lineTo(hx, hy);
+    c.stroke();
+    circle(c, hx, hy, 2.3, skin);
+    if (p.glowStick && sign === (p.umbrella ? -1 : 1)) {
+      c.strokeStyle = ["#83efd8", "#f6a2dc", "#f9e493"][p.id % 3];
+      c.lineWidth = 2.4;
+      c.beginPath();
+      c.moveTo(hx, hy);
+      c.lineTo(
+        hx + sign * 2,
+        hy - 10 + (reducedMotion ? 0 : Math.sin(time + p.id)),
+      );
+      c.stroke();
+    }
+  }
+  const head = Math.min(6.5, Math.max(5, r * 0.56));
+  circle(c, 0, -4.5, head, skin);
+  // Nose and hairline consistently indicate forward; there are no frontal eyes.
+  circle(c, 0, -4.5 - head - 1, 1.7, skin);
+  circle(c, 0, -3.8, head - 0.5, hair);
+  if (appearance.style === "bun") circle(c, 0, 3, 3.5, hair);
+  if (["long", "bob"].includes(appearance.style))
+    rounded(c, -5, -2, 10, appearance.style === "long" ? 10 : 6, 4, hair);
+  if (appearance.style === "thinning") circle(c, 0, -5, 3.5, skin);
+  if (appearance.style === "curls")
+    for (const dx of [-4, 0, 4]) circle(c, dx, 2, 2, hair);
+  if (p.suitcase) {
+    rounded(c, width / 2 + 3, 7, 10, 14, 3, "#775f4b");
+    c.strokeStyle = "#775f4b";
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(width / 2 + 3, 4);
+    c.lineTo(width / 2 + 8, 9);
+    c.stroke();
+  }
+  if (p.state === "reading") rounded(c, -5, -15, 10, 7, 1, "#fff4d6");
+  if (p.umbrella) {
+    const color = ["#507f9b", "#a96d6b", "#7d8c6b"][p.id % 3];
+    circle(c, 3, -6, 15, color);
+    c.strokeStyle = "#e2e9e5";
+    c.lineWidth = 0.7;
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      c.beginPath();
+      c.moveTo(3, -6);
+      c.lineTo(3 + Math.cos(a) * 15, -6 + Math.sin(a) * 15);
+      c.stroke();
+    }
+    circle(c, 3, -6, 1.5, "#e2e9e5");
+  }
+  c.restore();
+  if (player) {
+    rounded(c, -15, 23, 30, 15, 4, "#f9faf5");
+    c.fillStyle = "#21576c";
+    c.font = "bold 10px system-ui";
+    c.textAlign = "center";
+    c.fillText("YOU", 0, 34);
+  }
+  c.restore();
+  return { view: facingView(pose), stride, appearance, projection: "overhead" };
 }
 
 export function placeSpeech({ x, y, width, height, viewport, obstacles = [] }) {
