@@ -199,10 +199,10 @@ export function drawCharacter(
       : p.partner || p.friend
         ? p.shirt
         : live
-          ? ["#a84678", "#376f9c", "#975fbd", "#32998b", "#d58b36", "#3b425d"][
+          ? ["#954b43", "#537180", "#4e6961", "#a08352", "#6a6777", "#334954"][
               p.id % 6
             ]
-          : ["#ce866b", "#758e79", "#b1a075", "#8c87a2"][p.color],
+          : ["#b87255", "#687967", "#9c825d", "#6d7781"][p.color],
     skin = appearance.skin,
     hair = appearance.hair,
     stride =
@@ -220,17 +220,13 @@ export function drawCharacter(
     c.save();
     c.translate(0, 19);
     c.scale(1, 0.42);
-    const spot = c.createRadialGradient?.(0, 0, 1, 0, 0, 27);
-    if (spot) {
-      spot.addColorStop(0, contact ? "#ffd295a0" : "#fff8d199");
-      spot.addColorStop(0.5, contact ? "#ec985466" : "#fff4c45c");
-      spot.addColorStop(0.8, "#65bad82b");
-      spot.addColorStop(1, "#65bad800");
-    }
-    c.fillStyle = spot || "#fff4c45c";
+    c.fillStyle = contact ? "#e6b16a" : "#f5f0df";
+    c.strokeStyle = contact ? "#a74939" : "#293c40";
+    c.lineWidth = 1.5;
     c.beginPath();
-    c.arc(0, 0, 27, 0, Math.PI * 2);
+    c.ellipse(0, 0, 20, 15, 0, 0, Math.PI * 2);
     c.fill();
+    c.stroke();
     c.restore();
   }
   c.fillStyle = "#173d3c20";
@@ -287,6 +283,9 @@ export function drawCharacter(
     circle(c, hx, hy, 2.3, skin);
   }
   rounded(c, -width / 2, -9, width, 19, 3, shirt);
+  c.strokeStyle = "#293c4080";
+  c.lineWidth = 0.8;
+  c.strokeRect(-width / 2, -9, width, 19);
   rounded(c, -2, -14, 4, 6, 1, skin);
   if (appearance.outfit === "skirt" && !player) {
     c.fillStyle = shirt;
@@ -313,12 +312,12 @@ export function drawCharacter(
     // A continuous waistband joins both legs; the split starts below it.
     rounded(c, -width * 0.36, 8, width * 0.72, 4, 1, "#465269");
   }
-  if (live && !player && !p.friend && !p.partner) {
+  if (live && !player && !p.friend && !p.partner && p.id % 5 === 0) {
     rounded(c, -5, 1, 10, 7, 2, "#f3dbb1");
     c.fillStyle = shirt;
     c.font = "bold 5px system-ui";
     c.textAlign = "center";
-    c.fillText("LIVE", 0, 6);
+    c.fillText("CW", 0, 6);
     if (p.id % 3 === 0) {
       c.strokeStyle = "#f4bf56";
       c.lineWidth = 2;
@@ -467,8 +466,7 @@ export function drawCharacter(
     c.rotate(glowSide * 0.25 + swing);
     c.strokeStyle = ["#83efd8", "#f6a2dc", "#f9e493"][p.id % 3];
     c.lineWidth = 2.4;
-    c.shadowColor = c.strokeStyle;
-    c.shadowBlur = 4;
+    c.shadowBlur = 0;
     c.beginPath();
     c.moveTo(0, 0);
     c.lineTo(0, -10);
@@ -515,7 +513,11 @@ export function drawCharacter(
   }
   c.restore();
   if (player) {
-    c.fillStyle = live ? "#fff4ce" : "#245c56";
+    rounded(c, -14, 24, 28, 14, 1, "#f5f0df");
+    c.strokeStyle = "#293c40";
+    c.lineWidth = 0.8;
+    c.strokeRect(-14, 24, 28, 14);
+    c.fillStyle = "#293c40";
     c.font = "bold 11px system-ui";
     c.textAlign = "center";
     c.fillText("YOU", 0, 34);

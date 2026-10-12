@@ -5,6 +5,12 @@ import {
   venueJourney,
   hallInterior,
   goalBoundary,
+  scenePalette,
+  surroundings,
+  paintFloor,
+  architecture,
+  streetFurniture,
+  goalMark,
 } from "./art.js";
 import { TiltState, tiltPermission } from "./tilt.js";
 import { shareResult, resultText, resultTotals } from "./share.js";
@@ -460,7 +466,7 @@ $("#recenter").addEventListener("click", () => {
 function rounded(x, y, w, h, r, color) {
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+  ctx.roundRect(x, y, w, h, Math.min(r, 2));
   ctx.fill();
 }
 function person(p, player = false) {
@@ -524,106 +530,24 @@ function person(p, player = false) {
   });
 }
 function destination(scene) {
-  ctx.textAlign = "center";
-  ctx.font = "11px system-ui";
-  if (scene.landmark === "cafe") {
-    rounded(18, -155, 444, 170, 5, "#b7c2bc");
-    rounded(130, -150, 220, 165, 10, "#d7c6a3");
-
-    ctx.fillStyle = "#6b8579";
-    ctx.font = "bold 11px system-ui";
-    ctx.fillText("← 改札・出口 / 駅構内通路 / ホーム →", 240, 220);
-    rounded(176, -30, 128, 50, 4, "#dfe9d8");
-    rounded(150, -137, 160, 18, 5, "#8b6e4e");
-    ctx.fillStyle = "#fff4dc";
-    ctx.fillText("COFFEE / 駅カフェ", 230, -124);
-    for (const x of [170, 290]) {
-      rounded(x - 18, -90, 36, 26, 5, "#b69b72");
-      person({
-        x: x + 28,
-        y: -65,
-        r: 11,
-        ux: 0,
-        uy: -1,
-        color: 2,
-        state: "meeting",
-        walk: 0,
-        background: true,
-      });
-    }
-  } else if (scene.landmark === "station") {
-    rounded(100, -120, 280, 25, 4, "#426c65");
-    ctx.fillStyle = "#fff4dc";
-    ctx.fillText("最寄り駅 / STATION", 240, -103);
-    for (let x = 135; x < 370; x += 60) {
-      rounded(x, -80, 25, 80, 5, "#839a8c");
-      rounded(x + 6, -70, 13, 12, 3, "#c2e3cc");
-    }
-  } else if (scene.landmark === "home") {
-    for (const x of [110, 285]) {
-      rounded(x, -150, 85, 125, 5, "#d8c5a3");
-      ctx.fillStyle = "#9e7961";
-      ctx.beginPath();
-      ctx.moveTo(x - 10, -150);
-      ctx.lineTo(x + 43, -194);
-      ctx.lineTo(x + 95, -150);
-      ctx.fill();
-      rounded(x + 12, -130, 22, 24, 2, "#b5d2cf");
-      rounded(x + 50, -130, 22, 24, 2, "#b5d2cf");
-      rounded(x + 33, -70, 24, 45, 2, "#927858");
-    }
-    ctx.fillStyle = "#55796c";
-    ctx.fillText("住宅街 / 駅へ →", 240, -7);
-  } else if (scene.landmark === "venue") {
-    rounded(115, -175, 250, 150, 8, "#7d858e");
-    rounded(130, -160, 220, 28, 4, "#b17d71");
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "bold 13px system-ui";
-    ctx.fillText("LIVE / 今夜のパーティー", 240, -140);
-    rounded(205, -110, 70, 85, 4, "#c6d4c6");
-    rounded(135, -100, 45, 60, 3, "#aab8b3");
-    ctx.fillStyle = "#285d55";
-    ctx.font = "10px system-ui";
-    ctx.fillText("受付", 157, -67);
-    ctx.fillText("会場入口", 240, -4);
-  } else if (scene.landmark === "party") {
-    rounded(85, -195, 310, 150, 8, "#706984");
-    rounded(105, -180, 270, 95, 6, "#403b58");
-    ctx.fillStyle = "#ddc1e2";
-    ctx.font = "bold 22px system-ui";
-    ctx.fillText("LIVE PARTY", 240, -142);
-    ctx.fillStyle = "#e4c994";
-    for (const x of [135, 240, 345]) {
-      ctx.beginPath();
-      ctx.arc(x, -174, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    rounded(125, -100, 28, 46, 3, "#333449");
-    rounded(327, -100, 28, 46, 3, "#333449");
-    ctx.fillStyle = "#b5a6c9";
-    ctx.fillText("♪", 225, -96);
-    ctx.font = "10px system-ui";
-    if (game.phase !== "finished")
-      ctx.fillText("ステージ / 前方エリア", 240, -25);
-    concert(ctx, {
-      time: game.worldTime + (game.ambientTime || 0),
-      reducedMotion: reducedMotion.matches,
-      complete: game.phase === "finished",
-    });
-  }
+  architecture(ctx, scene, {
+    time: game.worldTime + (game.ambientTime || 0),
+    reducedMotion: reducedMotion.matches,
+    complete: game.phase === "finished",
+  });
 }
 function drawTraffic(t) {
   if (!t) return;
-  ctx.fillStyle = "#66777a";
-  ctx.fillRect(0, t.top, W, t.bottom - t.top);
+  ctx.fillStyle = "#53676b";
+  ctx.fillRect(-2000, t.top, 4480, t.bottom - t.top);
   ctx.fillStyle = "#b7c3bc";
-  ctx.fillRect(0, t.top - 5, W, 5);
-  ctx.fillRect(0, t.bottom, W, 5);
+  ctx.fillRect(-2000, t.top - 5, 4480, 5);
+  ctx.fillRect(-2000, t.bottom, 4480, 5);
   ctx.fillStyle = "#e9eddf";
   for (let y = t.top + 6; y < t.bottom - 3; y += 11)
     ctx.fillRect(t.left, y, t.right - t.left, 7);
   ctx.fillStyle = "#d7c483";
-  for (let x = 10; x < W; x += 40)
+  for (let x = -1990; x < 2480; x += 40)
     if (x < t.left - 25 || x > t.right + 5)
       ctx.fillRect(x, (t.top + t.bottom) / 2, 24, 2);
   for (let lane = 1; lane < t.lanes; lane++) {
@@ -632,8 +556,8 @@ function drawTraffic(t) {
     ctx.setLineDash([14, 12]);
     ctx.beginPath();
     const laneY = t.top + (lane * (t.bottom - t.top)) / t.lanes;
-    ctx.moveTo(0, laneY);
-    ctx.lineTo(W, laneY);
+    ctx.moveTo(-2000, laneY);
+    ctx.lineTo(2480, laneY);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -643,7 +567,7 @@ function drawTraffic(t) {
   ctx.fillRect(t.left, t.bottom + 12, t.right - t.left, 3);
   ctx.font = "bold 12px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("停止線 · 赤は両押しで待つ", 240, t.bottom + 42);
+  ctx.fillText("停止線", 240, t.bottom + 42);
   for (const [x, y] of [
     [100, t.bottom + 50],
     [380, t.top - 50],
@@ -742,7 +666,7 @@ function draw() {
   const { scale, ox, oy, width, height } = projection;
   ctx.setTransform(renderRatio, 0, 0, renderRatio, 0, 0);
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = game.stage === 4 ? "#37374d" : game.scene.floor;
+  ctx.fillStyle = scenePalette(game.scene).outer;
   ctx.fillRect(0, 0, width, height);
   ctx.save();
   ctx.translate(ox, oy);
@@ -761,43 +685,12 @@ function draw() {
   const topEdge =
     Math.floor((game.player.y - cameraY - oy / scale) / 150) * 150;
   const bottomEdge = topEdge + height / scale + 150;
-  for (let x = leftEdge; x < rightEdge; x += 120) {
-    if (x >= 0 && x < W) continue;
-    for (let y = topEdge; y < bottomEdge; y += 150) {
-      rounded(
-        x + 10,
-        y + 10,
-        100,
-        130,
-        6,
-        game.stage === 4 ? "#46455e" : game.stage === 3 ? "#889b9b" : "#c3ceb7",
-      );
-      rounded(
-        x + 22,
-        y + 25,
-        30,
-        34,
-        3,
-        game.stage === 4 ? "#6b607c" : "#e4e1cc",
-      );
-      rounded(
-        x + 64,
-        y + 25,
-        30,
-        34,
-        3,
-        game.stage === 4 ? "#6b607c" : "#d4e7e0",
-      );
-      rounded(
-        x + 20,
-        y + 90,
-        76,
-        12,
-        3,
-        game.stage === 4 ? "#57546f" : "#a7b693",
-      );
-    }
-  }
+  surroundings(ctx, game.scene, {
+    left: leftEdge,
+    right: rightEdge,
+    top: topEdge,
+    bottom: bottomEdge,
+  });
   const shareX =
     (ox + (finale ? 0 : 60 + 240 - game.player.x) * scale) * renderRatio;
   const shareY =
@@ -813,18 +706,7 @@ function draw() {
     width: (finale ? 480 : 360) * scale * renderRatio,
     height: (finale ? 390 : 258) * scale * renderRatio,
   };
-  ctx.fillStyle = game.scene.floor;
-  ctx.fillRect(0, -800, W, H + 1000);
-  ctx.fillStyle = "#d4dfcf";
-  ctx.fillRect(0, 0, 18, game.worldHeight);
-  ctx.fillRect(W - 18, 0, 18, game.worldHeight);
-  for (let y = -655; y < game.worldHeight; y += 40) {
-    ctx.strokeStyle = "#dce1d5";
-    ctx.beginPath();
-    ctx.moveTo(20, y);
-    ctx.lineTo(W - 20, y);
-    ctx.stroke();
-  }
+  paintFloor(ctx, game.scene, game.worldHeight);
   floorDetails(ctx, game.scene);
   if (game.stage === 3) venueJourney(ctx);
   if (game.stage === 4)
@@ -837,47 +719,6 @@ function draw() {
       time: game.worldTime + (game.ambientTime || 0),
       reducedMotion: reducedMotion.matches,
     });
-  rounded(18, -500, 444, 55, 8, "#cbd7ca");
-  ctx.fillStyle = "#285d55";
-  ctx.font = "bold 16px system-ui";
-  ctx.textAlign = "center";
-  ctx.fillText(
-    game.scene.environment === "residential"
-      ? "住宅街 / 駅方面 →"
-      : game.scene.environment === "party"
-        ? "LIVE / パーティー会場"
-        : game.scene.environment === "venue"
-          ? "会場の最寄り駅 →"
-          : "駅コンコース →",
-    240,
-    -470,
-  );
-  rounded(28, -230, 90, 35, 5, "#839781");
-  rounded(350, -230, 90, 35, 5, "#839781");
-  for (
-    let i = 0;
-    i < (game.stage === 4 ? 0 : game.scene.backgroundCount);
-    i++
-  ) {
-    const y =
-      -100 -
-      ((i * 63 +
-        (game.worldTime + (game.ambientTime || 0)) * (i % 2 ? 20 : -18) +
-        1200) %
-        350);
-    person({
-      x: 75 + i * 64,
-      y,
-      r: 13,
-      ux: 0,
-      uy: i % 2 ? -1 : 1,
-      visualKey: `background:${i}`,
-      color: i % 4,
-      state: "walking",
-      walk: (game.worldTime + (game.ambientTime || 0)) * (i % 2 ? 20 : 18),
-      background: true,
-    });
-  }
   destination(game.scene);
   goalBoundary(ctx, game.scene);
   if (game.stage === 4)
@@ -894,131 +735,8 @@ function draw() {
       uy: 0,
       visualKey: "ticket-staff",
     });
-  if (game.stage === 4 && !finale) {
-    ctx.fillStyle = "#d7d1e9";
-    ctx.textAlign = "center";
-    ctx.font = "bold 11px system-ui";
-    ctx.fillText("GOAL · 柵の手前の最前列へ", 240, 43);
-  }
-  if (!finale && game.stage !== 4) {
-    rounded(GOAL.x, GOAL.y, GOAL.w, GOAL.h, 12, "#dbe7d4");
-    rounded(GOAL.x, 5, GOAL.w, 22, 8, "#285d55");
-    ctx.fillStyle = "#fff5d8";
-    ctx.textAlign = "center";
-    ctx.font = "bold 13px system-ui";
-    ctx.fillText(game.scene.place, 240, 21);
-    ctx.font = "10px system-ui";
-    ctx.fillStyle = "#55796c";
-    ctx.fillText(
-      game.scene.targetKind === "clerk" ? "GOAL / 忘れ物受取" : "GOAL / 合流",
-      240,
-      82,
-    );
-    ctx.fillStyle = "#55796c";
-    ctx.font = "bold 12px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText(`${game.scene.place} ↑`, 240, 108);
-  }
-  if (game.scene.environment === "cafe") {
-    rounded(44, 178, 38, 5, 2, "#839781");
-    rounded(398, 178, 38, 5, 2, "#839781");
-    ctx.font = "9px system-ui";
-    ctx.fillText("待合席", 63, 194);
-    ctx.fillText("待合席", 417, 194);
-  }
-  if (game.stage < 2) {
-    for (const [x, y] of [
-      [0, 150],
-      [438, 350],
-    ]) {
-      rounded(x, y, 42, 75, 4, "#d7c5a7");
-      rounded(x + 8, y + 12, 12, 18, 2, "#b8d2ce");
-      rounded(x + 25, y + 12, 12, 18, 2, "#b8d2ce");
-    }
-  }
-  rounded(18, 180, 24, 100, 5, "#cbd7ca");
-  rounded(438, 380, 24, 100, 5, "#cbd7ca");
-  ctx.fillStyle = "#55796c";
-  ctx.save();
-  ctx.translate(33, 230);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(
-    game.stage < 2
-      ? "商店街"
-      : game.scene.environment === "party"
-        ? "ドリンク"
-        : game.scene.environment === "venue"
-          ? "会場最寄り駅"
-          : "1・2番ホーム",
-    0,
-    0,
-  );
-  ctx.restore();
-  ctx.save();
-  ctx.translate(449, 430);
-  ctx.rotate(Math.PI / 2);
-  ctx.fillText(
-    game.stage < 2
-      ? "公園・バス停"
-      : game.scene.environment === "party"
-        ? "ロビー"
-        : game.scene.environment === "venue"
-          ? "会場入口"
-          : "3・4番ホーム",
-    0,
-    0,
-  );
-  ctx.restore();
-  const facilityY = game.stage === 3 ? 1010 : game.traffic ? 145 : 340,
-    boardY = game.traffic ? 153 : 298;
-  rounded(397, facilityY, 40, 16, 4, "#67836f");
-  ctx.fillStyle = "#fff";
-  ctx.font = "9px system-ui";
-  ctx.fillText(
-    game.scene.environment === "residential" ? "花壇" : "トイレ",
-    417,
-    facilityY + 11,
-  );
-  ctx.fillStyle = "#55796c";
-  rounded(43, boardY, 40, 8, 3, "#67836f");
-  if (!game.traffic) rounded(397, boardY, 40, 8, 3, "#67836f");
-  ctx.font = "9px system-ui";
-  ctx.fillText("案内板", 63, boardY - 4);
-  if (!game.traffic) ctx.fillText("案内板", 417, boardY - 4);
-  rounded(96, 474, 28, 12, 3, "#d6b579");
-  ctx.font = "8px system-ui";
-  ctx.fillText(
-    game.scene.environment === "residential"
-      ? "街のお知らせ"
-      : game.scene.environment === "station" ||
-          game.scene.environment === "cafe"
-        ? "駅の絵"
-        : "公演ポスター",
-    110,
-    482,
-  );
-  rounded(44, 532, 38, 5, 2, "#839781");
-  ctx.fillText(
-    game.scene.environment === "residential" ? "ベンチ" : "待合",
-    63,
-    548,
-  );
-  rounded(398, 532, 38, 5, 2, "#839781");
-  ctx.fillText("待合", 417, 548);
-  ctx.fillText(
-    game.stage === 0
-      ? "自宅 / 出発"
-      : game.scene.environment === "party"
-        ? "会場入口"
-        : game.stage === 3
-          ? "会場最寄り駅の改札"
-          : "START",
-    240,
-    game.startY + 25,
-  );
-  ctx.fillStyle = "#759081";
-  ctx.font = "11px system-ui";
-  ctx.fillText("START", 240, game.startY + 37);
+  if (!finale) goalMark(ctx, game.scene);
+  streetFurniture(ctx, game.scene, { startY: game.startY });
   for (const t of game.crossings) drawTraffic(t);
   const displayMembers = finale
     ? game.party.members.map((m) => ({
@@ -1054,7 +772,7 @@ function draw() {
     : { ...game.player, player: true };
   if (game.party.members.length && !finale) {
     ctx.save();
-    ctx.strokeStyle = "#477f775c";
+    ctx.strokeStyle = "#365f6259";
     ctx.lineWidth = 2;
     ctx.setLineDash([3, 6]);
     ctx.beginPath();
@@ -1084,7 +802,7 @@ function draw() {
   }
   for (const m of displayMembers) {
     ctx.save();
-    ctx.fillStyle = m.flash > 0 ? "#b65b39" : "#245c56";
+    ctx.fillStyle = m.flash > 0 ? "#b65b39" : "#24474b";
     ctx.beginPath();
     ctx.arc(
       m.x + (m.docking && m.id % 2 ? -20 : 20),
@@ -1181,13 +899,13 @@ function drawResultRoster() {
     );
     c.restore();
     if (actor.newFriend) {
-      c.fillStyle = "#f0cf81";
+      c.fillStyle = "#785528";
       c.font = "bold 9px system-ui";
       c.textAlign = "center";
       c.fillText("NEW", x, 9);
     }
     if (!actor.player) {
-      c.fillStyle = game.stage === 4 ? "#fff3cf" : "#245c56";
+      c.fillStyle = "#24474b";
       c.font = "bold 10px system-ui";
       c.textAlign = "center";
       c.fillText(String(actor.id), x, 76);
