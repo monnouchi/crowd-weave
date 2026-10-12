@@ -941,3 +941,81 @@ main:has(.overlay.finale:not([hidden])) .hud {
 #overlay:not(.initial) .intro-only {
   display: none;
 }
+
+/* Clear game information sits above the street instead of mimicking a ticket. */
+main {
+  --scene-accent: #447866;
+}
+main[data-scene="station"] {
+  --scene-accent: #315d68;
+}
+main[data-scene="cafe"] {
+  --scene-accent: #866247;
+}
+main[data-scene="venue"] {
+  --scene-accent: #32635e;
+}
+main[data-scene="party"] {
+  --scene-accent: #d3a85d;
+}
+.hud {
+  background: #fbfaf5f2;
+  border: 1px solid #b5c6c1;
+  border-left: 5px solid var(--scene-accent);
+  border-radius: 9px;
+  box-shadow: 0 8px 20px #233d3d1f;
+}
+.eyebrow {
+  color: var(--scene-accent);
+}
+.stats {
+  border-bottom: 1px solid #cbd3cc;
+}
+.toolbar button,
+.settings summary,
+.steering span {
+  background: #fbfaf5f2;
+  border: 1px solid #a8bab5;
+  border-radius: 7px;
+  box-shadow: 0 3px 9px #233d3d19;
+}
+.steering button {
+  background: #244951;
+  border-color: #244951;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px #233d3d30;
+}
+.steering button.held {
+  background: #e2be78;
+}
+.card {
+  background: #fbfaf5;
+  border: 1px solid #afc0b8;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px #233d3d34;
+}
+.initial .card {
+  border: 1px solid #afc0b8;
+  box-shadow: 0 16px 36px #233d3d49;
+}
+.intro-kicker,
+.trip-route,
+#result-score {
+  border-color: #bdccc3;
+}
+.trip-route {
+  border-bottom-style: solid;
+}
+.trip-route li::before {
+  border: 0;
+  border-radius: 6px;
+}
+.finale .card {
+  border-top-color: var(--scene-accent);
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .hud {
+    border-left-width: 4px;
+    border-top-width: 1px;
+  }
+}

@@ -132,3 +132,45 @@ test("the player and all four companions celebrate with one arm per shoulder", (
       check({ ...p, state: "celebrating" }, heading, { live: true });
   }
 });
+
+test("overhead people retain two connected arms and two hands in all directions with props", () => {
+  for (let id = 0; id < 12; id++)
+    for (const heading of directions)
+      for (const props of [
+        {},
+        { umbrella: true },
+        { glowStick: true },
+        { suitcase: true },
+      ]) {
+        check(
+          {
+            id,
+            appearanceId: id,
+            x: 0,
+            y: 0,
+            r: 13,
+            partner: true,
+            color: 0,
+            state: "walking",
+            ...props,
+          },
+          heading,
+          { overhead: true, live: true },
+        );
+        check(
+          {
+            id,
+            appearanceId: id,
+            x: 0,
+            y: 0,
+            r: 13,
+            partner: true,
+            color: 0,
+            state: "celebrating",
+            ...props,
+          },
+          heading,
+          { overhead: true, live: true, waving: true },
+        );
+      }
+});
