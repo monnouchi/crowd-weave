@@ -38,6 +38,7 @@ import {
 } from "./logic.js";
 import { trafficViolations } from "./traffic.js";
 import { visiblePerson } from "./crowd.js";
+import { drawFinale } from "./finale.js";
 import {
   TwoButtons,
   EnterLatch,
@@ -62,44 +63,6 @@ function resizeDrawingSurface() {
     canvas.height = height;
   }
   renderRatio = ratio;
-  const compactFinal =
-    overlay.classList.contains("finale") &&
-    (rect.width < 600 || (rect.height <= 500 && rect.width <= 950));
-  if (compactFinal) {
-    // Fit the entire stage-to-front-row composition above the collapsed result.
-    const card = document.querySelector(".card");
-    const summary = card.querySelector(".start-actions");
-    const summaryBottom = summary.getBoundingClientRect().bottom;
-    const cardTop = card.getBoundingClientRect().top;
-    const collapsedHeight = summaryBottom - cardTop + 12;
-    const availableBottom =
-      rect.height -
-      Math.max(12, rect.height - card.getBoundingClientRect().bottom) -
-      collapsedHeight -
-      12;
-    const top = Math.max(
-      12,
-      Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--result-safe-top",
-        ),
-      ) || 0,
-    );
-    const sceneHeight = 430;
-    const scale = Math.min(
-      (rect.width - 24) / W,
-      Math.max(1, availableBottom - top) / sceneHeight,
-    );
-    projection = {
-      scale,
-      ox: rect.width / 2 - 240 * scale,
-      oy: top,
-      width: rect.width,
-      height: rect.height,
-      finalCameraY: game.player.y + 220,
-    };
-    return;
-  }
   const portrait = rect.width < 600 && rect.height > rect.width;
   const top = portrait
     ? document.querySelector(".hud").getBoundingClientRect().bottom + 8
@@ -149,15 +112,27 @@ let steeringMode = "buttons",
   tiltRequest = 0;
 const enterLatch = new EnterLatch();
 const audio = new GameAudio();
+let introSoundOn = false;
+let goBannerUntil = 0;
+let finalSceneCard = null;
 window.addEventListener("pointerdown", () => audio.unlock());
 window.addEventListener("keydown", () => audio.unlock());
 document.querySelector("#sound").addEventListener("click", () => {
   const muted = audio.toggle();
   document.querySelector("#sound").textContent = muted ? "音：OFF" : "音：ON";
-  document.querySelector("#sound").setAttribute("aria-pressed", String(muted));
+  document.querySelector("#sound").setAttribute("aria-pressed", String(!muted));
 });
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const $ = (s) => document.querySelector(s);
+const touchDevice = window.matchMedia("(pointer: coarse)");
+function updateCanvasHelp() {
+  canvas.setAttribute(
+    "aria-describedby",
+    touchDevice.matches ? "touch-help" : "keyboard-help",
+  );
+}
+updateCanvasHelp();
+touchDevice.addEventListener("change", updateCanvasHelp);
 document.title = PAGE_TITLE;
 document.querySelector("#game-name").textContent = GAME_NAME;
 const compactResult = window.matchMedia(
@@ -202,6 +177,7 @@ function clearInput() {
 }
 function panel(title, message, button, label = "CROWD WEAVE") {
   overlay.hidden = false;
+  $("#countdown").hidden = true;
   $("#result-score").hidden = game.phase !== "finished";
   overlay.classList.toggle("paused", game.phase === "paused");
   overlay.classList.remove("initial");
@@ -210,6 +186,11 @@ function panel(title, message, button, label = "CROWD WEAVE") {
     game.phase === "finished" && game.stage === 4,
   );
   $("#title").textContent = title;
+  if (game.phase === "finished" && game.stage === 4)
+    canvas.setAttribute(
+      "aria-label",
+      "客席から見たライブの舞台。演奏するバンドと、最前列で一緒に楽しむ自分と仲間4人。",
+    );
   $("#message").textContent = message;
   $("#result-detail-message").textContent = message;
   const final = game.phase === "finished" && game.stage === 4;
@@ -259,6 +240,17 @@ function start(stage = 0) {
   if (stage === 0 || runSeed === undefined) runSeed = chooseRunSeed();
   game = createGame(stage, seedForRun(runSeed, stage));
   game.runSeed = runSeed;
+  game.readyRemaining = 1.4;
+  goBannerUntil = 0;
+  finalSceneCard = null;
+  canvas.weaveResultRegion = null;
+  $("#countdown strong").textContent = "GET READY";
+  $("#countdown").classList.remove("go");
+  $("#countdown").hidden = false;
+  canvas.setAttribute(
+    "aria-label",
+    "人混みを避け、友だちと合流しながらライブ会場まで歩くゲーム",
+  );
   $("main").dataset.scene = game.scene.landmark;
   $("main").classList.toggle("with-traffic", !!game.traffic);
   playerPose = { lean: 0 };
@@ -270,7 +262,7 @@ function start(stage = 0) {
   $("#scene-label").textContent =
     `${["HOME", "STATION", "CAFÉ", "VENUE", "LIVE"][stage]} / 0${stage + 1}`;
   $("#stage").textContent = `STAGE ${stage + 1} / 5 · ${STAGES[stage].name}`;
-  game.phase = "playing";
+  game.phase = "countdown";
   overlay.hidden = true;
   overlay.classList.remove("finale", "initial", "paused");
   pause.disabled = false;
@@ -283,7 +275,8 @@ function start(stage = 0) {
 function setPaused() {
   clearInput();
   audio.suspend();
-  if (game.phase !== "playing") return;
+  if (game.phase !== "playing" && game.phase !== "countdown") return;
+  game.resumePhase = game.phase;
   game.phase = "paused";
   pause.disabled = true;
   panel(
@@ -292,28 +285,32 @@ function setPaused() {
     "再開する →",
   );
 }
-function initialStart(withSound) {
-  audio.muted = !withSound;
-  if (withSound) audio.unlock();
+function initialStart() {
+  audio.muted = !introSoundOn;
+  if (introSoundOn) audio.unlock();
   else audio.suspend();
-  $("#sound").textContent = withSound ? "音：ON" : "音：OFF";
-  $("#sound").setAttribute("aria-pressed", String(!withSound));
+  $("#sound").textContent = introSoundOn ? "音：ON" : "音：OFF";
+  $("#sound").setAttribute("aria-pressed", String(introSoundOn));
   start();
 }
 $("#start-sound").addEventListener("click", () => {
-  if (game.phase === "ready") initialStart(true);
+  if (game.phase !== "ready") return;
+  introSoundOn = !introSoundOn;
+  $("#start-sound").textContent = introSoundOn ? "音：ON" : "音：OFF";
+  $("#start-sound").setAttribute("aria-pressed", String(introSoundOn));
 });
 function activatePrimary() {
   const command = primaryCommand(game.phase, game.stage);
   if (command === "resume") {
     clearInput();
-    game.phase = "playing";
+    game.phase = game.resumePhase || "playing";
+    $("#countdown").hidden = game.phase !== "countdown";
     overlay.hidden = true;
     pause.disabled = false;
     last = performance.now();
     canvas.focus({ preventScroll: true });
   } else if (command === "next") start(game.stage + 1);
-  else if (command === "start") initialStart(false);
+  else if (command === "start") initialStart();
   else if (command === "retry") start();
   else if (command === "retry-stage") start(game.stage);
 }
@@ -331,11 +328,8 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     if (editable || e.isComposing) return;
     if (
-      game.phase === "finished" &&
       e.target instanceof Element &&
-      e.target.closest(
-        "#result-toggle,#close-result-details,#share,#copy-result",
-      )
+      e.target.closest("button:not(#action), summary, a, [role='button']")
     )
       return;
     e.preventDefault();
@@ -345,9 +339,7 @@ window.addEventListener("keydown", (e) => {
         modified: e.altKey || e.ctrlKey || e.metaKey || e.shiftKey,
       })
     ) {
-      if (game.phase === "ready" && e.target === $("#start-sound"))
-        initialStart(true);
-      else activatePrimary();
+      activatePrimary();
     }
     return;
   }
@@ -355,7 +347,7 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (controls.includes(k)) {
     e.preventDefault();
-    if (game.phase === "playing")
+    if (game.phase === "playing" || game.phase === "countdown")
       buttons.press(
         "key:" + k,
         k === "ArrowLeft" || k === "a" ? "left" : "right",
@@ -392,7 +384,8 @@ const pointerControls = bindPointerControls({
     [$("#brake"), "brake"],
   ],
   enabled: (side) =>
-    game.phase === "playing" && (side !== "brake" || steeringMode === "tilt"),
+    (game.phase === "playing" || game.phase === "countdown") &&
+    (side !== "brake" || steeringMode === "tilt"),
   press: (id, side) =>
     side === "brake" ? tilt.brakes.add(id) : buttons.press(id, side),
   release: (id, side) =>
@@ -652,24 +645,55 @@ function draw() {
   const { scale, ox, oy, width, height } = projection;
   ctx.setTransform(renderRatio, 0, 0, renderRatio, 0, 0);
   ctx.clearRect(0, 0, width, height);
+  if (game.stage === 4 && game.phase === "finished") {
+    const card = document.querySelector(".card").getBoundingClientRect();
+    const surface = canvas.getBoundingClientRect();
+    const expanded = overlay.classList.contains("result-expanded");
+    if (
+      !expanded ||
+      !finalSceneCard ||
+      finalSceneCard.width !== width ||
+      finalSceneCard.height !== height
+    ) {
+      const cardTop = card.top - surface.top;
+      const summaryBottom =
+        document.querySelector(".start-actions").getBoundingClientRect().bottom -
+        surface.top;
+      finalSceneCard = {
+        width,
+        height,
+        left: card.left - surface.left,
+        top: expanded
+          ? height -
+            Math.max(12, height - (card.bottom - surface.top)) -
+            (summaryBottom - cardTop + document.querySelector(".card").scrollTop + 12)
+          : cardTop,
+      };
+    }
+    canvas.weaveResultRegion = drawFinale(ctx, {
+      width,
+      height,
+      card: finalSceneCard,
+      ratio: renderRatio,
+      time: game.worldTime + (game.ambientTime || 0),
+      reducedMotion: reducedMotion.matches,
+      members: game.party.members,
+    });
+    return;
+  }
   ctx.fillStyle = scenePalette(game.scene).outer;
   ctx.fillRect(0, 0, width, height);
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
-  const finale = game.stage === 4 && game.phase === "finished";
-  ctx.translate(
-    finale ? 0 : 240 - game.player.x,
-    (finale ? (projection.finalCameraY ?? 320) : CAMERA_Y) - game.player.y,
-  );
+  ctx.translate(240 - game.player.x, CAMERA_Y - game.player.y);
   // Outside the playable corridor: buildings, greenery or hall walls.
-  const cameraY = finale ? (projection.finalCameraY ?? 320) : CAMERA_Y;
   const leftEdge =
     Math.floor((game.player.x - width / (2 * scale)) / 120) * 120;
   const rightEdge =
     Math.ceil((game.player.x + width / (2 * scale)) / 120) * 120;
   const topEdge =
-    Math.floor((game.player.y - cameraY - oy / scale) / 150) * 150;
+    Math.floor((game.player.y - CAMERA_Y - oy / scale) / 150) * 150;
   const bottomEdge = topEdge + height / scale + 150;
   surroundings(ctx, game.scene, {
     left: leftEdge,
@@ -677,21 +701,6 @@ function draw() {
     top: topEdge,
     bottom: bottomEdge,
   });
-  const shareX =
-    (ox + (finale ? 0 : 60 + 240 - game.player.x) * scale) * renderRatio;
-  const shareY =
-    (oy +
-      (-195 +
-        (finale ? (projection.finalCameraY ?? 320) : CAMERA_Y) -
-        game.player.y) *
-        scale) *
-    renderRatio;
-  canvas.weaveResultRegion = {
-    x: shareX,
-    y: shareY,
-    width: (finale ? 480 : 360) * scale * renderRatio,
-    height: (finale ? 390 : 258) * scale * renderRatio,
-  };
   paintFloor(ctx, game.scene, game.worldHeight);
   floorDetails(ctx, game.scene);
   if (game.stage === 3) venueJourney(ctx);
@@ -721,19 +730,10 @@ function draw() {
       uy: 0,
       visualKey: "ticket-staff",
     });
-  if (!finale) goalMark(ctx, game.scene);
+  goalMark(ctx, game.scene);
   streetFurniture(ctx, game.scene, { startY: game.startY });
   for (const t of game.crossings) drawTraffic(t);
-  const displayMembers = finale
-    ? game.party.members.map((m) => ({
-        ...m,
-        state: "celebrating",
-        ux: 0,
-        uy: -1,
-        flash: 0,
-        docking: false,
-      }))
-    : game.party.members;
+  const displayMembers = game.party.members;
   const displayPartner =
     game.stage === 4
       ? {
@@ -747,16 +747,8 @@ function draw() {
           glowStick: true,
         }
       : joiningFriend(game, reducedMotion.matches) || game.meetingPartner;
-  const displayPlayer = finale
-    ? {
-        ...game.player,
-        player: true,
-        state: "celebrating",
-        ux: 0,
-        uy: -1,
-      }
-    : { ...game.player, player: true };
-  if (game.party.members.length && !finale) {
+  const displayPlayer = { ...game.player, player: true };
+  if (game.party.members.length) {
     ctx.save();
     ctx.strokeStyle = "#365f6259";
     ctx.lineWidth = 2;
@@ -776,16 +768,6 @@ function draw() {
     displayPlayer,
   ].sort((a, b) => a.y - b.y))
     person(p, p.player);
-  if (finale && !reducedMotion.matches) {
-    // Sparse warm confetti, no flashes and no change to the recorded clock.
-    const t = game.worldTime + (game.ambientTime || 0);
-    for (let i = 0; i < 24; i++) {
-      const x = 70 + ((i * 73) % 340),
-        y = -210 + ((i * 29 + t * 12) % 230);
-      ctx.fillStyle = ["#e6c46f", "#e9acc7", "#a8dccd"][i % 3];
-      ctx.fillRect(x, y, 3, 5);
-    }
-  }
   for (const m of displayMembers) {
     ctx.save();
     ctx.fillStyle = m.flash > 0 ? "#b65b39" : "#24474b";
@@ -901,6 +883,24 @@ function drawResultRoster() {
 function frame(now) {
   const dt = (now - last) / 1000;
   last = now;
+  let simulationDt = dt;
+  if (game.phase === "countdown") {
+    game.readyRemaining = Math.max(
+      0,
+      game.readyRemaining - Math.max(0, Math.min(1, dt)),
+    );
+    simulationDt = 0;
+    if (game.readyRemaining === 0) {
+      game.phase = "playing";
+      goBannerUntil = now + 650;
+      $("#countdown strong").textContent = "GO!";
+      $("#countdown").classList.add("go");
+    }
+  }
+  if (game.phase === "playing" && goBannerUntil && now >= goBannerUntil) {
+    $("#countdown").hidden = true;
+    goBannerUntil = 0;
+  }
   if (
     steeringMode === "tilt" &&
     tilt.read(now).stale &&
@@ -923,7 +923,7 @@ function frame(now) {
   const previousX = game.player.x;
   const previousRegroup = game.party.regroup;
   const steering = input();
-  step(game, dt, steering);
+  if (simulationDt > 0) step(game, simulationDt, steering);
   advanceJoining(game, dt, {
     active: !document.hidden && document.hasFocus(),
     reducedMotion: reducedMotion.matches,
@@ -957,7 +957,9 @@ function frame(now) {
   $("#left").classList.toggle("held", steering.left);
   $("#right").classList.toggle("held", steering.right);
   $("#motion").textContent =
-    game.stage === 4 &&
+    game.phase === "countdown"
+      ? "準備中 · GO! で時計が動きます"
+      : game.stage === 4 &&
     game.phase === "playing" &&
     game.player.y > 740 &&
     game.player.y < 810

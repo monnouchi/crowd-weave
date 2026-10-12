@@ -7,10 +7,10 @@ import { planRoute, routeInput } from "../validation/plan-route.js";
 const run = (g, seconds, input = {}) => {
   for (let n = 0; n < Math.round(seconds / 0.025); n++) step(g, 0.025, input);
 };
-test("stage lengths preserve the first three courses and add actual outdoor and indoor entrance distance", () => {
+test("stage three adds three crossing halls while outdoor and indoor entrance distances stay fixed", () => {
   assert.deepEqual(
     Array.from({ length: 5 }, (_, i) => createGame(i).startY - GOAL.y - GOAL.h),
-    [540, 540, 540, 1040, 860],
+    [540, 540, 710, 1040, 860],
   );
   const g = createGame(3);
   assert.equal(g.crossings.length, 2);
@@ -133,6 +133,41 @@ test("cafe has primarily lateral station traffic; the concert gathers northward 
   assert.equal(live.phase, "finished");
   assert.ok(live.hits > 0, "straight forward does not bypass the audience");
   assert.equal(live.ticketChecked, true);
+});
+test("longer cafe has three moving crossing waves and a passable meeting group even at low frame rate", () => {
+  for (const seed of [17, 2026, 1402485884, 2567361276]) {
+    const g = createGame(2, seed);
+    assert.equal(g.startY - GOAL.y - GOAL.h, 710);
+    for (let i = 0; i < g.crowd.length; i++) {
+      assert.ok(Math.hypot(g.crowd[i].x - g.player.x,
+        g.crowd[i].y - g.player.y) > 60);
+      for (let j = i + 1; j < g.crowd.length; j++)
+        assert.ok(Math.hypot(g.crowd[i].x - g.crowd[j].x,
+          g.crowd[i].y - g.crowd[j].y) > 37,
+        `initial pedestrian overlap ${seed}/${i}/${j}`);
+    }
+    for (const y of [245, 445, 640])
+      assert.ok(g.crowd.filter((p) => p.flow === "crossing" &&
+        Math.abs(p.entry.y - y) < 45).length >= 4);
+    const meeting = g.crowd.filter((p) => p.role === "待ち合わせ中の人");
+    assert.equal(meeting.length, 3);
+    assert.ok(meeting.every((p) => p.state === "meeting" && p.wait > 10));
+    const route = planRoute(2, seed, 35);
+    assert.ok(route, `route ${seed}`);
+    const clean = createGame(2, seed);
+    clean.phase = "playing";
+    for (const action of route.path)
+      for (let frame = 0; frame < 2; frame++) step(clean, 0.05, routeInput(action));
+    assert.equal(clean.phase, "finished");
+    assert.equal(clean.hits, 0);
+    assert.ok(clean.party.members.every((p) => p.docked));
+    const straight = createGame(2, seed);
+    straight.phase = "playing";
+    for (let frame = 0; frame < 800 && straight.phase === "playing"; frame++)
+      step(straight, 0.05, {});
+    assert.equal(straight.phase, "finished");
+    assert.ok(straight.hits >= 1, "straight route encounters the new flow");
+  }
 });
 test("all revised busy scenes retain all-member zero-contact routes across different seeds", () => {
   for (const stage of [2, 3, 4])

@@ -98,24 +98,11 @@
           class="overlay initial"
           role="dialog"
           aria-labelledby="title"
-          aria-describedby="message enter-hint"
+          aria-describedby="message"
         >
           <div class="card">
-            <div class="intro-only intro-kicker" aria-hidden="true">
-              <span>CROWD WEAVE</span><span>5 STOPS / 1 NIGHT</span>
-            </div>
             <span class="eyebrow" id="label"></span>
-            <h2 id="title"><span>ライブへ</span><span>行こう！</span></h2>
-            <ol
-              class="intro-only trip-route"
-              aria-label="自宅からライブ最前列までの5区間"
-            >
-              <li><b>1</b>自宅</li>
-              <li><b>2</b>駅</li>
-              <li><b>3</b>カフェ</li>
-              <li><b>4</b>会場</li>
-              <li><b>5</b>最前列</li>
-            </ol>
+            <h2 id="title">ライブへ行こう！</h2>
             <dl id="result-score" hidden>
               <div>
                 <dt>到着タイム（加算込み）</dt>
@@ -142,12 +129,26 @@
             </div>
             <p id="next-purpose" hidden></p>
             <p id="message">
-              人の流れをよけて、友だちとライブへ。<br />自動で前進。左右でよけ、両押しで止まる。<br />仲間は同じ道を歩き、人への接触は＋2秒。
+              人混みのすきまを通り、友だちとライブ会場を目指そう。
             </p>
+            <section class="intro-only start-how" aria-label="最初の操作">
+              <strong>前へは自動で進みます</strong>
+              <div class="start-diagram" aria-hidden="true">
+                <span class="diagram-key">← 左</span>
+                <span class="diagram-walker">●<small>↑</small></span>
+                <span class="diagram-key">右 →</span>
+              </div>
+              <p class="touch-instructions">左右のボタンでよける</p>
+              <p class="keyboard-instructions">← → キーでよける（A・D も使えます）</p>
+              <div class="brake-diagram">
+                <span class="diagram-key">← 左</span>
+                <span>＋</span>
+                <span class="diagram-key">右 →</span>
+                <span>同時に押すと停止</span>
+              </div>
+            </section>
             <div class="start-actions">
-              <button id="action" aria-describedby="enter-hint">
-                音なしで開始
-              </button>
+              <button id="action">はじめる</button>
               <button
                 id="result-toggle"
                 class="secondary"
@@ -157,7 +158,17 @@
               >
                 詳細・共有
               </button>
-              <button id="start-sound" class="secondary">音ありで開始</button>
+            </div>
+            <div class="intro-only start-options">
+              <button id="start-sound" class="secondary" aria-pressed="false">
+                音：OFF
+              </button>
+              <details id="intro-guide">
+                <summary>くわしい遊びかた</summary>
+                <p>
+                  人にぶつかると到着タイムに2秒加算。仲間は同じ道をついてきます。信号が赤なら左右を同時に押して待ちましょう。
+                </p>
+              </details>
             </div>
             <section id="result-details" hidden aria-label="結果の詳細と共有">
               <p id="result-detail-message"></p>
@@ -172,9 +183,12 @@
               </button>
             </section>
             <p id="enter-hint" class="enter-hint">
-              Enter：音なし開始 · Tabで音あり
+              Enterでも開始できます
             </p>
           </div>
+        </div>
+        <div id="countdown" hidden role="status" aria-live="assertive">
+          <strong>GET READY</strong><small>↑ ゴールへ進もう</small>
         </div>
         <div id="goal-callout" hidden>こっちだよ！</div>
         <svg id="companion-link" hidden aria-hidden="true"><path /></svg>
@@ -199,8 +213,8 @@
           id="sound"
           disabled
           class="secondary"
-          aria-label="ミュート切り替え"
-          aria-pressed="true"
+          aria-label="音のオン・オフ"
+          aria-pressed="false"
         >
           音：OFF</button
         ><button id="pause" class="secondary" disabled>一時停止</button
@@ -224,9 +238,9 @@
           人への接触と赤信号での横断開始は＋2秒。自分や仲間が車・自転車に触れると、その区間から再挑戦です。
         </p>
         <footer>
-          <p id="keyboard-help">
-            PC：← → / A D · Enterで次へ · Escで停止
-            <span>スマホ：左右のボタン · 両方を押すと停止</span>
+          <p>
+            <span id="keyboard-help" class="keyboard-instructions">PC：← → / A D · Enterで次へ · Escで一時停止</span>
+            <span id="touch-help" class="touch-instructions">スマホ：左右のボタンでよける · 2つ同時で停止</span>
           </p>
         </footer>
       </details>

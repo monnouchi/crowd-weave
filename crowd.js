@@ -151,11 +151,16 @@ export function makeCrowd(
           : eastbound
             ? "east"
             : "west";
+    const cafeBand = Math.floor(id / 4) % 3;
     const a =
       flow === "crossing"
         ? {
             x: eastbound ? -60 : 540,
-            y: (eastbound ? 230 : 430) + (rand() - 0.5) * (traffic ? 30 : 90),
+            y:
+              environment === "cafe"
+                ? [640, 445, 245][cafeBand] + (rand() - 0.5) * 82
+                : (eastbound ? 230 : 430) +
+                  (rand() - 0.5) * (traffic ? 30 : 90),
           }
         : { x: lane, y: flow === "along" ? 760 : -80 };
     const b =
@@ -224,8 +229,10 @@ export function makeCrowd(
         y = queueY + (id - 1) * 42;
       }
       if (id === 16 || id === 17) {
-        x = id === 17 ? 120 : 165;
-        y = 540;
+        x = environment === "cafe"
+          ? id === 17 ? 255 : 210
+          : id === 17 ? 120 : 165;
+        y = environment === "cafe" ? 735 : 540;
       }
       if (environment === "residential" && id === 2) {
         x = 65;
@@ -258,7 +265,10 @@ export function makeCrowd(
       speed *
       profile.pace *
       (0.8 + rand() * 0.28) *
-      (urgency === "hurried" ? 1.15 : urgency === "relaxed" ? 0.78 : 1);
+      (urgency === "hurried" ? 1.15 : urgency === "relaxed" ? 0.78 : 1) *
+      (environment === "cafe" && flow === "crossing"
+        ? [1, 0.78, 1.2][cafeBand]
+        : 1);
     const p = {
       id,
       environment,
@@ -318,17 +328,21 @@ export function makeCrowd(
     p.vx = p.state === "walking" ? p.ux * pace : 0;
     p.vy = p.state === "walking" ? p.uy * pace : 0;
     if (id === 16 || id === 17) {
+      const familyX = environment === "cafe"
+        ? id === 17 ? 255 : 210
+        : id === 17 ? 110 : 155;
       p.group = "family";
       p.origin = "south";
       p.destination = "north";
       p.flow = "along";
       b.y = -80;
-      b.x = id === 17 ? 110 : 155;
+      b.x = familyX;
+      if (environment === "cafe") p.entry = { x: familyX, y: 890 };
       p.archetype = id === 17 ? "curious-child" : "companion";
       p.habit = "interest";
       p.pauseDuration = id === 17 ? 1.2 : 1.8;
       p.pace = speed * profile.pace * 0.78;
-      p.route = [{ x: id === 17 ? 110 : 155, y: 500 }, b];
+      p.route = [{ x: familyX, y: environment === "cafe" ? 660 : 500 }, b];
       p.leg = 0;
       aim(p);
     }
@@ -377,6 +391,48 @@ export function makeCrowd(
       p.vy = p.state === "walking" ? p.uy * p.pace : 0;
     }
     crowd.push(p);
+  }
+  if (environment === "cafe" && count >= 31) {
+    // A short conversation forms a visible island between the middle and
+    // upper crossing streams. Either side remains wide enough for the party.
+    const candidates = [355, 395, 515, 325, 545, 295, 485, 565].flatMap(
+      (y) => [240, 220, 260, 190, 290].map((x) => ({ x, y })),
+    );
+    const spot = candidates.find(({ x, y }) =>
+      crowd
+        .slice(0, 28)
+        .every((p) =>
+          [x - 40, x, x + 40].every(
+            (seat) => Math.hypot(p.x - seat, p.y - y) > 40,
+          ),
+        ),
+    );
+    if (!spot) throw new Error("No safe cafe meeting spot");
+    for (let i = 0; i < 3; i++) {
+      const p = crowd[28 + i],
+        x = spot.x - 40 + 40 * i;
+      Object.assign(p, {
+        x,
+        y: spot.y,
+        entry: { x, y: 890 },
+        route: [{ x, y: spot.y }, { x, y: -80 }],
+        leg: 0,
+        flow: "along",
+        origin: "south",
+        destination: "north",
+        originName: profile.places.south,
+        destinationName: profile.places.north,
+        habit: "meeting",
+        state: "meeting",
+        pauseDuration: 14,
+        wait: 14,
+        vx: 0,
+        vy: 0,
+        ux: 0,
+        uy: -1,
+        role: "待ち合わせ中の人",
+      });
+    }
   }
   return crowd;
 }

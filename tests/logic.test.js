@@ -69,10 +69,10 @@ test("goal completes and timer freezes; paused and ready freeze", () => {
     assert.equal(JSON.stringify(h), old);
   }
 });
-test("increasing density, purposeful and individual agents, safe initial spacing", () => {
+test("scene density, purposeful and individual agents, safe initial spacing", () => {
   assert.deepEqual(
     STAGES.map((_, i) => createGame(i).crowd.length),
-    [6, 12, 20, 30, 40],
+    [6, 12, 31, 30, 40],
   );
   for (let stage = 0; stage < 5; stage++)
     for (const seed of [1402485690 + stage * 97, 17, 2026]) {
