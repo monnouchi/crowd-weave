@@ -66,7 +66,7 @@ export const MEETING_PARTNER = Object.freeze({
 export const STAGES = [
   { name: "ひとりで出発", count: 6, speed: 30 },
   { name: "住宅街から最寄り駅へ", count: 12, speed: 35 },
-  { name: "駅のカフェで合流", count: 20, speed: 40 },
+  { name: "駅のカフェで合流", count: 31, speed: 40 },
   { name: "会場前のにぎわい", count: 30, speed: 45 },
   { name: "ライブの最前方へ", count: 40, speed: 50 },
 ];
@@ -101,8 +101,8 @@ export const SCENES = [
     place: "駅のカフェ",
     landmark: "cafe",
     environment: "cafe",
-    purpose: "駅構内の横の人流を渡り、壁沿いのカフェへ",
-    intro: "駅のカフェで合流し、郊外のライブ会場へ向かおう。",
+    purpose: "横切る人の流れを見ながら、駅のカフェへ",
+    intro: "駅の人の流れを渡って、カフェにいる友だちと合流しよう。",
     bubble: "カフェで待ってるよ！",
     arrival: "カフェで合流。次は会場の最寄り駅！",
     shirt: "#cc8b74",
@@ -221,11 +221,13 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   const config = STAGES[stage];
   const scene = SCENES[stage];
   const start =
-    stage === 3
-      ? { x: 240, y: 1125 }
-      : stage === 4
-        ? { x: 240, y: 945 }
-        : START;
+    stage === 2
+      ? { x: 240, y: 795 }
+      : stage === 3
+        ? { x: 240, y: 1125 }
+        : stage === 4
+          ? { x: 240, y: 945 }
+          : START;
   const crossings = trafficSpecs(stage).map((spec) =>
     createTraffic(stage, spec),
   );
@@ -241,7 +243,8 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     stage,
     phase: "ready",
     startY: start.y,
-    worldHeight: stage === 3 ? 1180 : stage === 4 ? 1000 : H,
+    worldHeight:
+      stage === 2 ? 850 : stage === 3 ? 1180 : stage === 4 ? 1000 : H,
     player: { ...start, r: 12 },
     party: createParty(stage, start),
     arriving: false,

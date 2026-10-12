@@ -22,6 +22,7 @@ const expected = [
   "branding.js",
   "character.js",
   "crowd.js",
+  "finale.js",
   "game.js",
   "index.html",
   "input.js",
@@ -106,6 +107,7 @@ test("Browser asset references stay within a GitHub Pages project base path", as
     "input.js",
     "branding.js",
     "art.js",
+    "finale.js",
   ]) {
     const code = await readFile(join(root, file), "utf8");
     for (const m of code.matchAll(/from\s+"([^"]+)"/g)) refs.push(m[1]);

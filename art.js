@@ -702,9 +702,9 @@ function spatialFloor(c, scene, height) {
       );
   } else if (kind === "cafe") {
     sPaving(c, 0, -800, 480, height + 200, 80, "#ddd4c4");
-    rect(c, 0, 128, 480, 82, "#e1dbc9");
-    rect(c, 0, 420, 480, 82, "#e1dbc9");
-    for (const y of [128, 210, 420, 502])
+    // Three separated crossing halls make each wave readable before entry.
+    for (const y of [245, 445, 640]) rect(c, 0, y - 42, 480, 84, "#e1dbc9");
+    for (const y of [203, 287, 403, 487, 598, 682])
       line(
         c,
         [
@@ -714,17 +714,8 @@ function spatialFloor(c, scene, height) {
         "#cabb9f",
         1.2,
       );
-    rect(c, 202, 95, 76, 535, "#f0ebde");
-    for (const x of [202, 278])
-      line(
-        c,
-        [
-          [x, 95],
-          [x, 630],
-        ],
-        "#e2d9c8",
-        1,
-      );
+    for (const [top, bottom] of [[95, 194], [296, 394], [496, 590], [690, 830]])
+      rect(c, 202, top, 76, bottom - top, "#f0ebde");
   } else if (kind === "venue") {
     rect(c, 0, -800, 480, 1100, "#d5dfda");
     rect(c, 0, 365, 480, 415, "#b6c7b8");
@@ -786,11 +777,14 @@ function spatialDetails(c, scene) {
         );
     }
   } else if (scene.landmark === "cafe") {
-    // Thresholds to each lateral destination explain the side-to-side flows.
-    for (const y of [254, 459, 633]) sPath(c, 0, y, 50, 38, "#d2ddd4");
-    for (const y of [208, 518]) sPath(c, 430, y, 50, 36, "#e5d5bc");
-    text(c, "1・2番線", 45, 269, 10, "#637b77");
-    text(c, "待合", 434, 226, 10, "#8c7155");
+    // Each side door feeds one crossing hall; the central path stops at them.
+    for (const y of [225, 425, 620]) {
+      sPath(c, 0, y, 50, 38, "#d2ddd4");
+      sPath(c, 430, y, 50, 38, "#e5d5bc");
+    }
+    text(c, "1・2番線", 45, 240, 10, "#637b77");
+    text(c, "待合", 434, 440, 10, "#8c7155");
+    text(c, "3・4番線", 45, 635, 10, "#637b77");
   }
   c.restore();
 }
