@@ -130,8 +130,8 @@ test("cafe has primarily lateral station traffic; the concert gathers northward 
   live.phase = "playing";
   for (let n = 0; n < 4000 && live.phase === "playing"; n++)
     step(live, 0.025, {});
-  assert.equal(live.phase, "finished");
-  assert.ok(live.hits > 0, "straight forward does not bypass the audience");
+  assert.equal(live.phase, "playing");
+  assert.ok(live.player.y > live.crowd.find((p) => p.anchor).y);
   assert.equal(live.ticketChecked, true);
 });
 test("longer cafe has three moving crossing waves and a passable meeting group even at low frame rate", () => {
@@ -158,6 +158,8 @@ test("longer cafe has three moving crossing waves and a passable meeting group e
     clean.phase = "playing";
     for (const action of route.path)
       for (let frame = 0; frame < 2; frame++) step(clean, 0.05, routeInput(action));
+    for (let frame = 0; frame < 40 && clean.phase === "playing"; frame++)
+      step(clean, 0.05, { left: true, right: true });
     assert.equal(clean.phase, "finished");
     assert.equal(clean.hits, 0);
     assert.ok(clean.party.members.every((p) => p.docked));
@@ -165,7 +167,8 @@ test("longer cafe has three moving crossing waves and a passable meeting group e
     straight.phase = "playing";
     for (let frame = 0; frame < 800 && straight.phase === "playing"; frame++)
       step(straight, 0.05, {});
-    assert.equal(straight.phase, "finished");
+    assert.equal(straight.phase, "playing");
+    assert.ok(straight.player.y > straight.crowd.find((p) => p.anchor).y);
     assert.ok(straight.hits >= 1, "straight route encounters the new flow");
   }
 });

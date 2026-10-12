@@ -87,7 +87,7 @@ export function moveParty(
   party,
   player,
   dt,
-  { braking = false, stunned = false, arriving = false } = {},
+  { braking = false, stunned = false, arriving = false, resolveFollower } = {},
 ) {
   appendTrail(party, player);
   party.regroup = Math.max(
@@ -119,7 +119,20 @@ export function moveParty(
       ? party.distance
       : party.distance - (i + 1) * spacing;
     const previous = { x: m.x, y: m.y };
-    m.s = Math.max(m.s, Math.min(target, m.s + 140 * dt));
+    const aheadS = i ? party.members[i - 1].s : party.distance,
+      proposedS = Math.max(
+        m.s,
+        Math.min(
+          target,
+          arriving ? target : aheadS - Math.max(22, spacing - 2),
+          m.s + 140 * dt,
+        ),
+      ),
+      proposed = sampleTrail(party.trail, proposedS),
+      fraction = resolveFollower
+        ? Math.max(0, Math.min(1, resolveFollower(m, proposed)))
+        : 1;
+    m.s += (proposedS - m.s) * fraction;
     const next = sampleTrail(party.trail, m.s);
     m.x = next.x;
     m.y = next.y;
