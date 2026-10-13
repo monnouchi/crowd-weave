@@ -367,7 +367,12 @@ function residentialCorner(c) {
   overheadHouse(c, 0, 0, 117, 140, 2, -5, 4);
   c.restore();
   rect(c, 206, -276, 34, 16, "#e3d9c3");
-  text(c, "駅へ →", 240, -224, 12, "#526e65");
+  for (const x of [142, 338]) {
+    rect(c, x - 9, -27, 18, 13, "#78906f", true);
+    rect(c, x - 5, -24, 10, 3, "#e9dfc5");
+    sCircle(c, x - 23, -18, 10, "#7c9a71", "#63815f");
+    sCircle(c, x + 23, -20, 8, "#8aa478", "#63815f");
+  }
 }
 
 // Physical boundaries follow the unchanged simulation coordinates.
@@ -415,25 +420,20 @@ export function hallInterior(c) {
   spatialHall(c);
 }
 export function streetFurniture(c, scene, { startY = 625 } = {}) {
-  if (scene.landmark === "home")
-    text(c, "出発", 240, startY + 45, 10, "#657d73");
-  else spatialFurniture(c, scene, startY);
+  if (scene.landmark === "home") {
+    for (const y of [startY + 24, startY + 49])
+      line(c, [[228, y + 10], [240, y], [252, y + 10]], "#abc0b4", 2);
+  } else spatialFurniture(c, scene, startY);
 }
 export function goalMark(c, scene) {
   if (scene.landmark !== "home") return spatialGoal(c, scene);
   c.save();
-  rect(c, 175, 20, 130, 65, "#ded9bc");
-  for (const x of [175, 305])
-    line(
-      c,
-      [
-        [x, 21],
-        [x, 85],
-      ],
-      "#56877a",
-      2,
-    );
-  text(c, "待ち合わせ", 240, 81, 10, "#476b62");
+  rect(c, 175, 25, 130, 58, "#ded9bc66");
+  for (const [x, direction] of [[175, 1], [305, -1]]) {
+    line(c, [[x, 27], [x, 80]], "#56877a", 2);
+    line(c, [[x, 27], [x + direction * 12, 27]], "#56877a", 2);
+    line(c, [[x, 80], [x + direction * 12, 80]], "#56877a", 2);
+  }
   c.restore();
 }
 
@@ -536,6 +536,24 @@ function sBench(c, x, y, w = 48) {
       "#d5b88b",
       1,
     );
+}
+function sCup(c, x, y) {
+  sCircle(c, x, y, 7, "#f8f2e5", "#715745");
+  sCircle(c, x, y, 4, "#74513d");
+  sCircle(c, x + 7, y, 3, "#f8f2e5", "#715745");
+  sCircle(c, x + 7, y, 1.4, "#c9a77f");
+}
+function sCafeTable(c, x, y) {
+  sCircle(c, x + 3, y + 4, 30, "#3f34312b");
+  for (const [dx, dy] of [[-38, 0], [38, 0], [0, -38], [0, 38]]) {
+    rect(c, x + dx - 9, y + dy - 9, 18, 18, "#6e8a77", true);
+    rect(c, x + dx - 5, y + dy - 5, 10, 10, "#a9c1a8");
+  }
+  sCircle(c, x, y, 28, "#a97856", "#644d3f");
+  sCircle(c, x, y, 23, "#dfbd8f", "#8b6348");
+  sCup(c, x - 10, y - 5);
+  sCircle(c, x + 12, y + 8, 6, "#f5e7cd", "#8b6348");
+  sCircle(c, x + 12, y + 8, 3, "#c18453");
 }
 function sSideBuilding(c, side, y, kind, index = 0) {
   c.save();
@@ -782,9 +800,11 @@ function spatialDetails(c, scene) {
       sPath(c, 0, y, 50, 38, "#d2ddd4");
       sPath(c, 430, y, 50, 38, "#e5d5bc");
     }
-    text(c, "1・2番線", 45, 240, 10, "#637b77");
-    text(c, "待合", 434, 440, 10, "#8c7155");
-    text(c, "3・4番線", 45, 635, 10, "#637b77");
+    // Canopy ribs on the platform edge and benches in the waiting room
+    // carry the station setting without labels in the walking lane.
+    for (const y of [225, 620])
+      for (const x of [12, 32])
+        rect(c, x, y - 8, 4, 49, "#607c79");
   }
   c.restore();
 }
@@ -828,10 +848,17 @@ function sStationGoal(c) {
   rect(c, 0, -205, 162, 292, "#718d8d", true);
   rect(c, 318, -205, 162, 292, "#718d8d", true);
   rect(c, 162, -205, 156, 225, "#d5e0da");
+  for (const y of [-190, -177])
+    line(c, [[166, y], [314, y]], "#55777b", 4);
+  rect(c, 163, -156, 154, 10, "#d4bf74");
+  for (let x = 169; x < 315; x += 13)
+    rect(c, x, -153, 5, 4, "#f3e5a8");
   for (const x of [185, 228, 271]) {
     rect(c, x, -122, 16, 55, "#456d70", true);
     rect(c, x + 2, -114, 12, 25, "#98bbb2");
     rect(c, x - 3, -67, 22, 7, "#567e74");
+    rect(c, x + 2, -82, 12, 8, "#253f43");
+    line(c, [[x + 5, -78], [x + 8, -75], [x + 12, -80]], "#c4e0b4", 2);
   }
   for (const [x, y] of [
     [46, -95],
@@ -842,24 +869,46 @@ function sStationGoal(c) {
   }
   sPath(c, 162, 15, 156, 80, "#c3d8d1");
   rect(c, 162, 13, 156, 5, "#446d70");
-  text(c, "改札へ", 240, 5, 12, "#345d5e");
+  line(c, [[229, 39], [240, 26], [251, 39]], "#5b8980", 3);
 }
 function sCafeGoal(c) {
-  rect(c, 0, -210, 162, 297, "#a99a83", true);
-  rect(c, 318, -210, 162, 297, "#a99a83", true);
-  rect(c, 162, -205, 156, 224, "#e7d8bc", true);
-  rect(c, 181, -178, 118, 49, "#ad8356", true);
-  for (const x of [194, 233, 272]) sCircle(c, x, -154, 9, "#f4e6ce", "#815f47");
-  rect(c, 182, -116, 116, 31, "#926c4e", true);
-  rect(c, 194, -105, 20, 13, "#394f4d");
-  rect(c, 243, -106, 31, 15, "#516f68");
-  for (const x of [200, 264]) {
-    sCircle(c, x, -53, 15, "#a27d59", "#755a45");
-    for (const dx of [-13, 13]) rect(c, x + dx - 4, -60, 8, 15, "#587369");
+  // Low railings make the two furnished terraces match the side boundaries;
+  // the open middle remains the only playable entrance.
+  for (const x of [0, 318]) {
+    rect(c, x, -210, 162, 297, "#d8c3a4", true);
+    for (let y = -194; y < 84; y += 23)
+      line(c, [[x + 6, y], [x + 155, y]], "#c7ad8b", 1);
+    rect(c, x === 0 ? 154 : 318, -206, 8, 293, "#806e58");
+    for (const y of [-195, -95, 5, 80])
+      sCircle(c, x === 0 ? 158 : 322, y, 4, "#eee1c8", "#6f5e4c");
+    sCafeTable(c, x + 80, -145);
+    sCafeTable(c, x + 80, -37);
   }
-  sPath(c, 162, 16, 156, 79, "#e8dcc7");
-  rect(c, 162, 14, 156, 4, "#795f4a");
-  text(c, "カフェ入口", 240, 3, 11, "#654c3e");
+  // A cutaway view into the cafe: counter, espresso machine and pastry case.
+  rect(c, 162, -205, 156, 230, "#f0e4cd", true);
+  for (let y = -194; y < 15; y += 42)
+    line(c, [[165, y], [315, y]], "#ddcbb0", 1);
+  rect(c, 177, -192, 126, 73, "#775848", true);
+  rect(c, 183, -186, 114, 29, "#b78b5e");
+  for (const x of [195, 235, 275]) sCup(c, x, -171);
+  rect(c, 184, -151, 112, 26, "#e3cda8", true);
+  for (const x of [198, 223, 248, 273]) {
+    sCircle(c, x, -138, 7, "#c4844d", "#86573c");
+    sCircle(c, x - 2, -141, 2, "#f6dcaa");
+  }
+  rect(c, 190, -106, 100, 29, "#9b7051", true);
+  rect(c, 197, -100, 35, 17, "#40504b", true);
+  for (const x of [250, 269]) sCup(c, x, -91);
+  // Two glass door leaves stand open below a striped fabric awning.
+  sPath(c, 166, 20, 148, 75, "#f3e8d6");
+  rect(c, 168, 27, 7, 59, "#77594b");
+  rect(c, 305, 27, 7, 59, "#77594b");
+  line(c, [[175, 28], [193, 45]], "#a3beb0", 3);
+  line(c, [[305, 28], [287, 45]], "#a3beb0", 3);
+  rect(c, 160, -8, 160, 31, "#f8e8c9", true);
+  for (let x = 161; x < 320; x += 20)
+    rect(c, x, -7, 10, 29, "#ad654c");
+  line(c, [[160, 23], [320, 23]], "#785845", 3);
 }
 function sVenueGoal(c) {
   // Roof planes, service fans, and a flat music emblem establish an overhead
@@ -883,13 +932,19 @@ function sVenueGoal(c) {
   sCircle(c, 240, -122, 29, "#496f63");
   text(c, "♪", 240, -109, 35, "#f0dfaa");
   rect(c, 180, -47, 120, 25, "#476d60");
-  text(c, "LIVE", 240, -29, 13, "#f1e4b8");
+  for (const [x, height] of [[197, 9], [212, 16], [227, 11], [242, 19], [257, 12], [272, 16]])
+    rect(c, x, -27 - height, 7, height, "#f1e4b8");
   rect(c, 162, -17, 156, 44, "#71988b");
   for (const x of [172, 202, 232, 262, 292])
     line(c, [[x, -13], [x + 19, 23]], "#9cb9a7", 1);
+  for (const x of [172, 191, 210, 229, 248, 267, 286, 305])
+    sCircle(c, x, 19, 4, "#f7df9f", "#7a785f");
   sPath(c, 162, 27, 156, 67, "#d9e3da");
   rect(c, 162, 27, 156, 5, "#416a60");
-  text(c, "会場入口", 240, 53, 11, "#4c7166");
+  for (const [x, direction] of [[153, -1], [327, 1]]) {
+    sCircle(c, x, 52, 5, "#d7d5b9", "#405e55");
+    line(c, [[x, 52], [x + direction * 23, 52]], "#d9d0ac", 2);
+  }
 }
 function sPartyGoal(c, opts) {
   rect(c, 78, -205, 324, 214, "#31494b", true);
@@ -1010,7 +1065,10 @@ function spatialJourney(c) {
   rect(c, 480, 1055, 152, 96, "#718f8c", true);
   rect(c, 154, 1073, 172, 61, "#c9d7d0");
   rect(c, 154, 1072, 172, 5, "#50756e");
-  text(c, "駅出口", 240, 1095, 12, "#3e6760");
+  for (const x of [184, 236, 288]) {
+    rect(c, x, 1085, 8, 27, "#47776e", true);
+    rect(c, x - 2, 1085, 12, 5, "#a4c3b7");
+  }
   for (const [x, y] of [
     [-17, 431],
     [497, 464],
@@ -1039,7 +1097,8 @@ function spatialJourney(c) {
     "#b3c4b4",
     1,
   );
-  text(c, "公園の通り道", 240, 575, 11, "#5b7d69");
+  for (const y of [520, 610])
+    line(c, [[230, y + 12], [240, y], [250, y + 12]], "#a7bbae", 2);
   c.restore();
 }
 function spatialHall(c) {
@@ -1079,46 +1138,38 @@ function spatialHall(c) {
     );
   }
   sPath(c, 166, 838, 148, 45, "#d9d4b9");
-  text(c, "受付", 240, 878, 11, "#685c49");
-  text(c, "ホール", 240, 734, 12, "#42635c");
+  for (const x of [195, 226, 257]) {
+    rect(c, x, 854, 21, 12, "#f4e8cc", true);
+    line(c, [[x + 6, 858], [x + 15, 858]], "#9b8d70", 1);
+  }
+  line(c, [[226, 751], [240, 737], [254, 751]], "#72978a", 3);
   c.restore();
 }
 function spatialFurniture(c, scene, startY) {
   c.save();
-  const kind = scene.landmark;
-  if (kind === "station") {
-    text(c, "駅前広場", 240, startY + 46, 10, "#55736d");
-  } else if (kind === "cafe") {
-    text(c, "コンコース", 240, startY + 45, 10, "#927858");
-  } else if (kind === "venue") {
-    text(c, "駅から会場へ", 240, startY + 48, 10, "#547870");
-  } else {
-    text(c, "ホール入口", 240, startY + 46, 10, "#645f4e");
-  }
+  const color = scene.landmark === "party" ? "#c8c2a7" : "#a6b6aa";
+  for (const y of [startY + 24, startY + 49])
+    line(c, [[228, y + 10], [240, y], [252, y + 10]], color, 2);
   c.restore();
 }
 function spatialGoal(c, scene) {
   c.save();
-  if (scene.landmark === "party") text(c, "最前列", 240, 43, 11, "#e5e8d4");
-  else {
+  if (scene.landmark === "party") {
+    for (const x of [153, 240, 327])
+      sCircle(c, x, 61, 26, "#ecd69a24");
+  } else {
     const color =
       scene.landmark === "cafe"
         ? "#e8dcc7"
         : scene.landmark === "venue"
           ? "#d9e3da"
           : "#c3d8d1";
-    rect(c, 175, 20, 130, 65, color);
-    for (const x of [175, 305])
-      line(
-        c,
-        [
-          [x, 21],
-          [x, 85],
-        ],
-        "#56877a",
-        2,
-      );
-    text(c, "待ち合わせ", 240, 81, 10, "#476b62");
+    rect(c, 175, 25, 130, 58, color + "66");
+    for (const [x, direction] of [[175, 1], [305, -1]]) {
+      line(c, [[x, 27], [x, 80]], "#56877a", 2);
+      line(c, [[x, 27], [x + direction * 12, 27]], "#56877a", 2);
+      line(c, [[x, 80], [x + direction * 12, 80]], "#56877a", 2);
+    }
   }
   c.restore();
 }
