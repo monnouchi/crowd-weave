@@ -189,7 +189,7 @@ function panel(title, message, button, label = "CROWD WEAVE") {
   if (game.phase === "finished" && game.stage === 4)
     canvas.setAttribute(
       "aria-label",
-      "客席から見たライブの舞台。演奏するバンドと、最前列で一緒に楽しむ自分と仲間4人。",
+      "客席から見たライブの舞台。演奏するバンドと、最前列で一緒に楽しむ自分と友だち4人。",
     );
   $("#message").textContent = message;
   $("#result-detail-message").textContent = message;
@@ -203,8 +203,8 @@ function panel(title, message, button, label = "CROWD WEAVE") {
     const count = game.party.members.length + (game.stage < 4 ? 1 : 0);
     $("#result-party-label").textContent =
       game.stage < 4
-        ? `仲間が1人増えた！ 自分＋仲間${count}人`
-        : `自分＋仲間${count}人・全員到着`;
+        ? `友だちが1人増えた！ 自分＋友だち${count}人`
+        : `自分＋友だち${count}人・全員到着`;
     $("#result-roster").setAttribute(
       "aria-label",
       `自分と友だち${Array.from({ length: count }, (_, i) => i + 1).join("、友だち")}${game.stage < 4 ? `。友だち${count}が新しく合流` : "。全員到着"}`,
@@ -971,10 +971,10 @@ function frame(now) {
           : game.phase === "paused"
             ? "一時停止 · 時計も停止中"
             : game.arriving
-              ? "合流中 · 仲間の到着を待っています"
+              ? "合流中 · 友だちの到着を待っています"
               : steering.left && steering.right
                 ? game.party.members.length
-                  ? "ブレーキ · 仲間が隊列を整えます"
+                  ? "ブレーキ · 友だちが隊列を整えます"
                   : "ブレーキ · 停止中"
                 : steering.left
                   ? "← 左へよける"
@@ -991,7 +991,7 @@ function frame(now) {
         ? "warning"
         : "green";
     signal.textContent = t.reserved
-      ? "↑ 横断中 · 仲間全員が渡るまで車は待ちます"
+      ? "↑ 横断中 · 友だち全員が渡るまで車は待ちます"
       : t.canEnter
         ? `↑ 青 · 全員で渡れます（残り${t.remaining.toFixed(1)}秒）`
         : t.warning
@@ -1031,7 +1031,7 @@ function frame(now) {
     game.phase === "playing" && now < noticeUntil,
   );
   $("#party-count").textContent =
-    `自分 + 仲間${game.party.members.length + (game.phase === "finished" && game.stage < 4 ? 1 : 0)}人`;
+    `自分 + 友だち${game.party.members.length + (game.phase === "finished" && game.stage < 4 ? 1 : 0)}人`;
   $("#party-roster").textContent =
     game.phase === "finished"
       ? [
@@ -1094,7 +1094,7 @@ function frame(now) {
       game.stage === 4 ? "全員、最前列へ！" : game.scene.arrival,
       game.stage === 4
         ? `全5区間を完走。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
-        : `友だち${game.stage + 1}と合流し、仲間が${game.stage + 1}人になりました。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
+        : `友だち${game.stage + 1}と合流し、友だちが${game.stage + 1}人になりました。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
       game.stage < 4 ? "次のステージへ →" : "もう一度遊ぶ →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
@@ -1103,7 +1103,7 @@ function frame(now) {
   drawResultRoster();
   $("#goal-callout").textContent =
     game.arriving && game.phase !== "finished"
-      ? "仲間全員を待とう！"
+      ? "友だち全員を待とう！"
       : game.scene.bubble;
   const callout = $("#goal-callout"),
     rect = canvas.getBoundingClientRect();

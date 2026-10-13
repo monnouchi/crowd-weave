@@ -211,7 +211,7 @@ function constrainCrossing(g, t, previous, input) {
         };
         g.violationEvent = t.violationEvent;
       }
-      t.message = "仲間全員で横断中";
+      t.message = "友だち全員で横断中";
       return;
     }
     g.player.y = stop;
