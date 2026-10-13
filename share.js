@@ -36,7 +36,7 @@ export function drawResultCard(records, scene) {
   x.textAlign = "left";
   x.fillStyle = "#d4ad65";
   x.font = "700 19px system-ui";
-  x.fillText("仲間全員、ライブ最前列へ！", 28, 96);
+  x.fillText("友だち全員、ライブ最前列へ！", 28, 96);
   const ratio = scene.width / 480,
     region = scene.weaveResultRegion || {
       x: 95 * ratio,
