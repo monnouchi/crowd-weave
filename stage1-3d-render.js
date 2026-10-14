@@ -1,4 +1,5 @@
 import { visiblePerson } from "./crowd.js";
+import { appearanceFor } from "./character.js";
 
 // A small orthographic 3D renderer. Geometry has world X/Y ground coordinates
 // and height Z; the unchanged game model owns every hitbox and movement rule.
@@ -29,10 +30,10 @@ export function houseDoor(house) {
   };
 }
 
-export function makeProjector(width, height, focusY) {
+export function makeProjector(width, height, focusY, viewport = {}) {
   const portrait = width < 620 && height > width;
-  const top = portrait ? 148 : 42;
-  const bottom = portrait ? 106 : 34;
+  const top = viewport.top ?? (portrait ? 148 : 42);
+  const bottom = viewport.bottom ?? (portrait ? 106 : 34);
   const usable = Math.max(240, height - top - bottom);
   const scale = Math.min(width / 640, usable / 540, 1.35);
   const centerY = top + usable * 0.66;
@@ -62,11 +63,11 @@ function path(ctx, points, fill, stroke = null, lineWidth = 1) {
   }
 }
 
-function face(ctx, projector, vertices, fill, stroke = null, width = 1) {
+export function face(ctx, projector, vertices, fill, stroke = null, width = 1) {
   path(ctx, vertices.map(([x, y, z]) => projector.point(x, y, z)), fill, stroke, width);
 }
 
-function segment(ctx, projector, a, b, color, width = 1) {
+export function segment(ctx, projector, a, b, color, width = 1) {
   const start = projector.point(...a);
   const end = projector.point(...b);
   ctx.beginPath();
@@ -78,11 +79,11 @@ function segment(ctx, projector, a, b, color, width = 1) {
   ctx.stroke();
 }
 
-function groundRect(ctx, projector, x0, y0, x1, y1, color) {
+export function groundRect(ctx, projector, x0, y0, x1, y1, color) {
   face(ctx, projector, [[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]], color);
 }
 
-function groundCircle(ctx, projector, x, y, r, fill, stroke = null, width = 1) {
+export function groundCircle(ctx, projector, x, y, r, fill, stroke = null, width = 1) {
   const points = Array.from({ length: 28 }, (_, i) => {
     const angle = i * Math.PI * 2 / 28;
     return projector.point(x + Math.cos(angle) * r, y + Math.sin(angle) * r, 0);
@@ -90,7 +91,7 @@ function groundCircle(ctx, projector, x, y, r, fill, stroke = null, width = 1) {
   path(ctx, points, fill, stroke, width);
 }
 
-function disk(ctx, x, y, rx, ry, color, outline = null) {
+export function disk(ctx, x, y, rx, ry, color, outline = null) {
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   ctx.fillStyle = color;
@@ -129,14 +130,14 @@ function drawGround(ctx, projector) {
   groundCircle(ctx, projector, 240, 54, 34, "#e9dcb5a0", "#72947e", 2.4 * projector.scale);
 }
 
-function drawBox(ctx, projector, x0, y0, x1, y1, z0, z1, top, south, east) {
+export function drawBox(ctx, projector, x0, y0, x1, y1, z0, z1, top, south, east) {
   face(ctx, projector, [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], "#2b3e3923");
   face(ctx, projector, [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], east);
   face(ctx, projector, [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], south);
   face(ctx, projector, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], top);
 }
 
-function drawTree(ctx, projector, x, y, radius = 13) {
+export function drawTree(ctx, projector, x, y, radius = 13) {
   const scale = projector.scale;
   const base = projector.point(x, y, 0);
   const crown = projector.point(x, y, 29);
@@ -146,7 +147,7 @@ function drawTree(ctx, projector, x, y, radius = 13) {
   disk(ctx, crown.x - 4 * scale, crown.y - 4 * scale, radius * scale * 0.38, radius * scale * 0.35, "#91ab7a");
 }
 
-function drawFence(ctx, projector, a, b, gap = null, color = "#6f806a") {
+export function drawFence(ctx, projector, a, b, gap = null, color = "#6f806a") {
   const horizontal = a.y === b.y;
   const from = horizontal ? a.x : a.y;
   const to = horizontal ? b.x : b.y;
@@ -253,34 +254,35 @@ function drawGoalHomes(ctx, projector) {
     drawTree(ctx, projector, x, y, 10);
 }
 
-function drawPerson(ctx, projector, p, { player = false, friend = false, time = 0, hit = false } = {}) {
+export function drawPerson(ctx, projector, p, { player = false, friend = false, time = 0, hit = false, baseZ = 0 } = {}) {
   const { x, y } = p;
   const scale = projector.scale;
-  const ground = projector.point(x, y, 0);
+  const appearance = appearanceFor(p, player);
+  const ground = projector.point(x, y, baseZ);
   disk(ctx, ground.x + 2 * scale, ground.y + 2 * scale, 11 * scale, 5 * scale, "#243a3d4d");
   if (player || friend) groundCircle(ctx, projector, x, y, p.r + 5,
     player ? "#2f9fc032" : "#f5c85d40", player ? "#117ea7" : "#bc8a35", 2.4 * scale);
   if (hit) groundCircle(ctx, projector, x, y, p.r + 6, null, "#c6543c", 3 * scale);
-  const shirt = player ? "#268eaf" : friend ? "#d9af55" : p.shirt || CROWD_SHIRTS[(p.color ?? p.id ?? 0) % CROWD_SHIRTS.length];
+  const shirt = player ? "#268eaf" : p.shirt || (friend ? "#d9af55" : CROWD_SHIRTS[(p.color ?? p.id ?? 0) % CROWD_SHIRTS.length]);
   const step = p.state === "walking" && !player ? Math.sin(time * 7 + (p.id || 0)) * 1.3 : 0;
   for (const side of [-1, 1]) {
-    segment(ctx, projector, [x + side * 4, y - step * side, 2], [x + side * 4, y, 15], "#334b55", 4.8 * scale);
-    const shoe = projector.point(x + side * 4, y - step * side + 2, 1);
+    segment(ctx, projector, [x + side * 4, y - step * side, baseZ + 2], [x + side * 4, y, baseZ + 15], "#334b55", 4.8 * scale);
+    const shoe = projector.point(x + side * 4, y - step * side + 2, baseZ + 1);
     disk(ctx, shoe.x, shoe.y, 4.2 * scale, 2.7 * scale, "#263b40");
   }
-  face(ctx, projector, [[x - 8, y + 4, 15], [x + 8, y + 4, 15], [x + 9, y + 4, 30], [x - 9, y + 4, 30]],
+  face(ctx, projector, [[x - 8, y + 4, baseZ + 15], [x + 8, y + 4, baseZ + 15], [x + 9, y + 4, baseZ + 30], [x - 9, y + 4, baseZ + 30]],
     shirt, "#28464a", 1.5 * scale);
-  face(ctx, projector, [[x + 8, y - 5, 15], [x + 8, y + 4, 15], [x + 9, y + 4, 30], [x + 9, y - 5, 30]],
+  face(ctx, projector, [[x + 8, y - 5, baseZ + 15], [x + 8, y + 4, baseZ + 15], [x + 9, y + 4, baseZ + 30], [x + 9, y - 5, baseZ + 30]],
     "#294a55aa");
   for (const side of [-1, 1]) {
-    segment(ctx, projector, [x + side * 8, y, 27], [x + side * 12, y + 1, 17], shirt, 4 * scale);
-    const hand = projector.point(x + side * 12, y + 1, 17);
-    disk(ctx, hand.x, hand.y, 2.2 * scale, 2.2 * scale, "#d1a17f");
+    segment(ctx, projector, [x + side * 8, y, baseZ + 27], [x + side * 12, y + 1, baseZ + 17], shirt, 4 * scale);
+    const hand = projector.point(x + side * 12, y + 1, baseZ + 17);
+    disk(ctx, hand.x, hand.y, 2.2 * scale, 2.2 * scale, appearance.skin);
   }
-  const head = projector.point(x, y, 39);
-  disk(ctx, head.x, head.y, 7.2 * scale, 7.2 * scale, "#d3a180", "#5b554a");
+  const head = projector.point(x, y, baseZ + 39);
+  disk(ctx, head.x, head.y, 7.2 * scale, 7.2 * scale, appearance.skin, "#5b554a");
   disk(ctx, head.x - 0.8 * scale, head.y - 3.3 * scale, 7 * scale, 4.5 * scale,
-    player ? "#253d50" : friend ? "#916f47" : "#403a38");
+    appearance.hair);
   if (player) {
     ctx.fillStyle = "#f6f0dd";
     ctx.strokeStyle = "#244f5c";
@@ -295,8 +297,8 @@ function drawPerson(ctx, projector, p, { player = false, friend = false, time = 
   }
 }
 
-export function drawStageOne3D(ctx, game, { width, height }) {
-  const projector = makeProjector(width, height, game.player.y);
+export function drawStageOne3D(ctx, game, { width, height, viewport, includePeople = true }) {
+  const projector = makeProjector(width, height, game.player.y, viewport);
   drawGround(ctx, projector);
   const houses = streetHouses().sort((a, b) => a.y - b.y);
   for (const house of houses) {
@@ -304,6 +306,7 @@ export function drawStageOne3D(ctx, game, { width, height }) {
     drawHouse(ctx, projector, house);
   }
   drawGoalHomes(ctx, projector);
+  if (!includePeople) return projector;
   const people = [
     ...game.crowd.filter(visiblePerson).map(p => ({ p })),
     { p: game.meetingPartner, friend: true },
