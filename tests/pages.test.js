@@ -40,15 +40,38 @@ const expected = [
 const prototypeDirectory = "prototype-stage1";
 const prototypeFiles = [
   "bodies.js",
+  "character.js",
   "crowd.js",
   "input.js",
   "logic.js",
   "party.js",
+  "pose.js",
   "stage1-3d-render.js",
   "stage1-3d.css",
   "stage1-3d.html",
   "stage1-3d.js",
   "traffic.js",
+];
+const full3dDirectory = "prototype-all-3d";
+const full3dFiles = [
+  "LICENSE",
+  "all-stage-3d.html",
+  "bodies.js",
+  "branding.js",
+  "character.js",
+  "crowd.js",
+  "game-all-3d.js",
+  "input.js",
+  "logic.js",
+  "party.js",
+  "pose.js",
+  "share-all-3d.js",
+  "sound.js",
+  "stage1-3d-render.js",
+  "style.css",
+  "tilt.js",
+  "traffic.js",
+  "world-3d.js",
 ];
 async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), "crowd-pages-"));
@@ -59,6 +82,7 @@ async function fixture(t) {
   for (const file of new Set([
     ...expected.filter((f) => f !== ".nojekyll"),
     ...prototypeFiles,
+    ...full3dFiles,
   ]))
     await copyFile(join(root, file), join(source, file));
   return { source, destination };
@@ -77,15 +101,20 @@ test("Pages build excludes private notes, local verification and stale files", a
   await buildPages(source, destination);
   assert.deepEqual(
     (await readdir(destination)).sort(),
-    [...expected, prototypeDirectory].sort(),
+    [...expected, prototypeDirectory, full3dDirectory].sort(),
   );
   assert.deepEqual(
     (await readdir(join(destination, prototypeDirectory))).sort(),
     prototypeFiles,
   );
+  assert.deepEqual(
+    (await readdir(join(destination, full3dDirectory))).sort(),
+    full3dFiles,
+  );
   for (const file of [
     ...expected,
     ...prototypeFiles.map((f) => join(prototypeDirectory, f)),
+    ...full3dFiles.map((f) => join(full3dDirectory, f)),
   ])
     assert.ok(
       !(await readFile(join(destination, file), "utf8")).includes(
@@ -110,6 +139,11 @@ test("Pages build preserves game code and rejects symlink sources and destructiv
       await readFile(join(destination, prototypeDirectory, file)),
       await readFile(join(root, file)),
     );
+  for (const file of full3dFiles)
+    assert.deepEqual(
+      await readFile(join(destination, full3dDirectory, file)),
+      await readFile(join(root, file)),
+    );
   await assert.rejects(buildPages(source, source), /must not contain/);
   await assert.rejects(
     buildPages(source, resolve(source, "..")),
@@ -122,6 +156,11 @@ test("Pages build preserves game code and rejects symlink sources and destructiv
   await copyFile(join(root, "game.js"), join(source, "game.js"));
   await rm(join(source, "stage1-3d.js"));
   await symlink(join(source, "logic.js"), join(source, "stage1-3d.js"));
+  await assert.rejects(buildPages(source, destination), /regular file/);
+  await rm(join(source, "stage1-3d.js"));
+  await copyFile(join(root, "stage1-3d.js"), join(source, "stage1-3d.js"));
+  await rm(join(source, "game-all-3d.js"));
+  await symlink(join(source, "logic.js"), join(source, "game-all-3d.js"));
   await assert.rejects(buildPages(source, destination), /regular file/);
 });
 test("Browser asset references stay within a GitHub Pages project base path", async () => {
@@ -179,6 +218,25 @@ test("prototype references resolve only to its allowlisted path or the existing 
       prototypeFiles.includes(url.pathname.slice(base.pathname.length)),
       ref,
     );
+  }
+});
+
+test("all-stage 3D references resolve only to its allowlisted path or the existing game", async () => {
+  const base = new URL("https://monnouchi.github.io/crowd-weave/prototype-all-3d/");
+  const html = await readFile(join(root, "all-stage-3d.html"), "utf8");
+  const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((ref) => !ref.startsWith("data:"));
+  for (const file of full3dFiles.filter((file) => file.endsWith(".js"))) {
+    const code = await readFile(join(root, file), "utf8");
+    for (const match of code.matchAll(/from\s+"([^"]+)"/g)) refs.push(match[1]);
+  }
+  for (const ref of refs) {
+    const url = new URL(ref, base);
+    assert.equal(url.origin, base.origin);
+    if (url.pathname === "/crowd-weave/") continue;
+    assert.ok(url.pathname.startsWith(base.pathname), ref);
+    assert.ok(full3dFiles.includes(url.pathname.slice(base.pathname.length)), ref);
   }
 });
 
