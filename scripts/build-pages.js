@@ -24,6 +24,19 @@ export const PUBLIC_FILES = Object.freeze([
   "traffic.js",
   "LICENSE",
 ]);
+export const PROTOTYPE_DIRECTORY = "prototype-stage1";
+export const PROTOTYPE_FILES = Object.freeze([
+  "stage1-3d.html",
+  "stage1-3d.css",
+  "stage1-3d.js",
+  "stage1-3d-render.js",
+  "input.js",
+  "logic.js",
+  "crowd.js",
+  "traffic.js",
+  "party.js",
+  "bodies.js",
+]);
 export async function buildPages(sourceRoot, destinationRoot) {
   const source = resolve(sourceRoot),
     destination = resolve(destinationRoot);
@@ -40,7 +53,7 @@ export async function buildPages(sourceRoot, destinationRoot) {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  for (const file of PUBLIC_FILES) {
+  for (const file of new Set([...PUBLIC_FILES, ...PROTOTYPE_FILES])) {
     const info = await lstat(resolve(source, file));
     if (!info.isFile() || info.isSymbolicLink())
       throw new Error(`Public source must be a regular file: ${file}`);
@@ -49,8 +62,16 @@ export async function buildPages(sourceRoot, destinationRoot) {
   await mkdir(destination, { recursive: true });
   for (const file of PUBLIC_FILES)
     await copyFile(resolve(source, file), resolve(destination, file));
+  const prototype = resolve(destination, PROTOTYPE_DIRECTORY);
+  await mkdir(prototype);
+  for (const file of PROTOTYPE_FILES)
+    await copyFile(resolve(source, file), resolve(prototype, file));
   await writeFile(resolve(destination, ".nojekyll"), "");
-  return [...PUBLIC_FILES, ".nojekyll"];
+  return [
+    ...PUBLIC_FILES,
+    ...PROTOTYPE_FILES.map((file) => `${PROTOTYPE_DIRECTORY}/${file}`),
+    ".nojekyll",
+  ];
 }
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 if (

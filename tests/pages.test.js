@@ -37,13 +37,29 @@ const expected = [
   "tilt.js",
   "traffic.js",
 ];
+const prototypeDirectory = "prototype-stage1";
+const prototypeFiles = [
+  "bodies.js",
+  "crowd.js",
+  "input.js",
+  "logic.js",
+  "party.js",
+  "stage1-3d-render.js",
+  "stage1-3d.css",
+  "stage1-3d.html",
+  "stage1-3d.js",
+  "traffic.js",
+];
 async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), "crowd-pages-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const source = join(dir, "source"),
     destination = join(dir, "site");
   await mkdir(source);
-  for (const file of expected.filter((f) => f !== ".nojekyll"))
+  for (const file of new Set([
+    ...expected.filter((f) => f !== ".nojekyll"),
+    ...prototypeFiles,
+  ]))
     await copyFile(join(root, file), join(source, file));
   return { source, destination };
 }
@@ -59,8 +75,18 @@ test("Pages build excludes private notes, local verification and stale files", a
     "PRIVATE_TEST_FIXTURE",
   );
   await buildPages(source, destination);
-  assert.deepEqual((await readdir(destination)).sort(), expected);
-  for (const file of expected)
+  assert.deepEqual(
+    (await readdir(destination)).sort(),
+    [...expected, prototypeDirectory].sort(),
+  );
+  assert.deepEqual(
+    (await readdir(join(destination, prototypeDirectory))).sort(),
+    prototypeFiles,
+  );
+  for (const file of [
+    ...expected,
+    ...prototypeFiles.map((f) => join(prototypeDirectory, f)),
+  ])
     assert.ok(
       !(await readFile(join(destination, file), "utf8")).includes(
         "PRIVATE_TEST_FIXTURE",
@@ -79,6 +105,11 @@ test("Pages build preserves game code and rejects symlink sources and destructiv
       await readFile(join(destination, file)),
       await readFile(join(root, file)),
     );
+  for (const file of prototypeFiles)
+    assert.deepEqual(
+      await readFile(join(destination, prototypeDirectory, file)),
+      await readFile(join(root, file)),
+    );
   await assert.rejects(buildPages(source, source), /must not contain/);
   await assert.rejects(
     buildPages(source, resolve(source, "..")),
@@ -86,6 +117,11 @@ test("Pages build preserves game code and rejects symlink sources and destructiv
   );
   await rm(join(source, "game.js"));
   await symlink(join(source, "logic.js"), join(source, "game.js"));
+  await assert.rejects(buildPages(source, destination), /regular file/);
+  await rm(join(source, "game.js"));
+  await copyFile(join(root, "game.js"), join(source, "game.js"));
+  await rm(join(source, "stage1-3d.js"));
+  await symlink(join(source, "logic.js"), join(source, "stage1-3d.js"));
   await assert.rejects(buildPages(source, destination), /regular file/);
 });
 test("Browser asset references stay within a GitHub Pages project base path", async () => {
@@ -121,6 +157,26 @@ test("Browser asset references stay within a GitHub Pages project base path", as
     if (url.pathname === base.pathname) continue;
     assert.ok(
       expected.includes(url.pathname.slice("/crowd-weave/".length)),
+      ref,
+    );
+  }
+});
+
+test("prototype references resolve only to its allowlisted path or the existing game", async () => {
+  const base = new URL("https://monnouchi.github.io/crowd-weave/prototype-stage1/");
+  const html = await readFile(join(root, "stage1-3d.html"), "utf8");
+  const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
+  for (const file of prototypeFiles.filter((file) => file.endsWith(".js"))) {
+    const code = await readFile(join(root, file), "utf8");
+    for (const match of code.matchAll(/from\s+"([^"]+)"/g)) refs.push(match[1]);
+  }
+  for (const ref of refs) {
+    const url = new URL(ref, base);
+    assert.equal(url.origin, base.origin);
+    if (url.pathname === "/crowd-weave/") continue;
+    assert.ok(url.pathname.startsWith(base.pathname), ref);
+    assert.ok(
+      prototypeFiles.includes(url.pathname.slice(base.pathname.length)),
       ref,
     );
   }
