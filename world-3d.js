@@ -387,6 +387,40 @@ function umbrella(ctx, p, actor, hand) {
   }
 }
 
+function animal(ctx, p, actor) {
+  const dog = actor.kind === "dog";
+  const dir = actor.vx < -0.2 ? -1 : 1;
+  const x = actor.x, y = actor.y;
+  const coat = dog ? "#b88055" : "#7f9694";
+  groundCircle(ctx, p, x, y, dog ? 15 : 12, "#233d3a38");
+  for (const legX of [-7, 7])
+    for (const legY of [-5, 5])
+      segment(ctx, p, [x + legX, y + legY, 10],
+        [x + legX + dir * 2, y + legY, 2],
+        dog ? "#765b48" : "#526d6c", 2.8 * p.scale);
+  drawBox(ctx, p, x - (dog ? 12 : 10), y - (dog ? 7 : 6),
+    x + (dog ? 12 : 10), y + (dog ? 7 : 6), 8, dog ? 20 : 17,
+    coat, dog ? "#956744" : "#647e7c", dog ? "#956744" : "#647e7c");
+  const hx = x + dir * (dog ? 13 : 11);
+  const head = p.point(hx, y, dog ? 20 : 18);
+  disk(ctx, head.x, head.y, (dog ? 6.6 : 5.7) * p.scale,
+    (dog ? 6.6 : 5.7) * p.scale, coat, "#4a5753");
+  for (const side of [-1, 1]) {
+    const earX = hx - dir * (dog ? 3 : 2), earY = y + side * 4;
+    face(ctx, p, [
+      [earX, earY, dog ? 22 : 21],
+      [earX - dir * 3, earY + side * 2, dog ? 18 : 20],
+      [earX - dir, earY + side, dog ? 27 : 26],
+    ], coat);
+  }
+  const nose = p.point(hx + dir * 5, y, dog ? 18 : 16);
+  disk(ctx, nose.x, nose.y, 1.8 * p.scale, 1.8 * p.scale, "#2d4142");
+  const tailX = x - dir * (dog ? 12 : 10);
+  segment(ctx, p, [tailX, y, dog ? 17 : 15],
+    [tailX - dir * 8, y + 2, dog ? 27 : 24], coat,
+    (dog ? 4 : 2.7) * p.scale);
+}
+
 export function drawGlowStick(ctx, p, hand, id, time) {
   const [x, y, gripZ] = hand,
     color = ["#80e9d4", "#f2a2d3", "#f2d789"][id % 3],
@@ -413,6 +447,7 @@ function people(ctx, p, game, reducedMotion, poses) {
     : newFriend || game.meetingPartner;
   const actors = [
     ...game.crowd.filter(visiblePerson),
+    ...game.animals,
     ...game.party.members,
     partner,
     { ...game.player, player: true },
@@ -434,6 +469,10 @@ function people(ctx, p, game, reducedMotion, poses) {
         [trail[i].x, trail[i].y, 0.4], "#306e7860", p.scale);
   }
   for (const actor of actors.sort((a, b) => a.y - b.y)) {
+    if (actor.animal) {
+      animal(ctx, p, actor);
+      continue;
+    }
     const player = !!actor.player;
     const friend = !!actor.friend || !!actor.partner;
     const hit = player && game.cooldown > 0 && game.lastContactMember === 0;

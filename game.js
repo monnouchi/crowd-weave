@@ -531,6 +531,38 @@ function person(p, player = false) {
     time: game.worldTime + (game.ambientTime || 0),
   });
 }
+function animal(p) {
+  const dog = p.kind === "dog";
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(p.vx < -0.2 ? -1 : 1, 1);
+  ctx.fillStyle = dog ? "#b88055" : "#7f9694";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, dog ? 13 : 10, dog ? 8 : 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(dog ? 13 : 11, 0, dog ? 6 : 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  for (const side of [-1, 1]) {
+    const y = side * 4;
+    ctx.moveTo(9, y);
+    ctx.lineTo(8, y + side * 6);
+    ctx.lineTo(14, y + side * 3);
+  }
+  ctx.fill();
+  ctx.strokeStyle = dog ? "#956744" : "#647e7c";
+  ctx.lineWidth = dog ? 3 : 2;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(-19, -8);
+  ctx.stroke();
+  ctx.fillStyle = "#263d40";
+  ctx.beginPath();
+  ctx.arc(dog ? 18 : 15, 0, 1.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
 function destination(scene) {
   architecture(ctx, scene, {
     time: game.worldTime + (game.ambientTime || 0),
@@ -772,11 +804,12 @@ function draw() {
   }
   for (const p of [
     ...game.crowd.filter(visiblePerson),
+    ...game.animals,
     ...displayMembers,
     displayPartner,
     displayPlayer,
   ].sort((a, b) => a.y - b.y))
-    person(p, p.player);
+    p.animal ? animal(p) : person(p, p.player);
   for (const m of displayMembers) {
     ctx.save();
     ctx.fillStyle = m.flash > 0 ? "#b65b39" : "#24474b";

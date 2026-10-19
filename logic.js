@@ -10,6 +10,8 @@ import { PARTY_SPACING, createParty, moveParty, partyArrived } from "./party.js"
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
+  createAnimals,
+  moveAnimals,
   extendJourney,
   moveCrowd,
   visiblePerson,
@@ -433,6 +435,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     callReadyAt: 0,
     seed,
     crowd,
+    animals: createAnimals(stage, crowd),
   };
 }
 export function step(g, dt, input) {
@@ -445,8 +448,9 @@ export function step(g, dt, input) {
   updateCallGesture(g, input);
   const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
-  moveCrowd(g.crowd, dt, g.crossings);
-  const people = g.crowd.filter(visiblePerson),
+  moveAnimals(g.animals, dt);
+  moveCrowd(g.crowd, dt, g.crossings, g.animals);
+  const people = [...g.crowd.filter(visiblePerson), ...g.animals],
     blockedContacts = new Map();
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
@@ -545,7 +549,7 @@ export function step(g, dt, input) {
     if (!memberId) continue;
     const person = people.find((p) => p.id === id),
       friend = g.party.members.find((m) => m.id === memberId);
-    if (person && friend) makeRoomForFollower(person, friend);
+    if (person && friend && !person.animal) makeRoomForFollower(person, friend);
   }
   const crash = vehicleContact(g, previousTeam);
   if (crash) {
@@ -582,7 +586,7 @@ export function step(g, dt, input) {
   }
   g.touchingIds = touching;
   if (contacted) {
-    reactToContact(contacted, contactMember);
+    if (!contacted.animal) reactToContact(contacted, contactMember);
     g.lastContactMember = contactMember.id;
     g.memberHits[contactMember.id]++;
     const hitFriend = g.party.members.find((m) => m.id === contactMember.id);

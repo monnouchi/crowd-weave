@@ -7,6 +7,39 @@ export function random(seed) {
     return value / 4294967296;
   };
 }
+// Small side-lane patrols add readable obstacles without sealing the route.
+// They stay on sidewalks, away from both road crossings and hall doorways.
+export function createAnimals(stage, crowd) {
+  const spec = {
+    0: { kind: "dog", minX: 312, maxX: 382, y: 790, r: 12, speed: 25 },
+    2: { kind: "cat", minX: 98, maxX: 174, y: 1070, r: 9, speed: 31 },
+    3: { kind: "dog", minX: 318, maxX: 395, y: 1430, r: 12, speed: 24 },
+  }[stage];
+  if (!spec) return [];
+  const middle = (spec.minX + spec.maxX) / 2;
+  const candidates = [spec.y, spec.y + 70, spec.y - 70];
+  const y = candidates.sort((a, b) => {
+    const clearance = (cy) => Math.min(...crowd.filter((p) => p.active)
+      .map((p) => Math.hypot(p.x - middle, p.y - cy)));
+    return clearance(b) - clearance(a);
+  })[0];
+  return [{ ...spec, id: 2000 + stage, animal: true, active: true,
+    x: middle, y, time: 0, vx: spec.speed, vy: 0 }];
+}
+export function moveAnimals(animals, dt) {
+  for (const animal of animals) {
+    animal.time += dt;
+    const span = (animal.maxX - animal.minX) / 2;
+    if (span <= 0) {
+      animal.vx = 0;
+      continue;
+    }
+    const previous = animal.x;
+    const phase = animal.time * animal.speed / span;
+    animal.x = (animal.minX + animal.maxX) / 2 + span * Math.sin(phase);
+    animal.vx = dt ? (animal.x - previous) / dt : 0;
+  }
+}
 export const PLACES = {
   north: "北口・コンコース",
   south: "改札",
