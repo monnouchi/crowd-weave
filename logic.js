@@ -21,6 +21,10 @@ export const W = 480,
   START = { x: 240, y: 1165 },
   GOAL = { x: 175, y: 20, w: 130, h: 65 };
 export const FRONT_BARRIER_Y = 20;
+export const CONCERT_ENTRY_Y = 700;
+export function insideConcert(game) {
+  return game.stage !== 4 || game.player.y < CONCERT_ENTRY_Y;
+}
 export function goalFor(stage) {
   return stage === 4 ? { x: 95, y: 20, w: 290, h: 65 } : GOAL;
 }

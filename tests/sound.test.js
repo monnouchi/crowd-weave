@@ -199,6 +199,34 @@ test("concert groove has backbeat, pitched kick, offbeat bass and a steady 120-B
   assert.ok(frequencies.some((n) => n < 100));
   assert.ok(MUSIC[4].volume < MUSIC[3].volume);
 });
+test("stage five changes from a subdued lobby motif to the original rock arrangement at the door", () => {
+  const a = new GameAudio(), f = fakeContext();
+  const param = () => ({ value: 0,
+    setValueAtTime(v) { this.value = v; },
+    cancelScheduledValues() {},
+    linearRampToValueAtTime(v) { this.value = v; },
+    exponentialRampToValueAtTime() {},
+  });
+  f.context.createGain = () => ({ gain: param(), connect() {}, disconnect() {} });
+  f.context.createBiquadFilter = () => ({ frequency: param(), connect() {}, disconnect() {} });
+  a.context = f.context;
+  a.muted = false;
+  for (let n = 0; n < 4; n++) {
+    f.context.currentTime = a.nextNote + 0.001;
+    a.update(true, false, 4, false);
+  }
+  const lobby = f.voices.slice();
+  assert.ok(lobby.every((voice) => voice.type !== "sawtooth"));
+  assert.ok(!lobby.some((voice) => voice.frequency.value === 140));
+  for (let n = 0; n < 4; n++) {
+    f.context.currentTime = a.nextNote + 0.001;
+    a.update(true, false, 4, true);
+  }
+  const live = f.voices.slice(lobby.length);
+  assert.ok(live.some((voice) => voice.type === "sawtooth"));
+  assert.ok(live.some((voice) => voice.frequency.value === 140));
+  assert.ok(live.some((voice) => voice.frequency.value >= 3000));
+});
 test("lobby music is quiet and muffled, door gain rises smoothly without exceeding normal, mute/restart preserve spatial state", () => {
   const a = new GameAudio(),
     f = fakeContext(),

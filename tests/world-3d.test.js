@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGame, seedForRun } from "../logic.js";
+import { createGame, insideConcert, seedForRun } from "../logic.js";
 import { drawWorld3D } from "../world-3d.js";
 
 test("all five 3D scenes render at phone and desktop sizes without changing game state", () => {
@@ -44,4 +44,28 @@ test("all five 3D scenes render at phone and desktop sizes without changing game
   } finally {
     Math.random = originalRandom;
   }
+});
+
+test("stage five doorway starts gentle concert lighting only inside the hall", () => {
+  const game = createGame(4, seedForRun(19, 4));
+  const fills = [];
+  const ctx = new Proxy({}, {
+    get: (object, key) => key in object ? object[key] : () => {},
+    set: (object, key, value) => {
+      object[key] = value;
+      if (key === "fillStyle") fills.push(value);
+      return true;
+    },
+  });
+  const render = (y) => {
+    game.player.y = y;
+    fills.length = 0;
+    drawWorld3D(ctx, game, { width: 390, height: 844, top: 120, bottom: 730 });
+    return fills.slice();
+  };
+  assert.equal(insideConcert(game), false);
+  assert.ok(!render(700).includes("#07152229"));
+  assert.equal(insideConcert(game), false);
+  assert.ok(render(699).includes("#07152229"));
+  assert.equal(insideConcert(game), true);
 });

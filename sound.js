@@ -343,7 +343,7 @@ export class GameAudio {
           true,
         );
       }
-      if (stage === 4) {
+      if (stage === 4 && this.hall) {
         // An original 120-BPM eighth-note groove: kick, backbeat, hats and bass.
         if (note % 4 === 0) this.tone(140, 0.15, 0.008, 0, "sine", true, 45);
         if (note % 4 === 2) {
@@ -367,7 +367,7 @@ export class GameAudio {
         music.duration,
         music.volume,
         0,
-        music.type,
+        stage === 4 && this.hall ? "sawtooth" : music.type,
         true,
       );
       this.nextNote = c.currentTime + music.beat;

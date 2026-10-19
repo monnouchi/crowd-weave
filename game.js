@@ -25,6 +25,7 @@ import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import {
   createGame,
   activeSpeech,
+  insideConcert,
   step,
   W,
   H,
@@ -920,7 +921,7 @@ function frame(now) {
     game.phase === "playing",
     input().left && input().right,
     game.stage,
-    game.stage !== 4 || game.player.y < 700,
+    insideConcert(game),
   );
   const previousX = game.player.x;
   const previousRegroup = game.party.regroup;

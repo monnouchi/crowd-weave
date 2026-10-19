@@ -1,5 +1,5 @@
 import { visiblePerson } from "./crowd.js";
-import { joiningFriend } from "./logic.js";
+import { insideConcert, joiningFriend } from "./logic.js";
 import {
   makeProjector,
   drawStageOne3D,
@@ -242,6 +242,7 @@ function venue(ctx, p) {
 }
 
 function hall(ctx, p, game) {
+  const live = insideConcert(game);
   ctx.fillStyle = "#2c4141";
   ctx.fillRect(0, 0, p.width, p.height);
   groundRect(ctx, p, -260, FLOOR_TOP, 740, FLOOR_BOTTOM, "#2c4141");
@@ -289,10 +290,10 @@ function hall(ctx, p, game) {
     "#52756c", "#375a58", "#375a58");
   for (const x of [120, 184, 248, 312, 376]) {
     topDisk(ctx, p, x, -166, 84, 8,
-      game.phase === "finished" ? "#f2d68e" : "#d5b477");
+      live ? "#f2d68e" : "#d5b477");
     face(ctx, p, [[x - 5, -166, 83], [x + 5, -166, 83],
       [x + 15, -80, 32], [x - 15, -80, 32]],
-    game.phase === "finished" ? "#ecd38920" : "#ceddc512");
+    live ? "#ecd38920" : "#ceddc512");
   }
   // Drums, keyboard and mic stand are at head height on the stage deck.
   topDisk(ctx, p, 190, -93, 43, 17, "#bf9669", "#75543c");
@@ -487,14 +488,15 @@ function rain(ctx, width, height, time, reducedMotion) {
 }
 
 function concertLights(ctx, p, game, reducedMotion) {
-  if (game.phase !== "finished") return;
+  if (!insideConcert(game)) return;
   const time = reducedMotion ? 0 : game.worldTime + (game.ambientTime || 0);
   for (let i = 0; i < 18; i++) {
     const x = 78 + (i * 91) % 325;
-    const y = -160 + (i * 43) % 152;
+    const y = -160 + (i * 43) % 250;
     const at = p.point(x, y, 75 + (i % 3) * 7);
-    disk(ctx, at.x, at.y + Math.sin(time * 2 + i) * 2,
-      (i % 3 + 2) * p.scale, (i % 3 + 2) * p.scale,
+    const shimmer = 0.72 + 0.28 * Math.sin(time * 1.3 + i * 2.1);
+    disk(ctx, at.x, at.y,
+      (1.5 + shimmer) * p.scale, (1.5 + shimmer) * p.scale,
       i % 2 ? "#f9daa9" : "#a1d9d0");
   }
 }
@@ -510,6 +512,11 @@ export function drawWorld3D(ctx, game, { width, height, top, bottom,
   else if (game.stage === 3) venue(ctx, p);
   else if (game.stage === 4) hall(ctx, p, game);
   for (const crossing of game.crossings) traffic(ctx, p, crossing);
+  if (game.stage === 4 && insideConcert(game)) {
+    // Dim the venue scenery after the doorway; actors and route marks stay clear.
+    ctx.fillStyle = "#07152229";
+    ctx.fillRect(0, 0, width, height);
+  }
   people(ctx, p, game, reducedMotion, poses);
   if (game.stage === 3)
     rain(ctx, width, height, game.worldTime, reducedMotion);
