@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activeCallRipple, activeSpeech, CALL_COOLDOWN, CALL_RIPPLE_DURATION,
-  CALL_TAP_WINDOW,
+  CALL_CHORD_WINDOW, CALL_TAP_WINDOW,
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { TwoButtons } from '../input.js';
@@ -10,6 +10,10 @@ import { drawCallRipple } from '../character.js';
 
 const chord = { left: true, right: true, call: true };
 const released = { left: false, right: false, call: true };
+const side = (name) => ({ left: name === 'left', right: name === 'right', call: true });
+function hold(g, input, frames) {
+  for (let i = 0; i < frames; i++) step(g, 0.025, input);
+}
 function crowded(stage = 0) {
   const g = createGame(stage, 17);
   g.phase = 'playing';
@@ -69,6 +73,63 @@ test('one stop, held chord, half-release and slow double taps do not call', () =
   step(g, 0.025, chord);
   assert.equal(g.callReadyAt, 0);
   assert.notEqual(activeSpeech(g)?.kind, 'call');
+  assert.equal(activeCallRipple(g), null);
+});
+
+test('staggered presses and releases in either order still complete a double chord', () => {
+  for (const [first, releasedFirst, second] of [
+    ['left', 'left', 'right'],
+    ['right', 'right', 'left'],
+    ['left', 'right', 'left'],
+    ['right', 'left', 'right'],
+  ]) {
+    const g = crowded();
+    hold(g, side(first), 8);
+    step(g, 0.025, chord);
+    hold(g, side(releasedFirst === 'left' ? 'right' : 'left'), 4);
+    assert.notEqual(g.callTapAt, null, 'partial release keeps the first tap');
+    step(g, 0.025, chord);
+    assert.equal(activeCallRipple(g), null, 're-press before full release is the same tap');
+    step(g, 0.025, released);
+    hold(g, released, 18);
+    hold(g, side(second), 10);
+    assert.equal(activeCallRipple(g), null, 'one side alone cannot call');
+    step(g, 0.025, chord);
+    assert.equal(activeCallRipple(g)?.mode, 'recognized');
+    assert.ok(g.callReadyAt > 0);
+    assert.equal(g.hopReadyAt, 0, 'a chord tail cannot become a side hop');
+  }
+});
+
+test('a slow second finger brakes; a late second chord starts a new sequence', () => {
+  const g = crowded();
+  hold(g, side('left'), Math.ceil(CALL_CHORD_WINDOW / 0.025) + 2);
+  step(g, 0.025, chord);
+  step(g, 0.025, released);
+  step(g, 0.025, chord);
+  assert.equal(activeCallRipple(g), null, 'slow steering plus brake was not tap one');
+  step(g, 0.025, released);
+  hold(g, released, Math.ceil(CALL_TAP_WINDOW / 0.025) + 2);
+  step(g, 0.025, chord);
+  assert.equal(activeCallRipple(g), null, 'the previous tap expired');
+  assert.notEqual(g.callTapAt, null);
+});
+
+test('ordinary steering and same-side double-tap hop survive call detection', () => {
+  const g = createGame(0, 17);
+  g.phase = 'playing';
+  g.crowd = [];
+  g.animals = [];
+  const startX = g.player.x;
+  hold(g, side('left'), 15);
+  assert.ok(g.player.x < startX - 10);
+  step(g, 0.025, chord);
+  assert.equal(g.callTapAt, null, 'late overlap is an ordinary brake');
+  step(g, 0.025, released);
+  step(g, 0.025, side('right'));
+  step(g, 0.025, released);
+  step(g, 0.025, side('right'));
+  assert.ok(g.hopReadyAt > 0);
   assert.equal(activeCallRipple(g), null);
 });
 

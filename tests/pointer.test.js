@@ -159,6 +159,30 @@ test("two distinct touch taps trigger a hop and two full two-finger chords trigg
   assert.ok(call.callReadyAt > 0);
   assert.equal(call.hop, null);
 });
+test("two mobile chords accept staggered finger starts and endings", () => {
+  const g = createGame(0, 17);
+  g.phase = "playing";
+  g.crowd = [];
+  g.animals = [];
+  const f = fixture({ onCancel: () => cancelCallGesture(g) });
+  const tick = () => step(g, 0.025, { ...f.buttons.read(), call: true });
+  f.left.emit("pointerdown", { pointerId: 61 });
+  tick();
+  f.right.emit("pointerdown", { pointerId: 62 });
+  tick();
+  f.root.emit("pointerup", { pointerId: 61 });
+  tick();
+  f.root.emit("pointerup", { pointerId: 62 });
+  tick();
+  f.right.emit("pointerdown", { pointerId: 63 });
+  tick();
+  f.left.emit("pointerdown", { pointerId: 64 });
+  tick();
+  assert.equal(g.callRipple?.mode, "recognized");
+  assert.equal(g.hopReadyAt, 0);
+  f.root.emit("pointerup", { pointerId: 63 });
+  f.root.emit("pointerup", { pointerId: 64 });
+});
 test("document release outside a control works even if capture is unavailable", () => {
   const f = fixture();
   f.left.setPointerCapture = () => {
