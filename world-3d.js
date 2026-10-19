@@ -1,5 +1,5 @@
 import { visiblePerson } from "./crowd.js";
-import { insideConcert, joiningFriend } from "./logic.js";
+import { HOP_DISTANCE, insideConcert, joiningFriend } from "./logic.js";
 import {
   makeProjector,
   drawStageOne3D,
@@ -500,7 +500,8 @@ function people(ctx, p, game, reducedMotion, poses) {
     const drawn = drawPerson(ctx, p, actor, {
       player, friend, hit,
       pose, reducedMotion,
-      baseZ: actor.band ? 31 : 0,
+      baseZ: actor.band ? 31 : player && game.hop && !reducedMotion
+        ? 5 * Math.sin(Math.PI * (1 - game.hop.remaining / HOP_DISTANCE)) : 0,
     });
     if (actor.umbrella) umbrella(ctx, p, actor, drawn.rightHand);
     if (actor.glowStick) drawGlowStick(ctx, p, drawn.rightHand, actor.id,

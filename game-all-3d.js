@@ -13,6 +13,7 @@ import {
   createGame,
   activeSpeech,
   cancelCallGesture,
+  cancelHopGesture,
   insideConcert,
   step,
   W,
@@ -182,6 +183,7 @@ function clearInput() {
   pointerControls.clear();
   buttons.clear();
   cancelCallGesture(game);
+  cancelHopGesture(game);
   tilt.reset();
   if (steeringMode === "tilt") tiltWaitingUntil = performance.now() + 3000;
 }
@@ -401,7 +403,10 @@ const pointerControls = bindPointerControls({
   release: (id, side) =>
     side === "brake" ? tilt.brakes.delete(id) : buttons.release(id),
   interrupted: setPaused,
-  canceled: () => cancelCallGesture(game),
+  canceled: () => {
+    cancelCallGesture(game);
+    cancelHopGesture(game);
+  },
 });
 window.addEventListener("pagehide", setPaused);
 function input() {
@@ -767,7 +772,7 @@ function frame(now) {
   }
   draw();
   audio.footsteps(walkingPoses.get("player"),
-    game.phase === "playing" && steering.left !== steering.right);
+    game.phase === "playing" && steering.left !== steering.right && !game.hop);
   drawResultRoster();
   $("#goal-callout").textContent =
     game.arriving && game.phase !== "finished"

@@ -84,6 +84,10 @@ const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
 export const CALL_TAP_WINDOW = 0.65;
 export const CALL_COOLDOWN = 10;
+export const HOP_TAP_WINDOW = 0.34;
+export const HOP_DISTANCE = 36;
+export const HOP_SPEED = 240;
+export const HOP_COOLDOWN = 1.2;
 export function activeSpeech(g) {
   return g.speech && g.worldTime < g.speech.until ? g.speech : null;
 }
@@ -120,6 +124,51 @@ export function cancelCallGesture(g) {
   g.callReleased = false;
   g.callTapAt = null;
 }
+export function cancelHopGesture(g) {
+  g.hopHeldSide = 0;
+  g.hopTapSide = 0;
+  g.hopTapAt = null;
+  g.hopReleased = false;
+  g.hop = null;
+}
+function updateHopGesture(g, input) {
+  if (input.call !== true || g.arriving || g.stun > 0) {
+    cancelHopGesture(g);
+    return;
+  }
+  if (input.left && input.right) {
+    cancelHopGesture(g);
+    return;
+  }
+  const side = input.left ? -1 : input.right ? 1 : 0;
+  if (!side) {
+    g.hopHeldSide = 0;
+    if (g.hopTapAt !== null) g.hopReleased = true;
+    return;
+  }
+  if (g.hop && g.hop.side !== side) g.hop = null;
+  if (g.hopHeldSide === side) return;
+  if (g.hopHeldSide) {
+    g.hopTapSide = 0;
+    g.hopTapAt = null;
+  }
+  g.hopHeldSide = side;
+  if (g.hopTapSide === side && g.hopReleased &&
+      g.hopTapAt !== null &&
+      g.worldTime - g.hopTapAt <= HOP_TAP_WINDOW) {
+    g.hopTapSide = 0;
+    g.hopTapAt = null;
+    g.hopReleased = false;
+    if (g.worldTime >= g.hopReadyAt) {
+      g.hop = { side, remaining: HOP_DISTANCE };
+      g.hopReadyAt = g.worldTime + HOP_COOLDOWN;
+    }
+  } else {
+    g.hopTapSide = side;
+    g.hopTapAt = g.worldTime;
+    g.hopReleased = false;
+  }
+}
 function updateCallGesture(g, input) {
   // The ordinary chord still brakes. Only a full release followed by a second
   // chord can request a short courtesy gap; holding or half releasing cannot.
@@ -129,6 +178,10 @@ function updateCallGesture(g, input) {
   }
   const both = !!(input.left && input.right);
   const clear = !input.left && !input.right;
+  if (!both && !clear) {
+    cancelCallGesture(g);
+    return;
+  }
   if (clear) {
     g.callHeld = false;
     if (g.callTapAt !== null) g.callReleased = true;
@@ -433,6 +486,12 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     callReleased: false,
     callTapAt: null,
     callReadyAt: 0,
+    hopHeldSide: 0,
+    hopTapSide: 0,
+    hopTapAt: null,
+    hopReleased: false,
+    hopReadyAt: 0,
+    hop: null,
     seed,
     crowd,
     animals: createAnimals(stage, crowd),
@@ -446,6 +505,7 @@ export function step(g, dt, input) {
   g.worldTime += dt;
   if (!activeSpeech(g)) g.speech = null;
   updateCallGesture(g, input);
+  updateHopGesture(g, input);
   const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
   moveAnimals(g.animals, dt);
@@ -455,15 +515,17 @@ export function step(g, dt, input) {
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
   g.stun = Math.max(0, g.stun - dt);
+  let hopRequested = 0;
   if (!g.stun && !g.arriving) {
     const brake = input.left && input.right;
     if (!brake) {
-      g.player.x +=
-        (Number.isFinite(input.axis)
+      const direction = Number.isFinite(input.axis)
           ? Math.max(-1, Math.min(1, input.axis))
-          : Number(!!input.right) - Number(!!input.left)) *
-        100 *
-        dt;
+          : Number(!!input.right) - Number(!!input.left);
+      if (g.hop) {
+        hopRequested = Math.min(g.hop.remaining, HOP_SPEED * dt);
+        g.player.x += g.hop.side * hopRequested;
+      } else g.player.x += direction * 100 * dt;
       g.player.y -= 75 * dt;
     }
   }
@@ -512,6 +574,12 @@ export function step(g, dt, input) {
     g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
     Math.min(g.worldHeight - 25, g.player.y),
   );
+  if (g.hop && hopRequested) {
+    const actual = Math.abs(g.player.x - previousPlayer.x);
+    g.hop.remaining -= actual;
+    if (actual < hopRequested - 0.1 || g.hop.remaining <= 0.1)
+      g.hop = null;
+  }
   const goal = goalFor(g.stage);
   if (
     !g.arriving &&

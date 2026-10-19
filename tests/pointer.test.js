@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { bindPointerControls, TwoButtons } from "../input.js";
-import { cancelCallGesture, createGame, step } from "../logic.js";
+import { cancelCallGesture, cancelHopGesture, createGame, step } from "../logic.js";
 function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
   class Target {
     constructor() {
@@ -108,6 +108,56 @@ test("canceled two-finger chord cannot become the first tap of a courtesy call",
   step(g, 0.025, { ...f.buttons.read(), call: true });
   assert.equal(g.callReadyAt, 0);
   assert.notEqual(g.callTapAt, null, "the new two-finger chord starts a fresh sequence");
+});
+test("a canceled mobile side tap cannot complete a lateral hop", () => {
+  const g = createGame(0, 17);
+  g.phase = "playing";
+  g.crowd = [];
+  g.animals = [];
+  const f = fixture({ onCancel: () => cancelHopGesture(g) });
+  f.left.emit("pointerdown", { pointerId: 11 });
+  step(g, 0.025, { ...f.buttons.read(), call: true });
+  f.root.emit("pointercancel", { pointerId: 11 });
+  step(g, 0.025, { ...f.buttons.read(), call: true });
+  f.left.emit("pointerdown", { pointerId: 12 });
+  step(g, 0.025, { ...f.buttons.read(), call: true });
+  assert.equal(g.hopReadyAt, 0);
+  assert.equal(g.hopTapSide, -1);
+});
+test("two distinct touch taps trigger a hop and two full two-finger chords trigger courtesy", () => {
+  const hop = createGame(0, 17);
+  hop.phase = "playing";
+  hop.crowd = [];
+  hop.animals = [];
+  const a = fixture();
+  a.right.emit("pointerdown", { pointerId: 31 });
+  step(hop, 0.025, { ...a.buttons.read(), call: true });
+  a.root.emit("pointerup", { pointerId: 31 });
+  step(hop, 0.025, { ...a.buttons.read(), call: true });
+  a.right.emit("pointerdown", { pointerId: 32 });
+  step(hop, 0.025, { ...a.buttons.read(), call: true });
+  assert.ok(hop.hopReadyAt > 0);
+  assert.equal(hop.callReadyAt, 0);
+
+  const call = createGame(0, 17);
+  call.phase = "playing";
+  call.animals = [];
+  call.crowd = call.crowd.slice(0, 2).map((p, i) => ({ ...p,
+    id: 900 + i, x: call.player.x + (i ? 20 : -20),
+    y: call.player.y - 30, anchor: true, active: true,
+    state: "meeting", wait: 100,
+  }));
+  const b = fixture();
+  for (const [leftId, rightId] of [[41, 42], [43, 44]]) {
+    b.left.emit("pointerdown", { pointerId: leftId });
+    b.right.emit("pointerdown", { pointerId: rightId });
+    step(call, 0.025, { ...b.buttons.read(), call: true });
+    b.root.emit("pointerup", { pointerId: leftId });
+    b.root.emit("pointerup", { pointerId: rightId });
+    step(call, 0.025, { ...b.buttons.read(), call: true });
+  }
+  assert.ok(call.callReadyAt > 0);
+  assert.equal(call.hop, null);
 });
 test("document release outside a control works even if capture is unavailable", () => {
   const f = fixture();

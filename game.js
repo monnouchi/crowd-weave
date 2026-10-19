@@ -26,6 +26,8 @@ import {
   createGame,
   activeSpeech,
   cancelCallGesture,
+  cancelHopGesture,
+  HOP_DISTANCE,
   insideConcert,
   step,
   W,
@@ -175,6 +177,7 @@ function clearInput() {
   pointerControls.clear();
   buttons.clear();
   cancelCallGesture(game);
+  cancelHopGesture(game);
   tilt.reset();
   if (steeringMode === "tilt") tiltWaitingUntil = performance.now() + 3000;
 }
@@ -394,7 +397,10 @@ const pointerControls = bindPointerControls({
   release: (id, side) =>
     side === "brake" ? tilt.brakes.delete(id) : buttons.release(id),
   interrupted: setPaused,
-  canceled: () => cancelCallGesture(game),
+  canceled: () => {
+    cancelCallGesture(game);
+    cancelHopGesture(game);
+  },
 });
 window.addEventListener("pagehide", setPaused);
 function input() {
@@ -517,6 +523,12 @@ function person(p, player = false) {
     Math.floor(game.cooldown * 9) % 2
   )
     opacity = 0.45;
+  const hopRise = player && game.hop && !reducedMotion.matches
+    ? 5 * Math.sin(Math.PI * (1 - game.hop.remaining / HOP_DISTANCE)) : 0;
+  if (hopRise) {
+    ctx.save();
+    ctx.translate(0, -hopRise);
+  }
   drawCharacter(ctx, p, {
     pose,
     player,
@@ -530,6 +542,7 @@ function person(p, player = false) {
     live: game.stage === 4,
     time: game.worldTime + (game.ambientTime || 0),
   });
+  if (hopRise) ctx.restore();
 }
 function animal(p) {
   const dog = p.kind === "dog";
@@ -1137,7 +1150,7 @@ function frame(now) {
   }
   draw();
   audio.footsteps(walkingPoses.get("self"),
-    game.phase === "playing" && steering.left !== steering.right);
+    game.phase === "playing" && steering.left !== steering.right && !game.hop);
   drawResultRoster();
   $("#goal-callout").textContent =
     game.arriving && game.phase !== "finished"
