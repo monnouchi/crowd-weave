@@ -220,11 +220,7 @@ function constrainCrossing(g, t, previous, input) {
         t.violationEvent = {
           id: `${t.id || "road"}:${t.violations}`,
           memberId: member?.id || 0,
-          message: member
-            ? t.violations % 2
-              ? "おい、赤だぞ！"
-              : "止まれよ！"
-            : "",
+          message: member ? "赤信号だぞ！" : "",
         };
         g.violationEvent = t.violationEvent;
       }

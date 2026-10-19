@@ -622,21 +622,27 @@ main:has(.overlay.initial:not([hidden])) .settings {
   border-bottom: 1px solid var(--ink);
   transform: translateX(-50%) rotate(45deg);
 }
-#companion-bubble {
+#speech-bubble {
   position: absolute;
   z-index: 2;
-  width: 132px;
+  width: max-content;
+  min-width: 94px;
+  max-width: min(160px, calc(100% - 20px));
   padding: 7px 9px;
   background: var(--paper);
   color: var(--ink);
   border: 1px solid var(--ink);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
   pointer-events: none;
   user-select: none;
 }
-#companion-link {
+#speech-bubble[data-kind="hazard"] {
+  background: #fff0df;
+  border-color: #a8513e;
+}
+#speech-link {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -644,7 +650,7 @@ main:has(.overlay.initial:not([hidden])) .settings {
   pointer-events: none;
   z-index: 1;
 }
-#companion-link path {
+#speech-link path {
   stroke: var(--ink);
   stroke-width: 1;
   fill: none;

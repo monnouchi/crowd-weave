@@ -6,7 +6,7 @@ import {
   trafficSpecs,
   vehicleContact,
 } from "./traffic.js";
-import { createParty, moveParty, partyArrived } from "./party.js";
+import { PARTY_SPACING, createParty, moveParty, partyArrived } from "./party.js";
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
@@ -73,6 +73,39 @@ export const STAGES = [
   { name: "会場前のにぎわい", count: 54, speed: 45, startY: 2165, baseCrowd: 30 },
   { name: "ライブの最前方へ", count: 58, speed: 50, startY: 1805, baseCrowd: 40 },
 ];
+const SPEECH_PRIORITY = { wait: 1, contact: 2, hazard: 3 };
+const CONTACT_WORDS = ["おおっと！", "うわっ！"];
+export function activeSpeech(g) {
+  return g.speech && g.worldTime < g.speech.until ? g.speech : null;
+}
+function say(g, kind, speakerId, text, duration) {
+  const current = activeSpeech(g);
+  if (current && SPEECH_PRIORITY[current.kind] >= SPEECH_PRIORITY[kind])
+    return false;
+  g.speech = {
+    kind, speakerId, text, started: g.worldTime,
+    until: g.worldTime + duration, serial: ++g.speechSequence,
+  };
+  return true;
+}
+function separationSpeech(g) {
+  const gaps = g.party.members
+    .filter((member) => !member.docked)
+    .map((member) => ({
+      member,
+      excess: Math.hypot(member.x - g.player.x, member.y - g.player.y)
+        - member.id * PARTY_SPACING,
+    }));
+  if (gaps.every(({ excess }) => excess < 35)) g.waitSpeechArmed = true;
+  if (g.arriving || !g.waitSpeechArmed || g.worldTime < g.waitSpeechReadyAt)
+    return;
+  const behind = gaps.sort((a, b) => b.excess - a.excess)[0];
+  if (behind?.excess > 70 &&
+      say(g, "wait", behind.member.id, "待って〜！", 1.65)) {
+    g.waitSpeechArmed = false;
+    g.waitSpeechReadyAt = g.worldTime + 5;
+  }
+}
 export const SCENES = [
   {
     place: "住宅街の角",
@@ -343,6 +376,12 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     stun: 0,
     lastContactId: null,
     touchingIds: [],
+    speech: null,
+    speechSequence: 0,
+    contactSpeechCount: 0,
+    contactSpeechReadyAt: 0,
+    waitSpeechReadyAt: 0,
+    waitSpeechArmed: true,
     seed,
     crowd,
   };
@@ -350,8 +389,10 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
 export function step(g, dt, input) {
   if (g.phase !== "playing") return;
   dt = Math.max(0, Math.min(dt, 0.05));
+  const previousViolationId = g.violationEvent?.id;
   g.elapsed += dt;
   g.worldTime += dt;
+  if (!activeSpeech(g)) g.speech = null;
   const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
   moveCrowd(g.crowd, dt, g.crossings);
@@ -501,7 +542,20 @@ export function step(g, dt, input) {
     g.elapsed += 2;
     g.cooldown = 1.4;
     g.stun = 0.35;
+    if (contactMember.id === 0 && g.worldTime >= g.contactSpeechReadyAt) {
+      if (say(g, "contact", 0,
+        CONTACT_WORDS[g.contactSpeechCount % CONTACT_WORDS.length], 1.25)) {
+        g.contactSpeechCount++;
+        g.contactSpeechReadyAt = g.worldTime + 2.3;
+      }
+    }
   }
+  if (g.violationEvent?.id !== previousViolationId &&
+      g.violationEvent?.memberId) {
+    say(g, "hazard", g.violationEvent.memberId,
+      g.violationEvent.message, 1.8);
+  }
+  separationSpeech(g);
   if (
     g.arriving &&
     partyArrived(g.party) &&

@@ -1,6 +1,7 @@
-import { createGame, seedForRun, step } from "./logic.js";
+import { activeSpeech, createGame, seedForRun, step } from "./logic.js";
 import { TwoButtons, bindPointerControls, EnterLatch } from "./input.js";
 import { drawStageOne3D } from "./stage1-3d-render.js";
+import { placeSpeech } from "./character.js";
 
 const canvas = document.querySelector("#scene");
 const ctx = canvas.getContext("2d", { alpha: false });
@@ -52,6 +53,7 @@ function restart() {
   clearInput();
   game = createGame(0, seedForRun(runSeed, 0));
   game.phase = "playing";
+  document.querySelector("#speech-bubble").dataset.key = "";
   lastFrame = performance.now();
   setPanel();
 }
@@ -103,7 +105,35 @@ function frame(now) {
     step(game, dt, buttons.read());
     if (game.phase === "finished") { clearInput(); setPanel(); }
   }
-  drawStageOne3D(ctx, game, { width, height });
+  const projector = drawStageOne3D(ctx, game, { width, height });
+  const speech = document.querySelector("#speech-bubble");
+  const link = document.querySelector("#speech-link");
+  const line = activeSpeech(game);
+  speech.hidden = link.hidden = game.phase !== "playing" ||
+    !line || line.speakerId !== 0;
+  if (!speech.hidden) {
+    const key = `${game.stage}:${line.serial}`;
+    if (speech.dataset.key !== key) {
+      speech.dataset.key = key;
+      speech.textContent = line.text;
+      speech.setAttribute("aria-label", `YOU：${line.text}`);
+    }
+    const anchor = projector.point(game.player.x, game.player.y, 52);
+    const obstacles = [".hud", ".toolbar", ".touch-controls"].map((selector) => {
+      const box = document.querySelector(selector).getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+    });
+    const layout = placeSpeech({
+      x: anchor.x, y: anchor.y,
+      width: speech.offsetWidth, height: speech.offsetHeight,
+      viewport: { width, height }, obstacles,
+    });
+    speech.style.left = `${layout.left}px`;
+    speech.style.top = `${layout.top}px`;
+    link.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    link.querySelector("path").setAttribute("d",
+      `M ${layout.tailX} ${layout.tailY} L ${layout.anchorX} ${layout.anchorY}`);
+  }
   time.textContent = `${game.elapsed.toFixed(1)}秒`;
   hits.textContent = `${game.hits}回`;
   requestAnimationFrame(frame);

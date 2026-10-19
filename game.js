@@ -24,6 +24,7 @@ import { drawCharacter, placeSpeech } from "./character.js";
 import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import {
   createGame,
+  activeSpeech,
   step,
   W,
   H,
@@ -105,7 +106,6 @@ let game = createGame(),
   playerPose = { lean: 0 };
 const walkingPoses = new Map();
 let visualDt = 0;
-let companionSpeech = null;
 const tilt = new TiltState();
 let steeringMode = "buttons",
   tiltWaitingUntil = 0,
@@ -269,7 +269,7 @@ function start(stage = 0) {
   last = performance.now();
   $("#notice").textContent = "";
   noticeUntil = 0;
-  companionSpeech = null;
+  $("#speech-bubble").dataset.key = "";
   canvas.focus({ preventScroll: true });
 }
 function setPaused() {
@@ -1010,16 +1010,7 @@ function frame(now) {
         signal.textContent;
     if (trafficViolations(game) > violations) {
       noticeUntil = now + 1800;
-      const event = game.violationEvent;
       $("#notice").textContent = "信号無視 +2秒 · 赤では両押しで待とう";
-      if (game.party.members.some((m) => m.id === event.memberId)) {
-        companionSpeech = {
-          ...event,
-          until: game.worldTime + (game.ambientTime || 0) + 1.8,
-        };
-        $("#companion-bubble").textContent =
-          `友だち${event.memberId}「${event.message}」`;
-      }
       audio.effect("contact");
     }
   }
@@ -1127,16 +1118,24 @@ function frame(now) {
       `${Math.max(10, Math.min(width - 10, px - left))}px`,
     );
   }
-  const speech = $("#companion-bubble"),
-    link = $("#companion-link");
-  const speaker =
-    companionSpeech &&
-    game.party.members.find((m) => m.id === companionSpeech.memberId);
+  const speech = $("#speech-bubble"),
+    link = $("#speech-link"),
+    line = activeSpeech(game);
+  const speaker = line && (line.speakerId === 0
+    ? game.player
+    : game.party.members.find((m) => m.id === line.speakerId));
   speech.hidden = link.hidden =
     !speaker ||
-    game.phase !== "playing" ||
-    game.worldTime + (game.ambientTime || 0) >= companionSpeech.until;
+    game.phase !== "playing";
   if (!speech.hidden) {
+    const key = `${game.stage}:${line.serial}`;
+    if (speech.dataset.key !== key) {
+      speech.dataset.key = key;
+      speech.dataset.kind = line.kind;
+      speech.textContent = line.text;
+      speech.setAttribute("aria-label",
+        `${line.speakerId ? `友だち${line.speakerId}` : "YOU"}：${line.text}`);
+    }
     const x = ox + (speaker.x + 240 - game.player.x) * scale;
     const y = oy + (speaker.y - 29 + CAMERA_Y - game.player.y) * scale;
     const width = speech.offsetWidth,
