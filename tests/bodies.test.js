@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, seedForRun, step } from "../logic.js";
 import { BODY_GAP } from "../bodies.js";
+import { createParty } from "../party.js";
 import { planRoute, routeInput } from "../validation/plan-route.js";
 
 test("a visible pair blocks idle progress without repeated time penalties", () => {
@@ -28,7 +29,7 @@ test("either direction recovers from a bump and goes around the rendered bodies"
     const g = createGame(0, seedForRun(17, 0));
     g.crowd = g.crowd.filter((p) => p.anchor);
     g.phase = "playing";
-    for (let frame = 0; frame < 110; frame++) step(g, 0.05, {});
+    for (let frame = 0; frame < 260; frame++) step(g, 0.05, {});
     const y = g.crowd[0].y;
     for (let frame = 0; frame < 36; frame++) {
       step(g, 0.05, { [direction]: true });
@@ -50,6 +51,8 @@ test("a follower stalled by a bystander regroups without piling up forever", () 
   const g = createGame(2);
   g.crowd = [];
   g.phase = "playing";
+  g.player.y = 625;
+  g.party = createParty(2, g.player);
   for (let frame = 0; frame < 48; frame++) step(g, 0.05, {});
   const y = g.party.members[0].y + 10;
   const bystander = {
@@ -106,7 +109,7 @@ test("many seeds keep both side routes open and idle runs short of the goal", ()
 });
 
 test("dense audience still clears after contact and every friend can finish", () => {
-  const route = planRoute(4, seedForRun(0, 4), 35, 1);
+  const route = planRoute(4, seedForRun(0, 4), 45, 1);
   assert.ok(route);
   const g = createGame(4, seedForRun(2, 4));
   g.phase = "playing";
@@ -128,7 +131,7 @@ test("dense audience still clears after contact and every friend can finish", ()
 
 test("all stages still have a contact-free route at the capped low frame rate", () => {
   for (let stage = 0; stage < 5; stage++) {
-    const route = planRoute(stage, undefined, 25, stage === 4 ? 1 : 0);
+    const route = planRoute(stage, undefined, 50, stage === 4 ? 1 : 0, 0.05);
     assert.ok(route, `stage ${stage + 1}`);
     const g = createGame(stage);
     g.phase = "playing";

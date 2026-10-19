@@ -43,7 +43,7 @@ test("bounded variation changes destinations, pace, dwell, entry timing and venu
     );
     for (const run of games) {
       const g = run[stage];
-      assert.equal(g.crowd.length, [6, 12, 31, 30, 40][stage]);
+      assert.equal(g.crowd.length, [14, 24, 49, 54, 58][stage]);
       if (stage === 1)
         assert.ok(g.crowd.filter((p) => p.flow !== "crossing").length >= 10);
       if (stage === 2)

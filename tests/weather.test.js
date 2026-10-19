@@ -13,7 +13,7 @@ test("rain, umbrellas and shelter destinations belong only to the outdoor venue 
       continue;
     }
     assert.equal(g.scene.weather, "rain");
-    assert.equal(g.crowd.length, 30);
+    assert.equal(g.crowd.length, 54);
     assert.ok(g.crowd.some((p) => p.umbrella));
     assert.ok(g.crowd.some((p) => !p.umbrella));
     const shelters = g.crowd.filter((p) => p.habit === "shelter");
@@ -22,7 +22,7 @@ test("rain, umbrellas and shelter destinations belong only to the outdoor venue 
       assert.equal(p.umbrella, false);
       assert.equal(p.route.length, 2);
       assert.ok([65, 415].includes(p.route[0].x));
-      assert.ok([-80, 1260].includes(p.route.at(-1).y));
+      assert.ok([-80, g.startY + 80].includes(p.route.at(-1).y));
       assert.equal(p.r, 13);
     }
     for (const p of g.crowd.filter((p) => p.group))

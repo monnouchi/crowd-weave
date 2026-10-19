@@ -51,16 +51,17 @@ function gatherSafely(head, party, crowd, model) {
 }
 // Time-expanded search replays all followers against the actual seeded pedestrians.
 // No crowd removal, position edits, or collision suppression is used to find routes.
-export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
+export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0,
+  simulationStep = 0.025) {
   const model = createGame(stage, seed),
     crowd = model.crowd,
     goal = goalFor(stage),
     startY = model.startY,
     maxProgress = Math.ceil((startY - 85) / 7.5),
     rowWidth = maxProgress + 2;
-  for (let n = 0; n < Math.round(initialWait / 0.025); n++) {
+  for (let n = 0; n < Math.round(initialWait / simulationStep); n++) {
     model.phase = "playing";
-    step(model, 0.025, { left: true, right: true });
+    step(model, simulationStep, { left: true, right: true });
   }
   let nodes = new Map([
     [
@@ -75,7 +76,7 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
     ],
   ]);
   const dt = 0.1,
-    substeps = 4;
+    substeps = Math.round(dt / simulationStep);
   for (let tick = 0; tick < maxSeconds / dt; tick++) {
     const snapshots = [],
       signals = [];
@@ -173,7 +174,7 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
             head.x += ax * r;
             head.y += ay * r;
           }
-          moveParty(party, head, 0.025, { braking: action === "B", arriving });
+          moveParty(party, head, simulationStep, { braking: action === "B", arriving });
           safe = safeTeam(head, party, snapshots[k]);
         }
         if (!safe) continue;
@@ -191,8 +192,8 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0) {
             : 0;
           if (settle !== null)
             return {
-              path: path + "B".repeat(Math.ceil(settle / dt)),
-              seconds: initialWait + (tick + 1) * dt + settle,
+              path: path + "B".repeat(Math.ceil((settle + 0.5) / dt)),
+              seconds: initialWait + (tick + 1) * dt + settle + 0.5,
             };
           continue;
         }

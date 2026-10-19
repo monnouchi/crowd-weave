@@ -14,7 +14,7 @@ export const GOAL_HOUSES = Object.freeze([
 ]);
 
 export function streetHouses() {
-  const rows = [145, 362, 580];
+  const rows = [145, 362, 580, 797, 1014];
   return rows.flatMap((y, i) => [
     { x: -115 + (i % 2) * 8, y, w: 135, d: 158 + (i % 2) * 10, face: "east", style: (i + 2) % 4 },
     { x: 460 - (i % 2) * 7, y: y + (i % 2) * 13, w: 135, d: 150 + (i % 2) * 13, face: "west", style: (i + 1) % 4 },
@@ -106,13 +106,13 @@ export function disk(ctx, x, y, rx, ry, color, outline = null) {
 function drawGround(ctx, projector) {
   ctx.fillStyle = "#b9cba8";
   ctx.fillRect(0, 0, projector.width, projector.height);
-  groundRect(ctx, projector, -310, -900, 790, 1600, "#b9cba8");
-  groundRect(ctx, projector, 30, -900, 450, 1600, "#d9d8cb");
-  groundRect(ctx, projector, 90, -900, 390, 1600, "#9daeb0");
-  groundRect(ctx, projector, 99, -900, 381, 1600, "#aebcbd");
+  groundRect(ctx, projector, -310, -900, 790, 2000, "#b9cba8");
+  groundRect(ctx, projector, 30, -900, 450, 2000, "#d9d8cb");
+  groundRect(ctx, projector, 90, -900, 390, 2000, "#9daeb0");
+  groundRect(ctx, projector, 99, -900, 381, 2000, "#aebcbd");
   for (const x of [90, 390])
-    segment(ctx, projector, [x, -900, 0.4], [x, 1600, 0.4], "#f4eee0", 2.2 * projector.scale);
-  for (let y = -860; y < 1600; y += 82) {
+    segment(ctx, projector, [x, -900, 0.4], [x, 2000, 0.4], "#f4eee0", 2.2 * projector.scale);
+  for (let y = -860; y < 2000; y += 82) {
     for (const [a, b] of [[30, 90], [390, 450]])
       segment(ctx, projector, [a, y, 0.3], [b, y, 0.3], "#c2c5b8", projector.scale);
     groundRect(ctx, projector, 237, y + 15, 243, y + 43, "#e7e6d7a8");

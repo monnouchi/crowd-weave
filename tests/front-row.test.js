@@ -8,6 +8,7 @@ import {
   advanceAudienceAmbience,
 } from "../logic.js";
 import { moveCrowd, visiblePerson } from "../crowd.js";
+import { createParty } from "../party.js";
 import { planRoute, routeInput } from "../validation/plan-route.js";
 
 test("front row spans the hall, with all arrival positions on the audience side of the barrier", () => {
@@ -17,6 +18,7 @@ test("front row spans the hall, with all arrival positions on the audience side 
     g.phase = "playing";
     g.player.x = x;
     g.player.y = 112;
+    g.party = createParty(4, g.player);
     // Followers start behind the leader and really walk to their own positions.
     for (const m of g.party.members) {
       m.x = x;
@@ -62,7 +64,7 @@ test("spectators occupy the front row, stay visible and never enter the stage ov
 
 test("arrival spectators continue moving without changing the result, and background/reduced motion freezes ambience", () => {
   const g = createGame(4),
-    route = planRoute(4, g.seed, 35);
+    route = planRoute(4, g.seed, 45);
   assert.ok(route);
   g.phase = "playing";
   for (const action of route.path)

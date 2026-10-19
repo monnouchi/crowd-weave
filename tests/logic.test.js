@@ -10,6 +10,7 @@ import {
 import { planRoute, routeInput } from "../validation/plan-route.js";
 import { performance } from "node:perf_hooks";
 import { TwoButtons } from "../input.js";
+import { createParty } from "../party.js";
 const playing = (stage = 0) => {
   const g = createGame(stage);
   g.phase = "playing";
@@ -19,7 +20,7 @@ test("automatic forward, left/right, simultaneous brake, bounds", () => {
   const g = playing();
   g.crowd = [];
   step(g, 0.05, {});
-  assert.equal(g.player.y, 621.25);
+  assert.equal(g.player.y, 1161.25);
   step(g, 0.05, { left: true });
   assert.equal(g.player.x, 235);
   const before = { ...g.player };
@@ -72,7 +73,7 @@ test("goal completes and timer freezes; paused and ready freeze", () => {
 test("scene density, purposeful and individual agents, safe initial spacing", () => {
   assert.deepEqual(
     STAGES.map((_, i) => createGame(i).crowd.length),
-    [6, 12, 31, 30, 40],
+    [14, 24, 49, 54, 58],
   );
   for (let stage = 0; stage < 5; stage++)
     for (const seed of [1402485690 + stage * 97, 17, 2026]) {
@@ -188,7 +189,7 @@ test("route followers cross, stop for reasons, yield smoothly and re-enter off r
 });
 test("all stages have a verified clean route, including the full-party signal window", () => {
   for (let stage = 0; stage < 5; stage++) {
-    const result = planRoute(stage);
+    const result = planRoute(stage, undefined, 50);
     assert.ok(result, `stage ${stage + 1} route`);
     const g = playing(stage);
     for (const action of result.path)
@@ -205,7 +206,7 @@ test("all stages have a verified clean route, including the full-party signal wi
     );
     if (g.traffic) {
       assert.equal(g.traffic.violations, 0);
-      assert.ok(g.elapsed < 30, "safe waiting has a bounded completion time");
+      assert.ok(g.elapsed < 45, "safe waiting has a bounded completion time");
     } else
       assert.ok(
         careless.hits
@@ -217,7 +218,7 @@ test("all stages have a verified clean route, including the full-party signal wi
 });
 test("alternate-seed busy stations retain fair routes", () => {
   for (const seed of [17, 2026, 33]) {
-    const result = planRoute(4, seed);
+    const result = planRoute(4, seed, 45);
     assert.ok(result);
     const g = createGame(4, seed);
     g.phase = "playing";
@@ -281,6 +282,7 @@ test("meeting partner has a clear purpose, is not a crowd obstacle and cannot pe
     g.crowd = [];
     g.player.x = g.meetingPartner.x;
     g.player.y = g.meetingPartner.y;
+    g.party = createParty(stage, g.player);
     step(g, 0.025, {});
     if (stage > 0)
       assert.equal(g.phase, "playing", "leader arrival alone does not finish");
@@ -385,7 +387,7 @@ test("longitudinal majority, visible reader dwell and ordered side queue", () =>
   const g = createGame(1);
   assert.ok(
     g.crowd.filter((p) => p.flow === "crossing").length >= 1 &&
-      g.crowd.filter((p) => p.flow === "crossing").length <= 4,
+      g.crowd.filter((p) => p.flow === "crossing").length <= 10,
   );
   assert.ok(g.crowd.filter((p) => p.flow !== "crossing").length >= 10);
   const reader = g.crowd.find((p) => p.id === 7);

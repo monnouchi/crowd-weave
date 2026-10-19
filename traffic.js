@@ -9,7 +9,7 @@ export function trafficSpec(stage) {
         period: 9,
         greenStart: 2.5,
         greenEnd: 9,
-        phaseOffset: 6.7,
+        phaseOffset: 0,
         lanes: 2,
       }
     : null;
@@ -25,7 +25,7 @@ export function trafficSpecs(stage) {
         lanes: 4,
         period: 11.5,
         greenEnd: 11.5,
-        phaseOffset: 10.1,
+        phaseOffset: 7.7,
       },
       {
         ...trafficSpec(stage),

@@ -254,7 +254,7 @@ test("cars and bicycles remain separate from all people across seeds and cycles"
 test("outdoor alternate seeds allow all-member zero-contact zero-violation arrival", () => {
   for (const stage of [1, 3])
     for (const seed of [17, 2026]) {
-      const route = planRoute(stage, seed, 32);
+      const route = planRoute(stage, seed, 50);
       assert.ok(route, `stage${stage} seed${seed}`);
       const g = createGame(stage, seed);
       g.phase = "playing";
@@ -346,7 +346,7 @@ test("signal queues retain people and body clearance, discharge both flows, and 
         south = new Set();
       for (let n = 0; n < 2200; n++) {
         step(g, 0.025, { left: true, right: true });
-        assert.equal(g.crowd.length, stage === 1 ? 12 : 30, "no crowd removal");
+        assert.equal(g.crowd.length, stage === 1 ? 24 : 54, "no crowd removal");
         const active = g.crowd.filter((p) => p.active);
         for (let i = 0; i < active.length; i++)
           for (let j = i + 1; j < active.length; j++)
@@ -392,7 +392,7 @@ test("bounded signal waiting and all-member clean routes remain achievable acros
         t.period - green + crossingTime(clean.party, t) < 7,
         "party entry window",
       );
-      const route = planRoute(stage, seed, 32);
+      const route = planRoute(stage, seed, 50);
       assert.ok(route);
       for (const a of route.path)
         for (let k = 0; k < 4; k++) step(clean, 0.025, routeInput(a));
@@ -405,7 +405,7 @@ test("bounded signal waiting and all-member clean routes remain achievable acros
       assert.equal(trafficViolations(clean), 0);
       assert.notEqual(direct.phase, "finished");
       assert.ok(
-        clean.elapsed < 32,
+        clean.elapsed < 45,
         `${stage}/${seed}: bounded clean arrival ${clean.elapsed}`,
       );
       assert.ok(

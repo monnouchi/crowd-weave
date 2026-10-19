@@ -716,7 +716,8 @@ function audienceShift(p) {
   const rand = random(p.seed + p.id * 101 + p.cycle * 7919);
   p.route[1] = {
     x: Math.max(65, Math.min(415, p.spot.x + (rand() - 0.5) * 100)),
-    y: Math.max(54, Math.min(590, p.spot.y + (rand() - 0.5) * 65)),
+    y: Math.max(54, Math.min(p.spot.y > 900 ? 1710 : 590,
+      p.spot.y + (rand() - 0.5) * 65)),
   };
 }
 export function makeAudience(count, speed, seed) {
@@ -812,6 +813,81 @@ export function makeAudience(count, speed, seed) {
     crowd.push(p);
   }
   return crowd;
+}
+// The old northern encounters stay intact. New, separated southern waves give
+// each longer journey a readable busy stretch followed by room to recover.
+export function extendJourney(crowd, stage, seed, config) {
+  const layouts = [
+    { bands: [760, 980], perBand: 4 },
+    { bands: [730, 890, 1030], perBand: 4 },
+    { bands: [920, 1150, 1330], perBand: 6 },
+    { bands: [1260, 1500, 1750, 1970], perBand: 6 },
+    { bands: [980, 1270, 1580], perBand: 6 },
+  ];
+  const { bands, perBand } = layouts[stage];
+  const rand = random(seed ^ 0x9271a3d5);
+  for (const p of crowd) p.boundsH = config.startY + 55;
+  if (stage !== 4) for (const p of crowd.slice(0, config.baseCrowd)) {
+    // Old south exits sat just outside the former short playfield. Move them
+    // beyond the new edge so a returning walker never appears mid-street.
+    if (p.entry.y > 650 && p.entry.x > 18 && p.entry.x < 462)
+      p.entry.y = config.startY + 80;
+    const last = p.route.at(-1);
+    if (last.y > 650 && last.x > 18 && last.x < 462)
+      last.y = config.startY + 80;
+  }
+  for (let i = 0; i < crowd.length - config.baseCrowd; i++) {
+    const p = crowd[config.baseCrowd + i];
+    const slot = i % perBand;
+    const x = perBand === 4 ? [85, 190, 300, 405][slot]
+      : [65, 135, 205, 275, 345, 415][slot];
+    const y = bands[Math.floor(i / perBand)] + (slot % 2 ? 34 : -34)
+      + (rand() - 0.5) * 12;
+    p.x = x;
+    p.y = y;
+    p.group = undefined;
+    p.anchor = false;
+    p.reaction = null;
+    p.leg = 0;
+    p.cycle = 0;
+    p.active = true;
+    if (stage === 4) {
+      p.spot = { x, y };
+      p.entry = { x: slot % 2 ? -24 : 504, y: config.startY + 80 };
+      p.route = [p.spot, { ...p.spot }, p.entry,
+        { x: slot % 2 ? 70 : 410, y: p.entry.y }];
+      audienceShift(p);
+      p.state = "watching";
+      p.wait = 5 + (i % 4) * 2;
+      p.vx = p.vy = 0;
+      p.ux = 0;
+      p.uy = -1;
+      continue;
+    }
+    const standing = slot === 2;
+    const along = slot === 0 || slot === perBand - 1;
+    const eastbound = slot % 2 === 0;
+    p.entry = along ? { x, y: config.startY + 80 }
+      : { x: eastbound ? -55 : 535, y };
+    p.route = standing
+      ? [{ x, y }, { x: x < 240 ? 65 : 415, y: y - 28 }]
+      : along ? [{ x, y: -80 }]
+        : [{ x: eastbound ? 535 : -55, y: y + (slot % 2 ? 20 : -20) }];
+    p.flow = along ? "along" : "crossing";
+    p.origin = along ? "south" : eastbound ? "west" : "east";
+    p.destination = along ? "north" : eastbound ? "east" : "west";
+    const profile = FLOW_PROFILES[p.environment];
+    p.originName = profile.places[p.origin];
+    p.destinationName = profile.places[p.destination];
+    p.habit = standing ? "meeting" : "direct";
+    p.state = standing ? "meeting" : "walking";
+    p.pauseDuration = standing ? 8 + (i % 3) * 2 : 0;
+    p.wait = p.pauseDuration;
+    p.pace = config.speed * profile.pace * (0.82 + rand() * 0.22);
+    aim(p);
+    p.vx = standing ? 0 : p.ux * p.pace;
+    p.vy = standing ? 0 : p.uy * p.pace;
+  }
 }
 export function visiblePerson(p) {
   return (

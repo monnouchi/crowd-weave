@@ -265,20 +265,20 @@ function residentialSurroundings(c, bounds) {
   }
 }
 function residentialFloor(c, height) {
-  rect(c, 0, -800, 480, height + 1000, "#e7e3d8");
-  rect(c, 94, -800, 292, height + 1000, "#d2d6d1");
+  rect(c, 0, -800, 480, height + 1700, "#e7e3d8");
+  rect(c, 94, -800, 292, height + 1700, "#d2d6d1");
   // Material seams, not barriers: every part of this ground remains walkable.
   for (const x of [94, 386])
     line(
       c,
       [
         [x, -800],
-        [x, height + 200],
+        [x, height + 900],
       ],
       "#b4beb5",
       2,
     );
-  for (let y = -720; y < height + 200; y += 88) {
+  for (let y = -720; y < height + 900; y += 88) {
     line(
       c,
       [
@@ -299,7 +299,7 @@ function residentialFloor(c, height) {
     );
   }
   // Each side branch reaches the gate opening of its own lot.
-  for (let y = Math.floor(-800 / 234) * 234; y < height + 200; y += 234) {
+  for (let y = Math.floor(-800 / 234) * 234; y < height + 900; y += 234) {
     const row = Math.floor(y / 234);
     for (const side of [-1, 1]) {
       const index = (((row + (side > 0 ? 2 : 0)) % 4) + 4) % 4;
@@ -624,8 +624,8 @@ function sSideBuilding(c, side, y, kind, index = 0) {
 function sStationExterior(c, { left, right, top, bottom }) {
   rect(c, left, top, right - left, bottom - top, "#b7c9c6");
   for (const side of [-1, 1]) {
-    sSideBuilding(c, side, 505, "station", side < 0 ? 0 : 1);
-    sSideBuilding(c, side, 118, "station", side < 0 ? 2 : 0);
+    for (const y of [118, 505, 765, 1010])
+      sSideBuilding(c, side, y, "station", (Math.floor(y / 200) + (side > 0 ? 1 : 0)) % 3);
     if (side < 0) {
       sTree(c, -93, 426, 26);
       sBench(c, -110, 469, 48);
@@ -641,7 +641,7 @@ function sCafeExterior(c, { left, right, top, bottom }) {
   // West connects to platforms, east to a waiting room. All fixtures are
   // behind the vertical edge of the playable concourse.
   rect(c, -244, top, 244, bottom - top, "#b9c3ba");
-  for (const y of [235, 440, 620]) {
+  for (const y of [235, 440, 620, 915, 1145, 1325]) {
     rect(c, -220, y, 212, 80, "#718c8a", true);
     for (let xx = -207; xx < -25; xx += 30)
       line(
@@ -655,7 +655,7 @@ function sCafeExterior(c, { left, right, top, bottom }) {
       );
     sPath(c, -10, y + 19, 10, 42);
   }
-  for (const y of [165, 475]) {
+  for (const y of [165, 475, 960, 1230, 1390]) {
     rect(c, 490, y, 181, 136, "#e0d1ba", true);
     sBench(c, 513, y + 22, 56);
     sBench(c, 594, y + 77, 56);
@@ -666,11 +666,11 @@ function sVenueExterior(c, { left, right, top, bottom }) {
   rect(c, left, top, right - left, bottom - top, "#9db4aa");
   for (const side of [-1, 1]) {
     const sx = side < 0 ? -125 : 515;
-    for (const y of [450, 586, 705])
+    for (const y of [450, 586, 705, 1400, 1670, 1960])
       sTree(c, sx + ((y / 10) % 2 ? 11 : -8), y, 29);
     sBench(c, side < 0 ? -75 : 503, 505, 54);
-    if (side < 0) sSideBuilding(c, side, 1015, "venue", 1);
-    else sSideBuilding(c, side, 1015, "venue", 2);
+    for (const y of [1015, 1450, 1840, 2080])
+      sSideBuilding(c, side, y, "venue", side < 0 ? 1 : 2);
     sSideBuilding(c, side, 125, "venue", side < 0 ? 1 : 2);
   }
 }
@@ -686,7 +686,8 @@ function sHallExterior(c, { left, right, top, bottom }) {
         sCircle(c, xx, y + 30, 7, "#607874");
     }
     rect(c, x, 715, 180, bottom - 715, "#888d7b");
-    sBench(c, x + 37, 895, 81);
+    for (const y of [895, 1160, 1450, 1690])
+      sBench(c, x + 37, y, 81);
   }
 }
 function spatialSurroundings(c, scene, bounds) {
@@ -701,11 +702,11 @@ function spatialFloor(c, scene, height) {
   const kind = scene.landmark,
     p = SPATIAL[kind];
   c.save();
-  rect(c, 0, -800, 480, height + 1000, p.ground);
+  rect(c, 0, -800, 480, height + 1700, p.ground);
   if (kind === "station") {
-    sPaving(c, 0, -800, 480, height + 200, 72, "#c6d5d0");
-    rect(c, 0, -800, 23, height + 1000, "#c0d0cb");
-    rect(c, 457, -800, 23, height + 1000, "#c0d0cb");
+    sPaving(c, 0, -800, 480, height + 900, 72, "#c6d5d0");
+    rect(c, 0, -800, 23, height + 1700, "#c0d0cb");
+    rect(c, 457, -800, 23, height + 1700, "#c0d0cb");
     // A broad plaza and a readable narrower station approach.
     rect(c, 126, 106, 228, 194, "#d4e0dc");
     for (const x of [126, 354])
@@ -719,10 +720,12 @@ function spatialFloor(c, scene, height) {
         1,
       );
   } else if (kind === "cafe") {
-    sPaving(c, 0, -800, 480, height + 200, 80, "#ddd4c4");
-    // Three separated crossing halls make each wave readable before entry.
-    for (const y of [245, 445, 640]) rect(c, 0, y - 42, 480, 84, "#e1dbc9");
-    for (const y of [203, 287, 403, 487, 598, 682])
+    sPaving(c, 0, -800, 480, height + 900, 80, "#ddd4c4");
+    // Separated crossing halls make each wave readable before entry.
+    for (const y of [245, 445, 640, 920, 1150, 1330])
+      rect(c, 0, y - 42, 480, 84, "#e1dbc9");
+    for (const y of [203, 287, 403, 487, 598, 682,
+      878, 962, 1108, 1192, 1288, 1372])
       line(
         c,
         [
@@ -732,13 +735,14 @@ function spatialFloor(c, scene, height) {
         "#cabb9f",
         1.2,
       );
-    for (const [top, bottom] of [[95, 194], [296, 394], [496, 590], [690, 830]])
+    for (const [top, bottom] of [[95, 194], [296, 394], [496, 590],
+      [690, 830], [970, 1070], [1200, 1260], [1380, 1450]])
       rect(c, 202, top, 76, bottom - top, "#f0ebde");
   } else if (kind === "venue") {
     rect(c, 0, -800, 480, 1100, "#d5dfda");
     rect(c, 0, 365, 480, 415, "#b6c7b8");
     rect(c, 62, 365, 356, 415, "#d9ded0");
-    rect(c, 0, 925, 480, height - 925 + 200, "#bfd0cb");
+    rect(c, 0, 925, 480, height - 925 + 900, "#bfd0cb");
     rect(c, 143, 365, 194, 415, "#e4e5da");
     // Three seams follow an actual public path, with no painted fence in it.
     for (const x of [62, 143, 337, 418])
@@ -751,10 +755,10 @@ function spatialFloor(c, scene, height) {
         "#9fb4a9",
         1,
       );
-    sPaving(c, 0, 930, 480, height + 200, 90, "#abc0b9");
+    sPaving(c, 0, 930, 480, height + 900, 90, "#abc0b9");
   } else {
     rect(c, 0, -800, 480, 1480, "#627b77");
-    rect(c, 0, 685, 480, height - 685 + 200, "#c5c1aa");
+    rect(c, 0, 685, 480, height - 685 + 900, "#c5c1aa");
     rect(c, 196, 38, 88, 640, "#75928b");
     for (let y = 125; y < 680; y += 94)
       line(
@@ -766,7 +770,7 @@ function spatialFloor(c, scene, height) {
         "#8aa09a",
         0.8,
       );
-    sPaving(c, 0, 730, 480, height + 200, 84, "#aeaf9a");
+    sPaving(c, 0, 730, 480, height + 900, 84, "#aeaf9a");
   }
   c.restore();
 }
@@ -796,13 +800,13 @@ function spatialDetails(c, scene) {
     }
   } else if (scene.landmark === "cafe") {
     // Each side door feeds one crossing hall; the central path stops at them.
-    for (const y of [225, 425, 620]) {
+    for (const y of [225, 425, 620, 920, 1150, 1330]) {
       sPath(c, 0, y, 50, 38, "#d2ddd4");
       sPath(c, 430, y, 50, 38, "#e5d5bc");
     }
     // Canopy ribs on the platform edge and benches in the waiting room
     // carry the station setting without labels in the walking lane.
-    for (const y of [225, 620])
+    for (const y of [225, 620, 920, 1330])
       for (const x of [12, 32])
         rect(c, x, y - 8, 4, 49, "#607c79");
   }
@@ -1021,6 +1025,8 @@ function spatialRain(c, opts) {
   for (const [x, y] of [
     [-104, 995],
     [478, 120],
+    [-104, 1585],
+    [478, 1915],
   ]) {
     rect(c, x + 3, y + 4, 92, 33, "#253f411f");
     rect(c, x, y, 92, 33, "#577e79", true);
@@ -1065,6 +1071,10 @@ function spatialJourney(c) {
   rect(c, 480, 1055, 152, 96, "#718f8c", true);
   rect(c, 154, 1073, 172, 61, "#c9d7d0");
   rect(c, 154, 1072, 172, 5, "#50756e");
+  for (const y of [1370, 1630, 1880, 2100]) {
+    sPath(c, 130, y - 34, 220, 68, "#d4dfd4");
+    line(c, [[130, y - 34], [350, y - 34]], "#94afa6", 1);
+  }
   for (const x of [184, 236, 288]) {
     rect(c, x, 1085, 8, 27, "#47776e", true);
     rect(c, x - 2, 1085, 12, 5, "#a4c3b7");
@@ -1138,6 +1148,10 @@ function spatialHall(c) {
     );
   }
   sPath(c, 166, 838, 148, 45, "#d9d4b9");
+  for (const y of [1040, 1310, 1600]) {
+    sPath(c, 155, y - 32, 170, 64, "#d5d0b5");
+    for (const x of [115, 365]) sCircle(c, x, y, 17, "#778c79", "#d0d7ba");
+  }
   for (const x of [195, 226, 257]) {
     rect(c, x, 854, 21, 12, "#f4e8cc", true);
     line(c, [[x + 6, 858], [x + 15, 858]], "#9b8d70", 1);

@@ -10,6 +10,7 @@ import { createParty, moveParty, partyArrived } from "./party.js";
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
+  extendJourney,
   moveCrowd,
   visiblePerson,
   reactToContact,
@@ -17,7 +18,7 @@ import {
 } from "./crowd.js";
 export const W = 480,
   H = 680,
-  START = { x: 240, y: 625 },
+  START = { x: 240, y: 1165 },
   GOAL = { x: 175, y: 20, w: 130, h: 65 };
 export const FRONT_BARRIER_Y = 20;
 export function goalFor(stage) {
@@ -66,11 +67,11 @@ export const MEETING_PARTNER = Object.freeze({
   walk: 0,
 });
 export const STAGES = [
-  { name: "ひとりで出発", count: 6, speed: 30 },
-  { name: "住宅街から最寄り駅へ", count: 12, speed: 35 },
-  { name: "駅のカフェで合流", count: 31, speed: 40 },
-  { name: "会場前のにぎわい", count: 30, speed: 45 },
-  { name: "ライブの最前方へ", count: 40, speed: 50 },
+  { name: "ひとりで出発", count: 14, speed: 30, startY: 1165, baseCrowd: 6 },
+  { name: "住宅街から最寄り駅へ", count: 24, speed: 35, startY: 1165, baseCrowd: 12 },
+  { name: "駅のカフェで合流", count: 49, speed: 40, startY: 1505, baseCrowd: 31 },
+  { name: "会場前のにぎわい", count: 54, speed: 45, startY: 2165, baseCrowd: 30 },
+  { name: "ライブの最前方へ", count: 58, speed: 50, startY: 1805, baseCrowd: 40 },
 ];
 export const SCENES = [
   {
@@ -301,14 +302,7 @@ function placePassingPair(crowd, stage) {
 export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   const config = STAGES[stage];
   const scene = SCENES[stage];
-  const start =
-    stage === 2
-      ? { x: 240, y: 795 }
-      : stage === 3
-        ? { x: 240, y: 1125 }
-        : stage === 4
-          ? { x: 240, y: 945 }
-          : START;
+  const start = { x: START.x, y: config.startY };
   const crossings = trafficSpecs(stage).map((spec) =>
     createTraffic(stage, spec),
   );
@@ -320,13 +314,13 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     trafficSpec(stage),
   );
   if (stage === 3) extendVenue(crowd, crossings);
+  extendJourney(crowd, stage, seed, config);
   placePassingPair(crowd, stage);
   return {
     stage,
     phase: "ready",
     startY: start.y,
-    worldHeight:
-      stage === 2 ? 850 : stage === 3 ? 1180 : stage === 4 ? 1000 : H,
+    worldHeight: config.startY + 55,
     player: { ...start, r: 12 },
     party: createParty(stage, start),
     arriving: false,

@@ -16,7 +16,7 @@ import {
 // The model keeps its original X/Y hitboxes. Every scene is solid geometry on
 // that same ground plane, viewed by the fixed oblique camera from Stage 1.
 const FLOOR_TOP = -450;
-const FLOOR_BOTTOM = 1450;
+const FLOOR_BOTTOM = 3000;
 
 function topDisk(ctx, p, x, y, z, radius, fill, edge = null) {
   const vertices = Array.from({ length: 24 }, (_, i) => {
@@ -88,9 +88,9 @@ function station(ctx, p) {
   ctx.fillRect(0, 0, p.width, p.height);
   groundRect(ctx, p, -250, FLOOR_TOP, 730, FLOOR_BOTTOM, "#b7cbc7");
   groundRect(ctx, p, 0, FLOOR_TOP, 480, FLOOR_BOTTOM, "#dce7e2");
-  tileGrid(ctx, p, -450, 1000, "#c1d2cb", 78);
+  tileGrid(ctx, p, -450, 1500, "#c1d2cb", 78);
   groundRect(ctx, p, 126, 95, 354, 300, "#e8efeb");
-  for (const y of [115, 525]) {
+  for (const y of [115, 525, 765, 1010]) {
     sideBlock(ctx, p, "west", y, 150,
       ["#d7e3d9", "#648588", "#b8cfca"]);
     sideBlock(ctx, p, "east", y + 20, 140,
@@ -132,8 +132,8 @@ function cafe(ctx, p) {
   ctx.fillRect(0, 0, p.width, p.height);
   groundRect(ctx, p, -240, FLOOR_TOP, 720, FLOOR_BOTTOM, "#c9c8b8");
   groundRect(ctx, p, 0, FLOOR_TOP, 480, FLOOR_BOTTOM, "#eee5d3");
-  tileGrid(ctx, p, -400, 930, "#d8cdb9", 80);
-  for (const y of [245, 445, 640]) {
+  tileGrid(ctx, p, -400, 1770, "#d8cdb9", 80);
+  for (const y of [245, 445, 640, 920, 1150, 1330]) {
     groundRect(ctx, p, 0, y - 42, 480, y + 42, "#e0d7c5");
     segment(ctx, p, [0, y - 42, 0.3], [480, y - 42, 0.3],
       "#bdaa91", p.scale);
@@ -142,10 +142,11 @@ function cafe(ctx, p) {
     groundRect(ctx, p, 0, y - 20, 48, y + 20, "#b8cdc3");
     groundRect(ctx, p, 432, y - 20, 480, y + 20, "#e2cfb1");
   }
-  for (const [top, bottom] of [[95, 194], [296, 394], [496, 590], [690, 830]])
+  for (const [top, bottom] of [[95, 194], [296, 394], [496, 590],
+    [690, 830], [970, 1070], [1200, 1260], [1380, 1450]])
     groundRect(ctx, p, 202, top, 278, bottom, "#f4eddc");
   // Platform edge and waiting-room furniture occupy the side margins.
-  for (const y of [155, 420, 660]) {
+  for (const y of [155, 420, 660, 960, 1210, 1390]) {
     sideBlock(ctx, p, "west", y, 115,
       ["#c0d1c7", "#6d8985", "#b4c5ba"]);
     sideBlock(ctx, p, "east", y + 15, 105,
@@ -192,8 +193,13 @@ function venue(ctx, p) {
   groundRect(ctx, p, 0, 365, 480, 780, "#b8cfb6");
   groundRect(ctx, p, 62, 365, 418, 780, "#d8dfd2");
   groundRect(ctx, p, 142, 365, 338, 780, "#e4e6d9");
-  groundRect(ctx, p, 0, 925, 480, 1230, "#bfd1cd");
-  tileGrid(ctx, p, 940, 1300, "#a6bbb6", 88);
+  groundRect(ctx, p, 0, 925, 480, FLOOR_BOTTOM, "#bfd1cd");
+  tileGrid(ctx, p, 940, FLOOR_BOTTOM, "#a6bbb6", 88);
+  for (const y of [1370, 1630, 1880, 2100]) {
+    groundRect(ctx, p, 130, y - 34, 350, y + 34, "#d4dfd4");
+    segment(ctx, p, [130, y - 34, 0.3], [350, y - 34, 0.3],
+      "#94afa6", p.scale);
+  }
   for (const x of [62, 142, 338, 418])
     segment(ctx, p, [x, 365, 0.3], [x, 780, 0.3],
       "#9cb6a5", p.scale);
@@ -205,11 +211,16 @@ function venue(ctx, p) {
       ["#d2e0d8", "#597f77", "#adc6b8"]);
     sideBlock(ctx, p, side, 135, 128,
       ["#d6e3d8", "#628a7f", "#adc6b8"]);
+    for (const y of [1450, 1840, 2080])
+      sideBlock(ctx, p, side, y, 125,
+        ["#d0ded5", "#6b8b82", "#b7cbbf"]);
   }
   for (const [x, y] of [[48, 478], [432, 493], [55, 620], [425, 700]])
     drawTree(ctx, p, x, y, 17);
   rainCanopy(ctx, p, -5, 997, 1);
   rainCanopy(ctx, p, 485, 122, -1);
+  rainCanopy(ctx, p, -5, 1585, 1);
+  rainCanopy(ctx, p, 485, 1915, -1);
   for (const [x, y] of [[52, 1022], [429, 465], [64, 677], [415, 135]]) {
     groundCircle(ctx, p, x, y, 21, "#8fb9b7a0");
     segment(ctx, p, [x - 8, y, 0.4], [x + 6, y, 0.4],
@@ -235,12 +246,17 @@ function hall(ctx, p, game) {
   ctx.fillRect(0, 0, p.width, p.height);
   groundRect(ctx, p, -260, FLOOR_TOP, 740, FLOOR_BOTTOM, "#2c4141");
   groundRect(ctx, p, 0, FLOOR_TOP, 480, 685, "#58736f");
-  groundRect(ctx, p, 0, 685, 480, 1250, "#c1c0a9");
+  groundRect(ctx, p, 0, 685, 480, FLOOR_BOTTOM, "#c1c0a9");
   groundRect(ctx, p, 194, 32, 286, 685, "#728d86");
   for (let y = 125; y < 685; y += 94)
     segment(ctx, p, [0, y, 0.2], [480, y, 0.2],
       "#8ba69c", p.scale);
-  tileGrid(ctx, p, 730, 1250, "#a3ad9b", 80);
+  tileGrid(ctx, p, 730, FLOOR_BOTTOM, "#a3ad9b", 80);
+  for (const y of [1040, 1310, 1600]) {
+    groundRect(ctx, p, 155, y - 32, 325, y + 32, "#d5d0b5");
+    for (const x of [115, 365])
+      topDisk(ctx, p, x, y, 1, 17, "#778c79", "#d0d7ba");
+  }
   // Audience seats remain outside player bounds, beside the central aisle.
   for (const side of ["west", "east"])
     for (let y = 75; y < 660; y += 100) {

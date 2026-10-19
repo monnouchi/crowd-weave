@@ -7,10 +7,10 @@ import { planRoute, routeInput } from "../validation/plan-route.js";
 const run = (g, seconds, input = {}) => {
   for (let n = 0; n < Math.round(seconds / 0.025); n++) step(g, 0.025, input);
 };
-test("stage three adds three crossing halls while outdoor and indoor entrance distances stay fixed", () => {
+test("all five journeys double their original straight travel distances", () => {
   assert.deepEqual(
     Array.from({ length: 5 }, (_, i) => createGame(i).startY - GOAL.y - GOAL.h),
-    [540, 540, 710, 1040, 860],
+    [1080, 1080, 1420, 2080, 1720],
   );
   const g = createGame(3);
   assert.equal(g.crossings.length, 2);
@@ -23,6 +23,31 @@ test("stage three adds three crossing halls while outdoor and indoor entrance di
         t.greenEnd - t.greenStart > crossingTime(createParty(4, g.player), t),
     ),
   );
+});
+test("new pedestrian bands have visible encounters and recovery space in every stage", () => {
+  const layouts = [
+    { base: 6, bands: [760, 980], size: 4 },
+    { base: 12, bands: [730, 890, 1030], size: 4 },
+    { base: 31, bands: [920, 1150, 1330], size: 6 },
+    { base: 30, bands: [1260, 1500, 1750, 1970], size: 6 },
+    { base: 40, bands: [980, 1270, 1580], size: 6 },
+  ];
+  for (const seed of [17, 2026])
+    layouts.forEach(({ base, bands, size }, stage) => {
+      const g = createGame(stage, seed);
+      const added = g.crowd.filter((p) => p.id >= base);
+      assert.equal(added.length, bands.length * size);
+      for (const y of bands) {
+        const wave = added.filter((p) => Math.abs(p.y - y) < 45);
+        assert.equal(wave.length, size);
+        assert.ok(wave.some((p) => p.state !== "walking"));
+        assert.ok(wave.every((p) => p.y < g.worldHeight - 25));
+      }
+      for (let i = 1; i < bands.length; i++) {
+        const middle = (bands[i - 1] + bands[i]) / 2;
+        assert.ok(added.every((p) => Math.abs(p.y - middle) > 25));
+      }
+    });
 });
 test("fixed initial signal phases give normal forward arrivals a visible red and short wait", () => {
   for (const stage of [1, 3]) {
@@ -113,7 +138,8 @@ test("cafe has primarily lateral station traffic; the concert gathers northward 
   assert.ok(
     live.crowd.every((p) => p.flow === "along" && p.destination === "north"),
   );
-  assert.equal(live.crowd.filter((p) => p.state === "watching").length, 24);
+  assert.equal(live.crowd.filter((p) => p.state === "watching" && p.y < 900).length, 24);
+  assert.equal(live.crowd.filter((p) => p.state === "watching" && p.y > 900).length, 18);
   assert.ok(
     live.crowd.filter((p) => p.y < 360).length >
       live.crowd.filter((p) => p.y > 700).length,
@@ -134,10 +160,10 @@ test("cafe has primarily lateral station traffic; the concert gathers northward 
   assert.ok(live.player.y > live.crowd.find((p) => p.anchor).y);
   assert.equal(live.ticketChecked, true);
 });
-test("longer cafe has three moving crossing waves and a passable meeting group even at low frame rate", () => {
+test("longer cafe has six moving crossing waves and a passable meeting group even at low frame rate", () => {
   for (const seed of [17, 2026, 1402485884, 2567361276]) {
     const g = createGame(2, seed);
-    assert.equal(g.startY - GOAL.y - GOAL.h, 710);
+    assert.equal(g.startY - GOAL.y - GOAL.h, 1420);
     for (let i = 0; i < g.crowd.length; i++) {
       assert.ok(Math.hypot(g.crowd[i].x - g.player.x,
         g.crowd[i].y - g.player.y) > 60);
@@ -152,7 +178,7 @@ test("longer cafe has three moving crossing waves and a passable meeting group e
     const meeting = g.crowd.filter((p) => p.role === "待ち合わせ中の人");
     assert.equal(meeting.length, 3);
     assert.ok(meeting.every((p) => p.state === "meeting" && p.wait > 10));
-    const route = planRoute(2, seed, 35);
+    const route = planRoute(2, seed, 45);
     assert.ok(route, `route ${seed}`);
     const clean = createGame(2, seed);
     clean.phase = "playing";
@@ -175,7 +201,7 @@ test("longer cafe has three moving crossing waves and a passable meeting group e
 test("all revised busy scenes retain all-member zero-contact routes across different seeds", () => {
   for (const stage of [2, 3, 4])
     for (const seed of [17, 2026]) {
-      const result = planRoute(stage, seed, 35);
+      const result = planRoute(stage, seed, 50);
       assert.ok(result, `${stage}/${seed}`);
       const g = createGame(stage, seed);
       g.phase = "playing";
@@ -196,7 +222,7 @@ test("both outdoor roads keep cars and bicycles apart from the complete moving p
   for (const seed of [17, 2026]) {
     const g = createGame(3, seed);
     g.phase = "playing";
-    const route = planRoute(3, seed, 35);
+    const route = planRoute(3, seed, 50);
     assert.ok(route);
     const kinds = new Set();
     for (const action of route.path)

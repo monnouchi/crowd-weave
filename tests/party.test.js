@@ -115,7 +115,7 @@ test("arrival waits for last friend and finishes with every member inside the go
   const g = createGame(4);
   g.crowd = [];
   g.phase = "playing";
-  for (let i = 0; i < 300 && !g.arriving; i++) step(g, 0.05, {});
+  for (let i = 0; i < 600 && !g.arriving; i++) step(g, 0.05, {});
   assert.equal(g.arriving, true);
   assert.equal(g.phase, "playing");
   assert.ok(g.party.members.some((m) => !m.docked));
