@@ -102,6 +102,7 @@ export class GameAudio {
     this.musicFilter = null;
     this.outputBus = null;
     this.peakGuard = null;
+    this.lastFootDistance = null;
   }
   output() {
     if (this.outputBus) return this.outputBus;
@@ -283,6 +284,26 @@ export class GameAudio {
     this.active = false;
     this.nextNote = 0;
     this.note = 0;
+    this.lastFootDistance = null;
+  }
+  footsteps(pose, steering) {
+    const distance = pose?.distance;
+    if (!Number.isFinite(distance)) {
+      this.lastFootDistance = null;
+      return;
+    }
+    const previous = this.lastFootDistance;
+    this.lastFootDistance = distance;
+    if (!steering || !pose.moving || this.muted ||
+        this.context?.state !== "running" || previous === null ||
+        distance <= previous || distance - previous > 16) return;
+    // The character's leg swing uses distance / 7; each half-cycle is a footfall.
+    const stride = 7 * Math.PI;
+    const foot = Math.floor(distance / stride);
+    if (foot <= Math.floor(previous / stride)) return;
+    this.tone(foot % 2 ? 102 : 117, 0.048, 0.0018, 0,
+      "triangle", false, foot % 2 ? 70 : 78);
+    this.tone(235, 0.018, 0.00075, 0.005, "triangle");
   }
   update(playing, braking, stage = 0, inside = true) {
     this.space(stage, inside);

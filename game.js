@@ -1136,6 +1136,8 @@ function frame(now) {
     );
   }
   draw();
+  audio.footsteps(walkingPoses.get("self"),
+    game.phase === "playing" && steering.left !== steering.right);
   drawResultRoster();
   $("#goal-callout").textContent =
     game.arriving && game.phase !== "finished"
