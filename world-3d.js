@@ -1,5 +1,6 @@
 import { visiblePerson } from "./crowd.js";
-import { HOP_DISTANCE, insideConcert, joiningFriend } from "./logic.js";
+import { drawCallRipple } from "./character.js";
+import { activeCallRipple, HOP_DISTANCE, insideConcert, joiningFriend } from "./logic.js";
 import {
   makeProjector,
   drawStageOne3D,
@@ -575,6 +576,11 @@ export function drawWorld3D(ctx, game, { width, height, top, bottom,
     ctx.fillRect(0, 0, width, height);
   }
   people(ctx, p, game, reducedMotion, poses);
+  const ripple = activeCallRipple(game);
+  if (ripple) {
+    const at = p.point(ripple.x, ripple.y, 35);
+    drawCallRipple(ctx, at.x, at.y, p.scale, ripple.progress, reducedMotion);
+  }
   if (game.stage === 3)
     drawRain(ctx, width, height, game.worldTime, reducedMotion);
   if (game.stage === 4) concertLights(ctx, p, game, reducedMotion);

@@ -84,12 +84,22 @@ const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
 export const CALL_TAP_WINDOW = 0.65;
 export const CALL_COOLDOWN = 10;
+export const CALL_RIPPLE_DURATION = 0.65;
 export const HOP_TAP_WINDOW = 0.34;
 export const HOP_DISTANCE = 36;
 export const HOP_SPEED = 240;
 export const HOP_COOLDOWN = 1.2;
 export function activeSpeech(g) {
   return g.speech && g.worldTime < g.speech.until ? g.speech : null;
+}
+export function activeCallRipple(g) {
+  if (!g.callRipple || g.phase === "finished" || g.phase === "gameover")
+    return null;
+  const age = g.worldTime - g.callRipple.started;
+  return age >= 0 && age < CALL_RIPPLE_DURATION
+    ? { x: g.callRipple.x, y: g.callRipple.y,
+        progress: age / CALL_RIPPLE_DURATION }
+    : null;
 }
 function say(g, kind, speakerId, text, duration) {
   const current = activeSpeech(g);
@@ -203,6 +213,7 @@ function updateCallGesture(g, input) {
   const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage);
   if (moved) {
     g.callReadyAt = g.worldTime + CALL_COOLDOWN;
+    g.callRipple = { x: g.player.x, y: g.player.y, started: g.worldTime };
     say(g, "call", 0, "すみませーん！", 1.35);
   }
 }
@@ -486,6 +497,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     callReleased: false,
     callTapAt: null,
     callReadyAt: 0,
+    callRipple: null,
     hopHeldSide: 0,
     hopTapSide: 0,
     hopTapAt: null,

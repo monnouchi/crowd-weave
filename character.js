@@ -1,4 +1,23 @@
 import { facingView } from "./pose.js";
+export function drawCallRipple(ctx, x, y, scale, progress, reducedMotion = false) {
+  const fade = 1 - progress;
+  const radii = reducedMotion
+    ? [54]
+    : [26 + 82 * progress, ...(progress > 0.17
+      ? [18 + 82 * (progress - 0.17)] : [])];
+  ctx.save();
+  for (const radius of radii) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius * scale, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(20, 80, 82, ${0.65 * fade})`;
+    ctx.lineWidth = 5 * scale;
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255, 239, 173, ${fade})`;
+    ctx.lineWidth = 2.6 * scale;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function rounded(c, x, y, w, h, r, color) {
   c.fillStyle = color;
   c.beginPath();

@@ -20,10 +20,11 @@ import {
   createWalkingPose,
   updateWalkingPose,
 } from "./pose.js";
-import { drawCharacter, placeSpeech } from "./character.js";
+import { drawCallRipple, drawCharacter, placeSpeech } from "./character.js";
 import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import {
   createGame,
+  activeCallRipple,
   activeSpeech,
   cancelCallGesture,
   cancelHopGesture,
@@ -860,6 +861,10 @@ function draw() {
       ctx.textAlign = "center";
       ctx.fillText("!", p.x, p.y - 21);
     }
+  const ripple = activeCallRipple(game);
+  if (ripple)
+    drawCallRipple(ctx, ripple.x, ripple.y, 1, ripple.progress,
+      reducedMotion.matches);
   ctx.restore();
   if (game.player.y > 580) {
     rounded(170, 12, 140, 28, 14, "#285d55");
