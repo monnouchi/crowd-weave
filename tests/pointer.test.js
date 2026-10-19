@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { bindPointerControls, TwoButtons } from "../input.js";
-function fixture({ windowEvents = false } = {}) {
+import { cancelCallGesture, createGame, step } from "../logic.js";
+function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
   class Target {
     constructor() {
       this.listeners = new Map();
@@ -71,6 +72,7 @@ function fixture({ windowEvents = false } = {}) {
     press: (id, side) => buttons.press(id, side),
     release: (id) => buttons.release(id),
     interrupted: () => interrupts++,
+    canceled: onCancel,
   });
   return {
     root,
@@ -88,6 +90,25 @@ function fixture({ windowEvents = false } = {}) {
     },
   };
 }
+test("canceled two-finger chord cannot become the first tap of a courtesy call", () => {
+  const g = createGame(0, 17);
+  g.phase = "playing";
+  g.crowd = [];
+  const f = fixture({ onCancel: () => cancelCallGesture(g) });
+  f.left.emit("pointerdown", { pointerId: 1 });
+  f.right.emit("pointerdown", { pointerId: 2 });
+  step(g, 0.025, { ...f.buttons.read(), call: true });
+  assert.notEqual(g.callTapAt, null);
+  f.root.emit("pointercancel", { pointerId: 1 });
+  f.root.emit("pointercancel", { pointerId: 2 });
+  step(g, 0.025, { ...f.buttons.read(), call: true });
+  assert.equal(g.callTapAt, null);
+  f.left.emit("pointerdown", { pointerId: 3 });
+  f.right.emit("pointerdown", { pointerId: 4 });
+  step(g, 0.025, { ...f.buttons.read(), call: true });
+  assert.equal(g.callReadyAt, 0);
+  assert.notEqual(g.callTapAt, null, "the new two-finger chord starts a fresh sequence");
+});
 test("document release outside a control works even if capture is unavailable", () => {
   const f = fixture();
   f.left.setPointerCapture = () => {

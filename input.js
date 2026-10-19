@@ -28,6 +28,7 @@ export function bindPointerControls({
   press,
   release,
   interrupted = () => {},
+  canceled = () => {},
 }) {
   const owners = new Map();
   const eventRoot = root.defaultView || root;
@@ -71,8 +72,11 @@ export function bindPointerControls({
       if (owners.get(e.pointerId)?.button === button) end(e.pointerId);
     });
   }
-  for (const name of ["pointerup", "pointercancel"])
-    eventRoot.addEventListener(name, (e) => end(e.pointerId), true);
+  eventRoot.addEventListener("pointerup", (e) => end(e.pointerId), true);
+  eventRoot.addEventListener("pointercancel", (e) => {
+    end(e.pointerId);
+    canceled();
+  }, true);
   eventRoot.addEventListener(
     "pointermove",
     (e) => {
@@ -109,7 +113,10 @@ export function bindPointerControls({
     }
   }
   for (const name of ["touchstart", "touchend", "touchcancel"])
-    eventRoot.addEventListener(name, reconcile, {
+    eventRoot.addEventListener(name, (e) => {
+      reconcile(e);
+      if (name === "touchcancel") canceled();
+    }, {
       capture: true,
       passive: true,
     });

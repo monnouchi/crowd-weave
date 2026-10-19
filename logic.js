@@ -15,6 +15,7 @@ import {
   visiblePerson,
   reactToContact,
   makeRoomForFollower,
+  askCrowdToMove,
 } from "./crowd.js";
 export const W = 480,
   H = 680,
@@ -77,8 +78,10 @@ export const STAGES = [
   { name: "会場前のにぎわい", count: 54, speed: 45, startY: 2165, baseCrowd: 30 },
   { name: "ライブの最前方へ", count: 58, speed: 50, startY: 1805, baseCrowd: 40 },
 ];
-const SPEECH_PRIORITY = { wait: 1, contact: 2, hazard: 3 };
+const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
+export const CALL_TAP_WINDOW = 0.65;
+export const CALL_COOLDOWN = 10;
 export function activeSpeech(g) {
   return g.speech && g.worldTime < g.speech.until ? g.speech : null;
 }
@@ -108,6 +111,44 @@ function separationSpeech(g) {
       say(g, "wait", behind.member.id, "待って〜！", 1.65)) {
     g.waitSpeechArmed = false;
     g.waitSpeechReadyAt = g.worldTime + 5;
+  }
+}
+export function cancelCallGesture(g) {
+  g.callHeld = false;
+  g.callReleased = false;
+  g.callTapAt = null;
+}
+function updateCallGesture(g, input) {
+  // The ordinary chord still brakes. Only a full release followed by a second
+  // chord can request a short courtesy gap; holding or half releasing cannot.
+  if (input.call !== true) {
+    cancelCallGesture(g);
+    return;
+  }
+  const both = !!(input.left && input.right);
+  const clear = !input.left && !input.right;
+  if (clear) {
+    g.callHeld = false;
+    if (g.callTapAt !== null) g.callReleased = true;
+  }
+  if (g.callTapAt !== null && g.worldTime - g.callTapAt > CALL_TAP_WINDOW)
+    g.callTapAt = null;
+  if (!both || g.callHeld) return;
+  g.callHeld = true;
+  if (g.callTapAt === null || !g.callReleased) {
+    g.callTapAt = g.worldTime;
+    g.callReleased = false;
+    return;
+  }
+  cancelCallGesture(g);
+  g.callHeld = true;
+  if (g.worldTime < g.callReadyAt || g.arriving ||
+      g.crossings.some((t) => g.player.y >= t.top - 55 &&
+        g.player.y <= t.bottom + 65)) return;
+  const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage);
+  if (moved) {
+    g.callReadyAt = g.worldTime + CALL_COOLDOWN;
+    say(g, "call", 0, "すみませーん！", 1.35);
   }
 }
 export const SCENES = [
@@ -386,6 +427,10 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     contactSpeechReadyAt: 0,
     waitSpeechReadyAt: 0,
     waitSpeechArmed: true,
+    callHeld: false,
+    callReleased: false,
+    callTapAt: null,
+    callReadyAt: 0,
     seed,
     crowd,
   };
@@ -397,6 +442,7 @@ export function step(g, dt, input) {
   g.elapsed += dt;
   g.worldTime += dt;
   if (!activeSpeech(g)) g.speech = null;
+  updateCallGesture(g, input);
   const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
   moveCrowd(g.crowd, dt, g.crossings);

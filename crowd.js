@@ -470,11 +470,39 @@ export function reactToContact(p, player) {
   p.vx = 0;
   p.vy = 0;
 }
+// A polite call changes only nearby pedestrians. The crossing, fixed walls and
+// vehicles retain their normal rules, and non-human obstacles never yield.
+export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
+  let moved = 0;
+  const ahead = crowd.filter((p) =>
+    p.active && !p.animal && p.y <= player.y - 8 &&
+    p.y >= player.y - 105 && Math.abs(p.x - player.x) < 68 &&
+    !crossings.some((t) => p.y >= t.top - 45 && p.y <= t.bottom + 45) &&
+    !(stage === 4 && p.y >= 640 && p.y <= 885));
+  ahead.sort((a, b) => b.y - a.y);
+  for (const p of ahead) {
+    if (moved >= 4 || p.courtesy) continue;
+    const side = p.x < player.x ? -1 : 1;
+    for (const direction of [side, -side]) {
+      const targetX = p.x + direction * 38;
+      if (targetX < 55 || targetX > 425 ||
+          Math.abs(targetX - player.x) <= Math.abs(p.x - player.x) ||
+          crowd.some((q) => q !== p && q.active &&
+            Math.hypot(q.x - targetX, q.y - p.y) < p.r + q.r + 5)) continue;
+      p.courtesy = { targetX, remaining: 1.1, ux: p.ux, uy: p.uy };
+      p.reaction = null;
+      moved++;
+      break;
+    }
+  }
+  return moved;
+}
 export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
   const crossings = traffic;
   const velocities = crowd.map((p) => {
     const traffic = walkerTraffic(p, p.route[p.leg], crossings);
-    if (!p.active || p.anchor || p.state !== "walking" || p.reaction)
+    if (!p.active || p.anchor || p.state !== "walking" || p.reaction ||
+        p.courtesy)
       return null;
     const target = trafficWaypoint(p, p.route[p.leg], traffic),
       dx = target.x - p.x,
@@ -619,6 +647,28 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
     if (p.reaction) {
       p.reaction.remaining = Math.max(0, p.reaction.remaining - dt);
       if (p.reaction.remaining === 0) p.reaction = null;
+      return;
+    }
+    if (p.courtesy) {
+      const aside = p.courtesy;
+      aside.remaining -= dt;
+      const dx = aside.targetX - p.x;
+      const move = Math.sign(dx) * Math.min(Math.abs(dx), 95 * dt);
+      const clear = crowd.every((q) => q === p || !q.active ||
+        Math.hypot(q.x - (p.x + move), q.y - p.y) >= p.r + q.r + 1);
+      if (clear) {
+        p.x += move;
+        p.vx = dt ? move / dt : 0;
+        p.vy = 0;
+        p.ux = Math.sign(move) || p.ux;
+        p.uy = 0;
+        p.walk += Math.abs(move);
+      }
+      if (aside.remaining <= 0 || Math.abs(aside.targetX - p.x) < 0.1) {
+        p.ux = aside.ux;
+        p.uy = aside.uy;
+        p.courtesy = null;
+      }
       return;
     }
     if (p.anchor) return;

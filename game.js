@@ -25,6 +25,7 @@ import { GAME_NAME, PAGE_TITLE } from "./branding.js";
 import {
   createGame,
   activeSpeech,
+  cancelCallGesture,
   insideConcert,
   step,
   W,
@@ -173,6 +174,7 @@ compactResult.addEventListener("change", () => {
 function clearInput() {
   pointerControls.clear();
   buttons.clear();
+  cancelCallGesture(game);
   tilt.reset();
   if (steeringMode === "tilt") tiltWaitingUntil = performance.now() + 3000;
 }
@@ -392,15 +394,19 @@ const pointerControls = bindPointerControls({
   release: (id, side) =>
     side === "brake" ? tilt.brakes.delete(id) : buttons.release(id),
   interrupted: setPaused,
+  canceled: () => cancelCallGesture(game),
 });
 window.addEventListener("pagehide", setPaused);
 function input() {
   const keys = buttons.read();
-  if (steeringMode !== "tilt") return keys;
+  if (steeringMode !== "tilt") return { ...keys, call: true };
   const sensor = tilt.read(performance.now());
-  if (tilt.brakes.size) return { left: true, right: true, axis: 0 };
-  if (keys.left || keys.right) return keys;
-  return sensor.stale ? { left: true, right: true, axis: 0 } : sensor;
+  if (tilt.brakes.size)
+    return { left: true, right: true, axis: 0, call: false };
+  if (keys.left || keys.right) return { ...keys, call: true };
+  return sensor.stale
+    ? { left: true, right: true, axis: 0, call: false }
+    : { ...sensor, call: true };
 }
 function chooseMode(mode, message) {
   steeringMode = mode;
