@@ -510,7 +510,9 @@ export function step(g, dt, input) {
   updateTraffic(g, dt);
   moveAnimals(g.animals, dt);
   moveCrowd(g.crowd, dt, g.crossings, g.animals);
-  const people = [...g.crowd.filter(visiblePerson), ...g.animals],
+  const nearbyAnimals = g.animals.filter((animal) =>
+    previousTeam.some((member) => Math.abs(animal.y - member.y) < 100));
+  const people = [...g.crowd.filter(visiblePerson), ...nearbyAnimals],
     blockedContacts = new Map();
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
