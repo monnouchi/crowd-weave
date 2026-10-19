@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, insideConcert, seedForRun } from "../logic.js";
-import { drawWorld3D } from "../world-3d.js";
+import { drawRain, drawWorld3D, umbrellaCanopy } from "../world-3d.js";
 
 test("all five 3D scenes render at phone and desktop sizes without changing game state", () => {
   const ctx = new Proxy({}, {
@@ -43,6 +43,37 @@ test("all five 3D scenes render at phone and desktop sizes without changing game
       "the final result card should include the stage, not a narrow strip");
   } finally {
     Math.random = originalRandom;
+  }
+});
+
+test("stage four umbrellas form a raised dome with a lower scalloped rim", () => {
+  const canopy = umbrellaCanopy(240, 350);
+  assert.equal(canopy.inner.length, 10);
+  assert.equal(canopy.rim.length, 10);
+  assert.ok(canopy.inner.every((v) => canopy.center[2] > v[2]));
+  assert.ok(canopy.rim.every((v) => v[2] < canopy.inner[0][2]));
+  assert.ok(new Set(canopy.rim.map((v) => v[2])).size > 1);
+  assert.ok(canopy.rim.every((v) => Math.abs(Math.hypot(v[0] - 240,
+    v[1] - 350) - 19) < 0.001));
+});
+
+test("rain streaks descend on screen without lateral particle drift", () => {
+  const lines = [];
+  const ctx = { save() {}, restore() {}, beginPath() {}, stroke() {},
+    moveTo(x, y) { this.from = { x, y }; },
+    lineTo(x, y) { lines.push({ from: this.from, to: { x, y } }); },
+  };
+  drawRain(ctx, 390, 844, 0, false);
+  const first = lines.splice(0);
+  drawRain(ctx, 390, 844, 0.1, false);
+  const next = lines.splice(0);
+  assert.equal(first.length, 70);
+  for (let i = 0; i < first.length; i++) {
+    assert.equal(first[i].from.x, next[i].from.x);
+    assert.ok(next[i].from.y > first[i].from.y ||
+      first[i].from.y > 800, 'particle moves down unless wrapping below the view');
+    assert.ok(first[i].to.y - first[i].from.y >= 18);
+    assert.ok(Math.abs(first[i].to.x - first[i].from.x) <= 2);
   }
 });
 

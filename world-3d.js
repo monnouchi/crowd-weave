@@ -373,17 +373,34 @@ function traffic(ctx, p, crossing) {
     "#dcca91", p.scale);
 }
 
+export function umbrellaCanopy(x, y) {
+  const center = [x, y, 67];
+  const inner = [], rim = [];
+  for (let i = 0; i < 10; i++) {
+    const angle = i * Math.PI / 5;
+    inner.push([x + 9 * Math.cos(angle), y + 9 * Math.sin(angle), 63]);
+    rim.push([x + 19 * Math.cos(angle), y + 19 * Math.sin(angle),
+      i % 2 ? 52 : 54]);
+  }
+  return { center, inner, rim };
+}
 function umbrella(ctx, p, actor, hand) {
   const [x, y, gripZ] = hand;
-  segment(ctx, p, [x, y, gripZ], [x, y, 56],
-    "#4f6870", 2 * p.scale);
-  topDisk(ctx, p, x, y, 56, 17,
-    actor.id % 2 ? "#e7c690" : "#8db7af", "#526f6c");
-  for (let angle = 0; angle < 6; angle++) {
-    const a = angle * Math.PI / 3;
-    segment(ctx, p, [x, y, 56.3],
-      [x + 16 * Math.cos(a), y + 16 * Math.sin(a), 56.3],
-      "#f1e7d0a0", 0.8 * p.scale);
+  const { center, inner, rim } = umbrellaCanopy(x, y);
+  const warm = actor.id % 2 === 1;
+  segment(ctx, p, [x, y, gripZ], center, "#4f6870", 2.4 * p.scale);
+  segment(ctx, p, [x, y, gripZ], [x + 3, y, gripZ - 3],
+    "#4f6870", 2.2 * p.scale);
+  for (let i = 0; i < rim.length; i++) {
+    const next = (i + 1) % rim.length;
+    face(ctx, p, [center, inner[i], inner[next]],
+      warm ? "#f1d6a1" : "#a5d0c5");
+    face(ctx, p, [inner[i], rim[i], rim[next], inner[next]],
+      warm ? (i % 2 ? "#d5ad73" : "#e5c48d")
+        : (i % 2 ? "#76aaa2" : "#8bbdb3"));
+    segment(ctx, p, center, rim[i],
+      warm ? "#f8e8c49c" : "#d4e9d995", 0.9 * p.scale);
+    segment(ctx, p, rim[i], rim[next], "#4f6b69", 1.8 * p.scale);
   }
 }
 
@@ -510,17 +527,17 @@ function people(ctx, p, game, reducedMotion, poses) {
   }
 }
 
-function rain(ctx, width, height, time, reducedMotion) {
+export function drawRain(ctx, width, height, time, reducedMotion) {
   ctx.save();
   ctx.strokeStyle = "#e2f1ec69";
   ctx.lineWidth = 1.1;
-  const shift = reducedMotion ? 0 : time * 110;
   for (let i = 0; i < 70; i++) {
-    const x = ((i * 139.7 + shift * 0.23) % (width + 80)) - 40;
-    const y = ((i * 283.3 + shift) % (height + 90)) - 45;
+    const x = ((i * 139.7) % (width + 80)) - 40;
+    const fall = reducedMotion ? 0 : time * (118 + (i % 3) * 17);
+    const y = ((i * 283.3 + fall) % (height + 90)) - 45;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x - 6, y + 19);
+    ctx.lineTo(x + 1.5, y + 19);
     ctx.stroke();
   }
   ctx.restore();
@@ -558,7 +575,7 @@ export function drawWorld3D(ctx, game, { width, height, top, bottom,
   }
   people(ctx, p, game, reducedMotion, poses);
   if (game.stage === 3)
-    rain(ctx, width, height, game.worldTime, reducedMotion);
+    drawRain(ctx, width, height, game.worldTime, reducedMotion);
   if (game.stage === 4) concertLights(ctx, p, game, reducedMotion);
   const cardPoints = [0, 480].flatMap((x) =>
     [-205, 145].flatMap((y) => [0, 85].map((z) => p.point(x, y, z))));
