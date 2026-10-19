@@ -492,6 +492,8 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     hopReleased: false,
     hopReadyAt: 0,
     hop: null,
+    edgeContactSide: 0,
+    edgeBumpSerial: 0,
     seed,
     crowd,
     animals: createAnimals(stage, crowd),
@@ -518,6 +520,7 @@ export function step(g, dt, input) {
   g.cooldown = Math.max(0, g.cooldown - dt);
   g.stun = Math.max(0, g.stun - dt);
   let hopRequested = 0;
+  let lateralIntent = 0;
   if (!g.stun && !g.arriving) {
     const brake = input.left && input.right;
     if (!brake) {
@@ -526,11 +529,17 @@ export function step(g, dt, input) {
           : Number(!!input.right) - Number(!!input.left);
       if (g.hop) {
         hopRequested = Math.min(g.hop.remaining, HOP_SPEED * dt);
+        lateralIntent = g.hop.side;
         g.player.x += g.hop.side * hopRequested;
-      } else g.player.x += direction * 100 * dt;
+      } else {
+        lateralIntent = direction;
+        g.player.x += direction * 100 * dt;
+      }
       g.player.y -= 75 * dt;
     }
   }
+  const attemptedEdge = dt > 0 && lateralIntent < 0 && g.player.x <= 30
+    ? -1 : dt > 0 && lateralIntent > 0 && g.player.x >= W - 30 ? 1 : 0;
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
   g.player.y = Math.max(
     g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
@@ -581,6 +590,15 @@ export function step(g, dt, input) {
     g.hop.remaining -= actual;
     if (actual < hopRequested - 0.1 || g.hop.remaining <= 0.1)
       g.hop = null;
+  }
+  const reachedEdge = attemptedEdge &&
+    (attemptedEdge < 0 ? g.player.x <= 30.001
+      : g.player.x >= W - 30.001);
+  if (reachedEdge && g.edgeContactSide !== attemptedEdge) {
+    g.edgeContactSide = attemptedEdge;
+    g.edgeBumpSerial++;
+  } else if (!reachedEdge && g.player.x > 32 && g.player.x < W - 32) {
+    g.edgeContactSide = 0;
   }
   const goal = goalFor(g.stage);
   if (

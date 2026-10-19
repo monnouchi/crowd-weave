@@ -201,6 +201,8 @@ export class GameAudio {
       this.tone(440, 0.22, 0.014, 0.11, "sine");
     }
     if (kind === "brake") this.tone(220, 0.08, 0.012);
+    if (kind === "boundary")
+      this.tone(470, 0.075, 0.0045, 0, "square", false, 330);
     if (kind === "goal" || kind === "final") {
       const band = kind === "final",
         tick = band ? 0.25 : 0.3;

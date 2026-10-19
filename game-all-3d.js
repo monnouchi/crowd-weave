@@ -591,6 +591,7 @@ function frame(now) {
   }
   const hits = game.hits;
   const violations = trafficViolations(game);
+  const edgeBumps = game.edgeBumpSerial;
   audio.update(
     game.phase === "playing",
     input().left && input().right,
@@ -697,6 +698,9 @@ function frame(now) {
         `${game.lastContactMember ? "友だち" + game.lastContactMember : "自分"}が接触！ +2秒`;
     }
   }
+  if (game.edgeBumpSerial > edgeBumps && game.hits === hits &&
+      trafficViolations(game) === violations && game.phase === "playing")
+    audio.effect("boundary");
   $("#notice").classList.toggle(
     "active",
     game.phase === "playing" && now < noticeUntil,
