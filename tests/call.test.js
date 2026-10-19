@@ -6,6 +6,7 @@ import {
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { TwoButtons } from '../input.js';
+import { drawCallRipple } from '../character.js';
 
 const chord = { left: true, right: true, call: true };
 const released = { left: false, right: false, call: true };
@@ -39,7 +40,7 @@ test('double chord yields a narrow person-only gap while both held still brakes'
   assert.equal(activeSpeech(g)?.speakerId, 0);
   assert.equal(g.callReadyAt, g.worldTime + CALL_COOLDOWN);
   assert.deepEqual(activeCallRipple(g), {
-    x: callFrom.x, y: callFrom.y, progress: 0,
+    x: callFrom.x, y: callFrom.y, progress: 0, mode: 'recognized',
   });
   assert.ok(g.crowd[0].courtesy && g.crowd[1].courtesy);
   const before = g.crowd.map((p) => p.x);
@@ -89,6 +90,7 @@ test('keyboard chord must fully release; cooldown cannot retrigger while held', 
   step(g, 0.025, { ...buttons.read(), call: true });
   assert.ok(g.callReadyAt > 0);
   const firstRipple = g.callRipple;
+  const firstSerial = g.speech.serial;
   buttons.clear();
   step(g, 0.025, { ...buttons.read(), call: true });
   buttons.press('key:ArrowLeft', 'left');
@@ -99,28 +101,37 @@ test('keyboard chord must fully release; cooldown cannot retrigger while held', 
   buttons.press('key:ArrowLeft', 'left');
   buttons.press('key:ArrowRight', 'right');
   step(g, 0.025, { ...buttons.read(), call: true });
-  assert.equal(g.callRipple, firstRipple,
-    'a fresh double chord during cooldown must not show a new ripple');
+  assert.notEqual(g.callRipple, firstRipple,
+    'a fresh double chord still confirms that the input was recognized');
+  assert.ok(g.callRipple.started > firstRipple.started);
+  assert.equal(g.callRipple.mode, 'unavailable');
+  assert.equal(g.speech.serial, firstSerial,
+    'cooldown does not trigger the crowd-moving effect again');
+  const cooldownRipple = g.callRipple;
   const serial = g.speech.serial;
   for (let i = 0; i < 430; i++) step(g, 0.025, { ...buttons.read(), call: true });
   assert.equal(g.speechSequence, serial);
+  assert.equal(g.callRipple, cooldownRipple,
+    'holding the chord does not repeat the recognition cue');
   assert.equal(g.callReadyAt, CALL_COOLDOWN + 0.125);
 });
 
-test('red approach, no people, pause, restart and stage transition cancel or suppress the gesture', () => {
+test('no people still confirms input; restricted approach, pause and restart stay safe', () => {
   const empty = createGame(0, 17);
   empty.phase = 'playing';
   empty.crowd = [];
   doubleTap(empty);
   assert.equal(empty.callReadyAt, 0);
-  assert.equal(activeCallRipple(empty), null, 'no target means no success cue');
+  assert.equal(activeCallRipple(empty)?.mode, 'recognized',
+    'recognition is visible even when no one needs to move');
+  assert.equal(activeSpeech(empty), null);
   const road = crowded(1);
   road.player.y = road.traffic.bottom + 35;
   road.crowd.forEach((p) => p.y = road.player.y - 30);
   doubleTap(road);
   assert.equal(road.callReadyAt, 0);
   assert.equal(road.crowd.some((p) => p.courtesy), false);
-  assert.equal(activeCallRipple(road), null);
+  assert.equal(activeCallRipple(road)?.mode, 'unavailable');
   const g = crowded();
   step(g, 0.025, chord);
   g.phase = 'paused';
@@ -136,7 +147,7 @@ test('red approach, no people, pause, restart and stage transition cancel or sup
   assert.equal(createGame(1, 17).callRipple, null);
 });
 
-test('a successful cue freezes on pause and disappears after the brief window', () => {
+test('a recognized gesture freezes its ripple on pause and ends after the brief window', () => {
   const g = crowded();
   doubleTap(g);
   assert.ok(activeCallRipple(g));
@@ -147,4 +158,16 @@ test('a successful cue freezes on pause and disappears after the brief window', 
   g.phase = 'playing';
   for (let i = 0; i < 28; i++) step(g, 0.025, released);
   assert.equal(activeCallRipple(g), null);
+});
+
+test('an unavailable call draws a smaller, cooler single ripple', () => {
+  const strokes = [];
+  const ctx = { save() {}, restore() {}, beginPath() {}, arc() {},
+    stroke() { strokes.push(this.strokeStyle); } };
+  drawCallRipple(ctx, 20, 20, 1, 0.2, false, false);
+  const recognized = strokes.splice(0);
+  drawCallRipple(ctx, 20, 20, 1, 0.2, false, true);
+  assert.equal(recognized.length, 4, 'recognized input has two rings');
+  assert.equal(strokes.length, 2, 'unavailable effect has one ring');
+  assert.notEqual(strokes[1], recognized[1], 'cooldown color is distinct');
 });

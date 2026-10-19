@@ -864,7 +864,7 @@ function draw() {
   const ripple = activeCallRipple(game);
   if (ripple)
     drawCallRipple(ctx, ripple.x, ripple.y, 1, ripple.progress,
-      reducedMotion.matches);
+      reducedMotion.matches, ripple.mode === "unavailable");
   ctx.restore();
   if (game.player.y > 580) {
     rounded(170, 12, 140, 28, 14, "#285d55");

@@ -98,7 +98,7 @@ export function activeCallRipple(g) {
   const age = g.worldTime - g.callRipple.started;
   return age >= 0 && age < CALL_RIPPLE_DURATION
     ? { x: g.callRipple.x, y: g.callRipple.y,
-        progress: age / CALL_RIPPLE_DURATION }
+        progress: age / CALL_RIPPLE_DURATION, mode: g.callRipple.mode }
     : null;
 }
 function say(g, kind, speakerId, text, duration) {
@@ -207,13 +207,17 @@ function updateCallGesture(g, input) {
   }
   cancelCallGesture(g);
   g.callHeld = true;
-  if (g.worldTime < g.callReadyAt || g.arriving ||
-      g.crossings.some((t) => g.player.y >= t.top - 55 &&
-        g.player.y <= t.bottom + 65)) return;
+  const unavailable = g.worldTime < g.callReadyAt || g.arriving ||
+    g.crossings.some((t) => g.player.y >= t.top - 55 &&
+      g.player.y <= t.bottom + 65);
+  // The ripple acknowledges the completed input. A quieter color distinguishes
+  // a recognized gesture whose crowd-moving effect is currently unavailable.
+  g.callRipple = { x: g.player.x, y: g.player.y, started: g.worldTime,
+    mode: unavailable ? "unavailable" : "recognized" };
+  if (unavailable) return;
   const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage);
   if (moved) {
     g.callReadyAt = g.worldTime + CALL_COOLDOWN;
-    g.callRipple = { x: g.player.x, y: g.player.y, started: g.worldTime };
     say(g, "call", 0, "すみませーん！", 1.35);
   }
 }

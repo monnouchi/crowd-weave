@@ -579,7 +579,8 @@ export function drawWorld3D(ctx, game, { width, height, top, bottom,
   const ripple = activeCallRipple(game);
   if (ripple) {
     const at = p.point(ripple.x, ripple.y, 35);
-    drawCallRipple(ctx, at.x, at.y, p.scale, ripple.progress, reducedMotion);
+    drawCallRipple(ctx, at.x, at.y, p.scale, ripple.progress, reducedMotion,
+      ripple.mode === "unavailable");
   }
   if (game.stage === 3)
     drawRain(ctx, width, height, game.worldTime, reducedMotion);

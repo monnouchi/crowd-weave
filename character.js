@@ -1,18 +1,24 @@
 import { facingView } from "./pose.js";
-export function drawCallRipple(ctx, x, y, scale, progress, reducedMotion = false) {
+export function drawCallRipple(ctx, x, y, scale, progress,
+  reducedMotion = false, muted = false) {
   const fade = 1 - progress;
-  const radii = reducedMotion
-    ? [54]
-    : [26 + 82 * progress, ...(progress > 0.17
-      ? [18 + 82 * (progress - 0.17)] : [])];
+  let radii;
+  if (muted) radii = [reducedMotion ? 46 : 28 + 60 * progress];
+  else if (reducedMotion) radii = [54];
+  else radii = [26 + 82 * progress, ...(progress > 0.17
+    ? [18 + 82 * (progress - 0.17)] : [])];
   ctx.save();
   for (const radius of radii) {
     ctx.beginPath();
     ctx.arc(x, y, radius * scale, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(20, 80, 82, ${0.65 * fade})`;
+    ctx.strokeStyle = muted
+      ? `rgba(29, 83, 96, ${0.75 * fade})`
+      : `rgba(20, 80, 82, ${0.65 * fade})`;
     ctx.lineWidth = 5 * scale;
     ctx.stroke();
-    ctx.strokeStyle = `rgba(255, 239, 173, ${fade})`;
+    ctx.strokeStyle = muted
+      ? `rgba(195, 240, 241, ${0.95 * fade})`
+      : `rgba(255, 239, 173, ${fade})`;
     ctx.lineWidth = 2.6 * scale;
     ctx.stroke();
   }
