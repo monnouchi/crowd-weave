@@ -200,6 +200,12 @@ header > div {
     radial-gradient(circle at 11px 30px, #8ac4a0 6px, transparent 6.5px),
     #293c40;
 }
+#traffic-status.blink-off::before {
+  background:
+    radial-gradient(circle at 11px 10px, #486267 6px, transparent 6.5px),
+    radial-gradient(circle at 11px 30px, #486267 6px, transparent 6.5px),
+    #293c40;
+}
 .toolbar {
   position: absolute;
   z-index: 4;
@@ -812,6 +818,12 @@ main:has(.overlay.finale:not([hidden])) .hud {
     background:
       radial-gradient(circle at 10px 10px, #486267 6px, transparent 6.5px),
       radial-gradient(circle at 30px 10px, #8ac4a0 6px, transparent 6.5px),
+      #293c40;
+  }
+  #traffic-status.blink-off::before {
+    background:
+      radial-gradient(circle at 10px 10px, #486267 6px, transparent 6.5px),
+      radial-gradient(circle at 30px 10px, #486267 6px, transparent 6.5px),
       #293c40;
   }
   .toolbar {

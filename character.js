@@ -11,6 +11,14 @@ function circle(c, x, y, r, color) {
   c.arc(x, y, r, 0, Math.PI * 2);
   c.fill();
 }
+function lightStick(c, id) {
+  const color = ["#83efd8", "#f6a2dc", "#f9e493"][(id || 0) % 3];
+  rounded(c, -2.2, -7, 4.4, 8, 1.5, "#364d53");
+  rounded(c, -3.8, -22, 7.6, 17, 3.8, color + "55");
+  rounded(c, -2.6, -21, 5.2, 15, 2.6, color);
+  rounded(c, -0.8, -19, 1.6, 11, 0.8, "#fff5db");
+  circle(c, 0, -21, 2.6, color);
+}
 function foot(c, x, y, ux, uy) {
   c.save();
   c.translate(x, y);
@@ -477,13 +485,7 @@ export function drawCharacter(
     c.save();
     c.translate(handX, handY - 1);
     c.rotate(glowSide * 0.25 + swing);
-    c.strokeStyle = ["#83efd8", "#f6a2dc", "#f9e493"][p.id % 3];
-    c.lineWidth = 2.4;
-    c.shadowBlur = 0;
-    c.beginPath();
-    c.moveTo(0, 0);
-    c.lineTo(0, -10);
-    c.stroke();
+    lightStick(c, p.id);
     c.restore();
   }
   if (p.reaction && !back) {
@@ -619,15 +621,11 @@ export function drawOverheadCharacter(c, p, options = {}) {
     c.stroke();
     circle(c, hx, hy, 2.3, skin);
     if (p.glowStick && sign === (p.umbrella ? -1 : 1)) {
-      c.strokeStyle = ["#83efd8", "#f6a2dc", "#f9e493"][p.id % 3];
-      c.lineWidth = 2.4;
-      c.beginPath();
-      c.moveTo(hx, hy);
-      c.lineTo(
-        hx + sign * 2,
-        hy - 10 + (reducedMotion ? 0 : Math.sin(time + p.id)),
-      );
-      c.stroke();
+      c.save();
+      c.translate(hx, hy);
+      c.rotate(sign * 0.2 + (reducedMotion ? 0 : Math.sin(time + p.id) * 0.1));
+      lightStick(c, p.id);
+      c.restore();
     }
   }
   const head = Math.min(6.5, Math.max(5, r * 0.56));

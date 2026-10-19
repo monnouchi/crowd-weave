@@ -254,35 +254,77 @@ function drawGoalHomes(ctx, projector) {
     drawTree(ctx, projector, x, y, 10);
 }
 
-export function drawPerson(ctx, projector, p, { player = false, friend = false, time = 0, hit = false, baseZ = 0 } = {}) {
+export function personFrame(p, pose = null) {
+  const ux = pose?.ux ?? p.ux ?? 0,
+    uy = pose?.uy ?? p.uy ?? -1,
+    length = Math.hypot(ux, uy) || 1,
+    forward = { x: ux / length, y: uy / length },
+    right = { x: -forward.y, y: forward.x },
+    moving = pose ? pose.moving :
+      (["walking", "following", "docking"].includes(p.state) &&
+        Math.hypot(p.vx || 0, p.vy || 0) > 1),
+    speed = pose?.speed ?? Math.hypot(p.vx || 0, p.vy || 0),
+    distance = pose?.distance ?? p.walk ?? 0,
+    stride = moving
+      ? Math.sin(distance / 7 + (p.id || 0) * 1.7) *
+        Math.min(1, speed / 35) * 2.8
+      : 0;
+  return { forward, right, stride };
+}
+
+export function drawPerson(ctx, projector, p, {
+  player = false, friend = false, hit = false, baseZ = 0,
+  pose = null, reducedMotion = false,
+} = {}) {
   const { x, y } = p;
   const scale = projector.scale;
   const appearance = appearanceFor(p, player);
+  const frame = personFrame(p, pose),
+    { forward, right } = frame,
+    stride = reducedMotion ? 0 : frame.stride,
+    at = (side, front, height) => [
+      x + right.x * side + forward.x * front,
+      y + right.y * side + forward.y * front,
+      baseZ + height,
+    ];
   const ground = projector.point(x, y, baseZ);
   disk(ctx, ground.x + 2 * scale, ground.y + 2 * scale, 11 * scale, 5 * scale, "#243a3d4d");
   if (player || friend) groundCircle(ctx, projector, x, y, p.r + 5,
     player ? "#2f9fc032" : "#f5c85d40", player ? "#117ea7" : "#bc8a35", 2.4 * scale);
   if (hit) groundCircle(ctx, projector, x, y, p.r + 6, null, "#c6543c", 3 * scale);
   const shirt = player ? "#268eaf" : p.shirt || (friend ? "#d9af55" : CROWD_SHIRTS[(p.color ?? p.id ?? 0) % CROWD_SHIRTS.length]);
-  const step = p.state === "walking" && !player ? Math.sin(time * 7 + (p.id || 0)) * 1.3 : 0;
   for (const side of [-1, 1]) {
-    segment(ctx, projector, [x + side * 4, y - step * side, baseZ + 2], [x + side * 4, y, baseZ + 15], "#334b55", 4.8 * scale);
-    const shoe = projector.point(x + side * 4, y - step * side + 2, baseZ + 1);
+    segment(ctx, projector, at(side * 4, 0, 15),
+      at(side * 4, stride * side, 2), "#334b55", 4.8 * scale);
+    const shoe = projector.point(...at(side * 4, stride * side + 2, 1));
     disk(ctx, shoe.x, shoe.y, 4.2 * scale, 2.7 * scale, "#263b40");
   }
-  face(ctx, projector, [[x - 8, y + 4, baseZ + 15], [x + 8, y + 4, baseZ + 15], [x + 9, y + 4, baseZ + 30], [x - 9, y + 4, baseZ + 30]],
-    shirt, "#28464a", 1.5 * scale);
-  face(ctx, projector, [[x + 8, y - 5, baseZ + 15], [x + 8, y + 4, baseZ + 15], [x + 9, y + 4, baseZ + 30], [x + 9, y - 5, baseZ + 30]],
-    "#294a55aa");
+  const corners = [[-8, 5], [8, 5], [8, -5], [-8, -5]];
+  const walls = corners.map(([side, front], i) => {
+    const [nextSide, nextFront] = corners[(i + 1) % 4];
+    const vertices = [at(side, front, 15), at(nextSide, nextFront, 15),
+      at(nextSide, nextFront, 30), at(side, front, 30)];
+    const depth = vertices.reduce((sum, point) =>
+      sum + projector.point(...point).y, 0) / 4;
+    return { vertices, depth, fill: i % 2 === 0 ? shirt : "#294a55aa" };
+  });
+  for (const wall of walls.sort((a, b) => a.depth - b.depth))
+    face(ctx, projector, wall.vertices, wall.fill, "#28464a", 1.2 * scale);
+  face(ctx, projector, corners.map(([side, front]) => at(side, front, 30)), shirt);
+  let rightHand;
   for (const side of [-1, 1]) {
-    segment(ctx, projector, [x + side * 8, y, baseZ + 27], [x + side * 12, y + 1, baseZ + 17], shirt, 4 * scale);
-    const hand = projector.point(x + side * 12, y + 1, baseZ + 17);
+    const grip = at(side * 12, stride * side * 0.45, 17);
+    segment(ctx, projector, at(side * 8, 0, 27), grip, shirt, 4 * scale);
+    const hand = projector.point(...grip);
     disk(ctx, hand.x, hand.y, 2.2 * scale, 2.2 * scale, appearance.skin);
+    if (side === 1) rightHand = grip;
   }
-  const head = projector.point(x, y, baseZ + 39);
+  const head = projector.point(...at(0, 0, 39));
   disk(ctx, head.x, head.y, 7.2 * scale, 7.2 * scale, appearance.skin, "#5b554a");
-  disk(ctx, head.x - 0.8 * scale, head.y - 3.3 * scale, 7 * scale, 4.5 * scale,
-    appearance.hair);
+  const hair = projector.point(...at(0, -3, 41));
+  disk(ctx, hair.x, hair.y, 6.8 * scale, 4.5 * scale, appearance.hair);
+  const nose = projector.point(...at(0, 7, 38));
+  disk(ctx, nose.x, nose.y, 1.8 * scale, 1.8 * scale, appearance.skin);
   if (player) {
     ctx.fillStyle = "#f6f0dd";
     ctx.strokeStyle = "#244f5c";
@@ -295,6 +337,7 @@ export function drawPerson(ctx, projector, p, { player = false, friend = false, 
     ctx.textAlign = "center";
     ctx.fillText("YOU", ground.x, labelY + 10 * scale);
   }
+  return { rightHand, frame: { ...frame, stride } };
 }
 
 export function drawStageOne3D(ctx, game, { width, height, viewport, includePeople = true }) {

@@ -7,6 +7,7 @@ import {
   crossingTime,
   createTraffic,
   trafficViolations,
+  trafficBlocks,
 } from "../traffic.js";
 import { planRoute, routeInput } from "../validation/plan-route.js";
 function fixture(stage = 3) {
@@ -47,6 +48,84 @@ test("paused/background clock freezes lights, cars and time penalties", () => {
   g.phase = "playing";
   step(g, 0.025, {});
   assert.equal(g.worldTime, before.worldTime + 0.025);
+});
+test("pedestrian blue flashes before red on repeated signal cycles", () => {
+  const g = fixture(1), t = g.traffic;
+  for (let cycle = 0; cycle < 3; cycle++) {
+    for (const [phase, green, blinking, lit] of [
+      [7.4, true, false, true],
+      [7.8, true, true, false],
+      [8.05, true, true, true],
+      [9.01, false, false, false],
+    ]) {
+      g.worldTime = cycle * t.period + phase;
+      t.vehicle.active = false;
+      updateTraffic(g, 0);
+      assert.equal(t.nominalGreen, green);
+      assert.equal(t.blinking, blinking);
+      assert.equal(t.blinkOn, lit);
+    }
+  }
+});
+test("a walker enters on steady blue and vehicles wait for its committed crossing", () => {
+  const g = fixture(1), t = g.traffic;
+  for (let cycle = 0; cycle < 3; cycle++) {
+    const walker = {
+      id: 1, x: 290, y: t.bottom + 16, r: 11,
+      route: [{ x: 290, y: 200 }], leg: 0, pace: 40, active: true,
+    };
+    g.crowd = [walker];
+    g.worldTime = cycle * t.period + 6.4;
+    t.vehicle.active = false;
+    updateTraffic(g, 0);
+    assert.equal(t.green, true);
+    assert.equal(t.blinking, false);
+    assert.equal(trafficBlocks(walker, -40, t, 0.05), false);
+    assert.equal(walker.trafficCommitted, "road");
+    g.worldTime = cycle * t.period + 7.8;
+    updateTraffic(g, 0);
+    const newWalker = { ...walker, trafficCommitted: null };
+    assert.equal(trafficBlocks(newWalker, -40, t, 0.05), true,
+      "new entrants wait during blue flashing");
+    g.worldTime = (cycle + 1) * t.period + 0.01;
+    updateTraffic(g, 0);
+    assert.equal(t.nominalGreen, false);
+    assert.equal(trafficBlocks(walker, -40, t, 0.05), false);
+    assert.equal(t.vehicle.entered, false,
+      "the approaching committed walker holds the car at red");
+    walker.y = t.top - 70;
+    updateTraffic(g, 0);
+    assert.equal(walker.trafficCommitted, null);
+    assert.equal(walker.trafficDirection, 0);
+    const vehicleX = t.vehicle.x;
+    updateTraffic(g, 0.05);
+    assert.notEqual(t.vehicle.x, vehicleX,
+      "vehicle traffic resumes after the walker clears the road");
+  }
+});
+test("real pedestrian flows start crossing on steady blue across several cycles", () => {
+  for (const stage of [1, 3]) {
+    const g = createGame(stage, 17);
+    g.phase = "playing";
+    const previous = new Map(),
+      windows = new Map(g.crossings.map((t) => [t.id, new Set()]));
+    for (let frame = 0; frame < 1600; frame++) {
+      step(g, 0.025, { left: true, right: true });
+      for (const p of g.crowd) {
+        if (p.trafficCommitted && !previous.get(p.id)) {
+          const t = g.crossings.find((crossing) =>
+            crossing.id === p.trafficCommitted);
+          assert.ok(t?.nominalGreen && !t.blinking,
+            "a new crossing begins on steady blue");
+          windows.get(t.id).add(Math.floor(
+            (g.worldTime + t.phaseOffset) / t.period));
+        }
+        previous.set(p.id, p.trafficCommitted);
+      }
+    }
+    for (const [road, cycles] of windows)
+      assert.ok(cycles.size >= 3, `${road} discharged on repeated cycles`);
+  }
 });
 test("red entry is voluntary and produces one violation for the entire crossing", () => {
   const g = fixture();

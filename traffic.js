@@ -86,6 +86,8 @@ export function createTraffic(stage, spec = trafficSpec(stage)) {
         ...spec,
         green: false,
         nominalGreen: false,
+        blinking: false,
+        blinkOn: false,
         remaining: spec.greenStart,
         canEnter: false,
         reserved: false,
@@ -116,6 +118,15 @@ export function updateTraffic(g, dt) {
   g.traffic = activeTraffic(g);
 }
 function updateCrossing(g, t, dt) {
+  const key = t.id || "road";
+  for (const p of g.crowd)
+    if (p.trafficCommitted === key &&
+      (!p.active || (p.trafficDirection < 0
+        ? p.y + p.r < t.top - 15
+        : p.y - p.r > t.bottom + 15))) {
+      p.trafficCommitted = null;
+      p.trafficDirection = 0;
+    }
   const clock = g.worldTime + (t.phaseOffset || 0);
   const phase = clock % t.period;
   t.nominalGreen = phase >= t.greenStart && phase < t.greenEnd;
@@ -124,6 +135,11 @@ function updateCrossing(g, t, dt) {
     : phase < t.greenStart
       ? t.greenStart - phase
       : t.period - phase + t.greenStart;
+  // The pedestrian lamp flashes during the last 1.5 seconds of green.
+  // Deriving it from world time also freezes the flash while the game is paused.
+  t.blinking = t.nominalGreen && t.remaining <= 1.5;
+  t.blinkOn = t.nominalGreen &&
+    (!t.blinking || Math.floor(clock * 4) % 2 === 0);
   const team = [g.player, ...g.party.members];
   if (t.crossing && team.every((p) => p.y + p.r < t.top - 2)) {
     t.reserved = false;
@@ -143,10 +159,11 @@ function updateCrossing(g, t, dt) {
     ...(t.reserved ? team : []),
   ].some(
     (p) =>
-      p.y + p.r > t.top - 5 &&
-      p.y - p.r < t.bottom + 5 &&
-      p.x + p.r > -10 &&
-      p.x - p.r < 490,
+      p.trafficCommitted === key ||
+      (p.y + p.r > t.top - 5 &&
+        p.y - p.r < t.bottom + 5 &&
+        p.x + p.r > -10 &&
+        p.x - p.r < 490),
   );
   v.previousX = v.x;
   v.wasActive = v.active;
@@ -252,16 +269,23 @@ export function trafficWaypoint(p, target, t) {
 }
 export function trafficBlocks(p, vy, t, dt) {
   if (!t) return false;
+  const key = t.id || "road";
   const crossing = crossingLane(p, p.route[p.leg], t);
-  const enough =
-    t.green &&
-    (!crossing || Math.abs(p.x - crossing.lane) <= 12) &&
-    t.remaining > (t.bottom - t.top + 26) / Math.max(12, p.pace) + 0.7;
-  if (enough) return false;
-  return (
-    (vy < 0 && p.y >= t.bottom + 15 && p.y + vy * dt < t.bottom + 15) ||
-    (vy > 0 && p.y <= t.top - 15 && p.y + vy * dt > t.top - 15)
-  );
+  if (!crossing) return false;
+  const stop = crossing.north ? t.bottom + 15 : t.top - 15;
+  const entering = crossing.north
+    ? p.y >= stop && p.y + vy * dt < stop
+    : p.y <= stop && p.y + vy * dt > stop;
+  if (p.trafficCommitted === key) return false;
+  if (!entering) return false;
+  const mayStart = t.green && !t.blinking &&
+    Math.abs(p.x - crossing.lane) <= 12;
+  if (mayStart) {
+    // Keep a walker who left the stop line protected through the red phase.
+    p.trafficCommitted = key;
+    p.trafficDirection = crossing.north ? -1 : 1;
+  }
+  return !mayStart;
 }
 
 function segmentBox(a, b, left, top, right, bottom) {

@@ -318,7 +318,9 @@ function traffic(ctx, p, crossing) {
       "#203c40", "#263f43", "#263f43");
     const bulb = p.point(x, y + 7, 57);
     disk(ctx, bulb.x, bulb.y, 4.5 * p.scale, 4.5 * p.scale,
-      t.nominalGreen ? "#47d6a5" : "#ee6970", "#f2ead1");
+      t.nominalGreen
+        ? (t.blinkOn ? "#47d6a5" : "#314d50")
+        : "#ee6970", "#f2ead1");
     groundCircle(ctx, p, x, y, 11, "#435d58b0");
   }
   const vehicle = t.vehicle;
@@ -354,9 +356,9 @@ function traffic(ctx, p, crossing) {
     "#dcca91", p.scale);
 }
 
-function umbrella(ctx, p, actor) {
-  const x = actor.x + 9, y = actor.y;
-  segment(ctx, p, [x, y, 18], [x, y, 56],
+function umbrella(ctx, p, actor, hand) {
+  const [x, y, gripZ] = hand;
+  segment(ctx, p, [x, y, gripZ], [x, y, 56],
     "#4f6870", 2 * p.scale);
   topDisk(ctx, p, x, y, 56, 17,
     actor.id % 2 ? "#e7c690" : "#8db7af", "#526f6c");
@@ -368,18 +370,25 @@ function umbrella(ctx, p, actor) {
   }
 }
 
-function glowStick(ctx, p, actor, time) {
-  const x = actor.x + 12, y = actor.y + 1;
-  segment(ctx, p, [x, y, 23], [x + 3, y, 51],
-    "#e6d9a6", 2 * p.scale);
-  const tip = p.point(x + 3, y, 51);
-  disk(ctx, tip.x, tip.y, 5 * p.scale, 5 * p.scale,
-    Math.sin(time * 5 + actor.id) > 0 ? "#a8e3d8a0" : "#f4d29f80");
-  disk(ctx, tip.x, tip.y, 2 * p.scale, 2 * p.scale,
-    "#f5eed2");
+export function drawGlowStick(ctx, p, hand, id, time) {
+  const [x, y, gripZ] = hand,
+    color = ["#80e9d4", "#f2a2d3", "#f2d789"][id % 3],
+    tip = p.point(x + 3, y, gripZ + 37);
+  segment(ctx, p, hand, [x + 1, y, gripZ + 11],
+    "#394e54", 5 * p.scale);
+  segment(ctx, p, [x + 1, y, gripZ + 10],
+    [x + 3, y, gripZ + 37], color + "55", 10 * p.scale);
+  segment(ctx, p, [x + 1, y, gripZ + 11],
+    [x + 3, y, gripZ + 36], color, 5.5 * p.scale);
+  segment(ctx, p, [x + 2, y, gripZ + 13],
+    [x + 3, y, gripZ + 35], "#fff6da", 1.6 * p.scale);
+  disk(ctx, tip.x, tip.y, 4 * p.scale, 4 * p.scale, color);
+  disk(ctx, tip.x, tip.y,
+    (Math.sin(time * 5 + id) > 0 ? 7 : 5) * p.scale,
+    (Math.sin(time * 5 + id) > 0 ? 7 : 5) * p.scale, color + "44");
 }
 
-function people(ctx, p, game, reducedMotion) {
+function people(ctx, p, game, reducedMotion, poses) {
   const newFriend = joiningFriend(game, reducedMotion);
   const partner = game.stage === 4
     ? { ...game.meetingPartner, partner: false, background: true,
@@ -411,13 +420,17 @@ function people(ctx, p, game, reducedMotion) {
     const player = !!actor.player;
     const friend = !!actor.friend || !!actor.partner;
     const hit = player && game.cooldown > 0 && game.lastContactMember === 0;
-    drawPerson(ctx, p, actor, {
+    const key = player ? "player" : actor.friend ? `friend:${actor.id}`
+      : actor.partner ? "partner" : actor.background || actor.band || actor.clerk
+        ? null : `crowd:${actor.id}`;
+    const pose = key ? poses?.get(key) : null;
+    const drawn = drawPerson(ctx, p, actor, {
       player, friend, hit,
-      time: game.worldTime + (game.ambientTime || 0),
+      pose, reducedMotion,
       baseZ: actor.band ? 31 : 0,
     });
-    if (actor.umbrella) umbrella(ctx, p, actor);
-    if (actor.glowStick) glowStick(ctx, p, actor,
+    if (actor.umbrella) umbrella(ctx, p, actor, drawn.rightHand);
+    if (actor.glowStick) drawGlowStick(ctx, p, drawn.rightHand, actor.id,
       game.worldTime + (game.ambientTime || 0));
     if (actor.friend && actor.id) {
       const at = p.point(actor.x, actor.y, 48);
@@ -471,7 +484,7 @@ function concertLights(ctx, p, game, reducedMotion) {
 }
 
 export function drawWorld3D(ctx, game, { width, height, top, bottom,
-  reducedMotion = false } = {}) {
+  reducedMotion = false, poses = null } = {}) {
   const viewport = { top, bottom };
   const p = game.stage === 0
     ? drawStageOne3D(ctx, game, { width, height, viewport, includePeople: false })
@@ -481,7 +494,7 @@ export function drawWorld3D(ctx, game, { width, height, top, bottom,
   else if (game.stage === 3) venue(ctx, p);
   else if (game.stage === 4) hall(ctx, p, game);
   for (const crossing of game.crossings) traffic(ctx, p, crossing);
-  people(ctx, p, game, reducedMotion);
+  people(ctx, p, game, reducedMotion, poses);
   if (game.stage === 3)
     rain(ctx, width, height, game.worldTime, reducedMotion);
   if (game.stage === 4) concertLights(ctx, p, game, reducedMotion);

@@ -91,7 +91,27 @@ let game = createGame(),
   records = [],
   playerPose = { lean: 0 };
 const walkingPoses = new Map();
-let visualDt = 0;
+function updateVisualPoses(dt) {
+  const active = !document.hidden && document.hasFocus() &&
+    (game.phase === "playing" ||
+      (game.phase === "finished" && game.stage === 4));
+  const actors = [
+    ["player", game.player],
+    ["partner", game.meetingPartner],
+    ...game.party.members.map((p) => [`friend:${p.id}`, p]),
+    ...game.crowd.map((p) => [`crowd:${p.id}`, p]),
+  ];
+  for (const [key, actor] of actors) {
+    const previous = walkingPoses.get(key) || createWalkingPose(actor, {
+      x: actor.ux ?? 0,
+      y: actor.uy ?? -1,
+    });
+    walkingPoses.set(key, updateWalkingPose(previous, actor, dt, {
+      canMove: active && (actor.state === undefined ||
+        ["walking", "following", "docking"].includes(actor.state)),
+    }));
+  }
+}
 let companionSpeech = null;
 const tilt = new TiltState();
 let steeringMode = "buttons",
@@ -451,6 +471,7 @@ function draw() {
   const result = drawWorld3D(ctx, game, {
     width, height, top, bottom,
     reducedMotion: reducedMotion.matches,
+    poses: walkingPoses,
   });
   worldProjector = result.projector;
   canvas.weaveResultRegion = game.stage === 4 && game.phase === "finished"
@@ -591,7 +612,7 @@ function frame(now) {
     }
   }
   const movementDt = Math.max(0, Math.min(0.05, dt));
-  visualDt = movementDt;
+  updateVisualPoses(movementDt);
   playerPose = updatePlayerPose(
     playerPose,
     movementDt ? (game.player.x - previousX) / movementDt : 0,
@@ -634,12 +655,15 @@ function frame(now) {
       : t.warning || !t.green
         ? "warning"
         : "green";
+    signal.classList.toggle("blink-off", t.blinking && !t.blinkOn);
     signal.textContent = t.reserved
       ? "↑ 横断中 · 友だち全員が渡るまで車は待ちます"
       : t.canEnter
         ? `↑ 青 · 全員で渡れます（残り${t.remaining.toFixed(1)}秒）`
-        : t.warning
-          ? "■ もうすぐ赤 · 次の青まで待とう"
+        : t.blinking
+          ? "■ 青点滅 · まもなく赤、次の青まで待とう"
+          : t.warning
+            ? "■ もうすぐ赤 · 次の青まで待とう"
           : t.nominalGreen
             ? "■ 車の通過待ち · 両押しで待とう"
             : `■ 赤 · 両押しで停止（青まで${t.remaining.toFixed(1)}秒）`;

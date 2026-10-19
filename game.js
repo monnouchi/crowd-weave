@@ -575,7 +575,9 @@ function drawTraffic(t) {
     ctx.beginPath();
     ctx.arc(x, y, 9, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = green ? "#43d6a3" : "#ec6672";
+    ctx.fillStyle = green
+      ? (t.blinkOn ? "#43d6a3" : "#486267")
+      : "#ec6672";
     ctx.beginPath();
     ctx.arc(x, y, 5.5, 0, Math.PI * 2);
     ctx.fill();
@@ -990,12 +992,15 @@ function frame(now) {
       : t.warning || !t.green
         ? "warning"
         : "green";
+    signal.classList.toggle("blink-off", t.blinking && !t.blinkOn);
     signal.textContent = t.reserved
       ? "↑ 横断中 · 友だち全員が渡るまで車は待ちます"
       : t.canEnter
         ? `↑ 青 · 全員で渡れます（残り${t.remaining.toFixed(1)}秒）`
-        : t.warning
-          ? "■ もうすぐ赤 · 次の青まで待とう"
+        : t.blinking
+          ? "■ 青点滅 · まもなく赤、次の青まで待とう"
+          : t.warning
+            ? "■ もうすぐ赤 · 次の青まで待とう"
           : t.nominalGreen
             ? "■ 車の通過待ち · 両押しで待とう"
             : `■ 赤 · 両押しで停止（青まで${t.remaining.toFixed(1)}秒）`;
