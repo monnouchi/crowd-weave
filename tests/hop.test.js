@@ -5,8 +5,8 @@ import {
   HOP_SPEED, step,
 } from '../logic.js';
 
-const released = { left: false, right: false, call: true };
-const side = (right) => ({ left: !right, right, call: true });
+const released = { left: false, right: false, hopEnabled: true };
+const side = (right) => ({ left: !right, right, hopEnabled: true });
 function ready(stage = 0) {
   const g = createGame(stage, 17);
   g.phase = 'playing';
@@ -52,7 +52,7 @@ test('held keys, opposite taps and a brake chord never count as a same-side doub
   step(g, 0.025, side(false));
   assert.equal(g.hopReadyAt, 0);
   step(g, 0.025, released);
-  step(g, 0.025, { left: true, right: true, call: true });
+  step(g, 0.025, { left: true, right: true, hopEnabled: true });
   assert.equal(g.hopReadyAt, 0);
   assert.equal(g.hop, null);
   assert.equal(g.callReadyAt, 0);

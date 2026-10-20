@@ -138,8 +138,8 @@
                 <span class="diagram-walker">●<small>↑</small></span>
                 <span class="diagram-key">右 →</span>
               </div>
-              <p class="touch-instructions">左右のボタンでよける</p>
-              <p class="keyboard-instructions">← → キーでよける（A・D も使えます）</p>
+              <p class="touch-instructions">左右でよける · 中央のボタンで声かけ</p>
+              <p class="keyboard-instructions">← → キーでよける（A・D も可）· Cで声かけ</p>
               <div class="brake-diagram">
                 <span class="diagram-key">← 左</span>
                 <span>＋</span>
@@ -166,7 +166,7 @@
               <details id="intro-guide">
                 <summary>くわしい遊びかた</summary>
                 <p>
-                  前をふさぐ人は左右から回り込もう。左または右を短く2回押すと横へホップします。近くの人に道をあけてもらうには、左右を同時に短く2回押します（いったん両方離す）。人にぶつかると少し止まり、到着タイムに2秒加算。友だちは同じ道をついてきます。信号が赤なら左右を同時に押して待ちましょう。
+                  前をふさぐ人は左右から回り込もう。左または右を短く2回押すと横へホップします。近くの人には「すみませーん」ボタンで声をかけられます（PCはCキー）。犬猫には効きません。人にぶつかると少し止まり、到着タイムに2秒加算。友だちは同じ道をついてきます。信号が赤なら左右を同時に押して待ちましょう。
                 </p>
               </details>
             </div>
@@ -200,9 +200,14 @@
         ></div>
       </div>
       <div class="steering">
-        <button id="left" aria-label="左へ移動">← 左へ</button
-        ><span id="motion">自動で前進 · 両押しで停止</span
-        ><button id="right" aria-label="右へ移動">右へ →</button>
+        <button id="left" aria-label="左へ移動">← 左へ</button>
+        <div class="steering-center">
+          <button id="call" aria-label="すみませーんと声をかける" aria-describedby="call-status">
+            <span>すみませーん</span><small id="call-status">タップで声かけ</small>
+          </button>
+          <span id="motion">自動で前進 · 両押しで停止</span>
+        </div>
+        <button id="right" aria-label="右へ移動">右へ →</button>
       </div>
       <div id="tilt-controls" hidden>
         <button id="recenter" class="secondary">正面合わせ</button
@@ -239,8 +244,8 @@
         </p>
         <footer>
           <p>
-            <span id="keyboard-help" class="keyboard-instructions">PC：← → / A D · Enterで次へ · Escで一時停止</span>
-            <span id="touch-help" class="touch-instructions">スマホ：左右のボタンでよける · 2つ同時で停止</span>
+            <span id="keyboard-help" class="keyboard-instructions">PC：← → / A D · Cで声かけ · Enterで次へ · Escで一時停止</span>
+            <span id="touch-help" class="touch-instructions">スマホ：左右でよける · 同時で停止 · 中央で声かけ</span>
           </p>
         </footer>
       </details>

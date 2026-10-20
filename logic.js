@@ -82,8 +82,6 @@ export const STAGES = [
 ];
 const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
-export const CALL_CHORD_WINDOW = 0.3;
-export const CALL_TAP_WINDOW = 1.1;
 export const CALL_COOLDOWN = 10;
 export const CALL_RIPPLE_DURATION = 0.65;
 export const HOP_TAP_WINDOW = 0.34;
@@ -132,10 +130,6 @@ function separationSpeech(g) {
 }
 export function cancelCallGesture(g) {
   g.callHeld = false;
-  g.callReleased = false;
-  g.callTapAt = null;
-  g.callPendingSide = 0;
-  g.callPendingAt = null;
 }
 export function cancelHopGesture(g) {
   g.hopHeldSide = 0;
@@ -145,11 +139,11 @@ export function cancelHopGesture(g) {
   g.hop = null;
 }
 function updateHopGesture(g, input) {
-  if (input.call !== true || g.arriving || g.stun > 0) {
+  if (input.hopEnabled !== true || g.arriving || g.stun > 0) {
     cancelHopGesture(g);
     return;
   }
-  if (g.callHeld || (input.left && input.right)) {
+  if (input.left && input.right) {
     cancelHopGesture(g);
     return;
   }
@@ -183,47 +177,10 @@ function updateHopGesture(g, input) {
   }
 }
 function updateCallGesture(g, input) {
-  // A chord may start with either side. Its episode ends only when both sides
-  // are up, so staggered releases cannot erase a completed first tap.
-  if (input.call !== true) {
-    cancelCallGesture(g);
-    return;
-  }
-  const both = !!(input.left && input.right);
-  const clear = !input.left && !input.right;
-  if (g.callTapAt !== null && g.worldTime - g.callTapAt > CALL_TAP_WINDOW) {
-    g.callTapAt = null;
-    g.callReleased = false;
-  }
-  if (clear) {
-    g.callHeld = false;
-    g.callPendingSide = 0;
-    g.callPendingAt = null;
-    if (g.callTapAt !== null) g.callReleased = true;
-    return;
-  }
+  if (input.call !== true) return cancelCallGesture(g);
+  // A held key or pointer can request only once until it is released.
   if (g.callHeld) return;
-  if (!both) {
-    const side = input.left ? -1 : 1;
-    if (g.callPendingSide !== side) {
-      g.callPendingSide = side;
-      g.callPendingAt = g.worldTime;
-    }
-    return;
-  }
   g.callHeld = true;
-  const timelyChord = g.callPendingAt === null ||
-    g.worldTime - g.callPendingAt <= CALL_CHORD_WINDOW;
-  g.callPendingSide = 0;
-  g.callPendingAt = null;
-  if (!timelyChord) return; // Ordinary staggered steering becomes a brake.
-  if (g.callTapAt === null || !g.callReleased) {
-    g.callTapAt = g.worldTime;
-    g.callReleased = false;
-    return;
-  }
-  g.callTapAt = null;
-  g.callReleased = false;
   const unavailable = g.worldTime < g.callReadyAt || g.arriving ||
     g.crossings.some((t) => g.player.y >= t.top - 55 &&
       g.player.y <= t.bottom + 65);
@@ -515,10 +472,6 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     waitSpeechReadyAt: 0,
     waitSpeechArmed: true,
     callHeld: false,
-    callReleased: false,
-    callTapAt: null,
-    callPendingSide: 0,
-    callPendingAt: null,
     callReadyAt: 0,
     callRipple: null,
     hopHeldSide: 0,

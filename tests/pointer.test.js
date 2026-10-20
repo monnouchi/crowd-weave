@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bindPointerControls, TwoButtons } from "../input.js";
+import { bindPointerControls, OneShotControl, TwoButtons } from "../input.js";
 import { cancelCallGesture, cancelHopGesture, createGame, step } from "../logic.js";
 function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
   class Target {
@@ -44,7 +44,9 @@ function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
   const root = new Target(),
     left = new Target(),
     right = new Target(),
-    buttons = new TwoButtons();
+    callButton = new Target(),
+    buttons = new TwoButtons(),
+    call = new OneShotControl();
   let selection = false,
     interrupts = 0;
   const win = windowEvents ? new Target() : null;
@@ -67,10 +69,11 @@ function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
     controls: [
       [left, "left"],
       [right, "right"],
+      [callButton, "call"],
     ],
     enabled: () => true,
-    press: (id, side) => buttons.press(id, side),
-    release: (id) => buttons.release(id),
+    press: (id, side) => side === "call" ? call.press() : buttons.press(id, side),
+    release: (id, side) => side === "call" ? call.release() : buttons.release(id),
     interrupted: () => interrupts++,
     canceled: onCancel,
   });
@@ -79,6 +82,8 @@ function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
     win,
     left,
     right,
+    callButton,
+    call,
     buttons,
     controller,
     select() {
@@ -90,24 +95,28 @@ function fixture({ windowEvents = false, onCancel = () => {} } = {}) {
     },
   };
 }
-test("canceled two-finger chord cannot become the first tap of a courtesy call", () => {
+test("a single touch calls; a canceled touch cannot leave a pending call", () => {
   const g = createGame(0, 17);
   g.phase = "playing";
   g.crowd = [];
-  const f = fixture({ onCancel: () => cancelCallGesture(g) });
-  f.left.emit("pointerdown", { pointerId: 1 });
-  f.right.emit("pointerdown", { pointerId: 2 });
-  step(g, 0.025, { ...f.buttons.read(), call: true });
-  assert.notEqual(g.callTapAt, null);
-  f.root.emit("pointercancel", { pointerId: 1 });
+  const f = fixture({ onCancel: () => { f.call.clear(); cancelCallGesture(g); } });
+  f.callButton.emit("pointerdown", { pointerId: 1 });
+  f.root.emit("pointerup", { pointerId: 1 });
+  step(g, 0.025, { ...f.buttons.read(), call: f.call.take() });
+  assert.equal(g.callRipple?.mode, "recognized");
+  f.callButton.emit("pointerdown", { pointerId: 2 });
   f.root.emit("pointercancel", { pointerId: 2 });
-  step(g, 0.025, { ...f.buttons.read(), call: true });
-  assert.equal(g.callTapAt, null);
-  f.left.emit("pointerdown", { pointerId: 3 });
-  f.right.emit("pointerdown", { pointerId: 4 });
-  step(g, 0.025, { ...f.buttons.read(), call: true });
-  assert.equal(g.callReadyAt, 0);
-  assert.notEqual(g.callTapAt, null, "the new two-finger chord starts a fresh sequence");
+  assert.equal(f.call.take(), false);
+});
+test("a thumb can keep steering while another thumb taps the call button", () => {
+  const f = fixture();
+  f.left.emit("pointerdown", { pointerId: 5 });
+  f.callButton.emit("pointerdown", { pointerId: 6 });
+  f.root.emit("pointerup", { pointerId: 6 });
+  assert.equal(f.call.take(), true);
+  assert.deepEqual(f.buttons.read(), { left: true, right: false });
+  f.root.emit("pointerup", { pointerId: 5 });
+  assert.deepEqual(f.buttons.read(), { left: false, right: false });
 });
 test("a canceled mobile side tap cannot complete a lateral hop", () => {
   const g = createGame(0, 17);
@@ -116,73 +125,39 @@ test("a canceled mobile side tap cannot complete a lateral hop", () => {
   g.animals = [];
   const f = fixture({ onCancel: () => cancelHopGesture(g) });
   f.left.emit("pointerdown", { pointerId: 11 });
-  step(g, 0.025, { ...f.buttons.read(), call: true });
+  step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
   f.root.emit("pointercancel", { pointerId: 11 });
-  step(g, 0.025, { ...f.buttons.read(), call: true });
+  step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
   f.left.emit("pointerdown", { pointerId: 12 });
-  step(g, 0.025, { ...f.buttons.read(), call: true });
+  step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
   assert.equal(g.hopReadyAt, 0);
   assert.equal(g.hopTapSide, -1);
 });
-test("two distinct touch taps trigger a hop and two full two-finger chords trigger courtesy", () => {
-  const hop = createGame(0, 17);
-  hop.phase = "playing";
-  hop.crowd = [];
-  hop.animals = [];
-  const a = fixture();
-  a.right.emit("pointerdown", { pointerId: 31 });
-  step(hop, 0.025, { ...a.buttons.read(), call: true });
-  a.root.emit("pointerup", { pointerId: 31 });
-  step(hop, 0.025, { ...a.buttons.read(), call: true });
-  a.right.emit("pointerdown", { pointerId: 32 });
-  step(hop, 0.025, { ...a.buttons.read(), call: true });
-  assert.ok(hop.hopReadyAt > 0);
-  assert.equal(hop.callReadyAt, 0);
-
-  const call = createGame(0, 17);
-  call.phase = "playing";
-  call.animals = [];
-  call.crowd = call.crowd.slice(0, 2).map((p, i) => ({ ...p,
-    id: 900 + i, x: call.player.x + (i ? 20 : -20),
-    y: call.player.y - 30, anchor: true, active: true,
-    state: "meeting", wait: 100,
-  }));
-  const b = fixture();
-  for (const [leftId, rightId] of [[41, 42], [43, 44]]) {
-    b.left.emit("pointerdown", { pointerId: leftId });
-    b.right.emit("pointerdown", { pointerId: rightId });
-    step(call, 0.025, { ...b.buttons.read(), call: true });
-    b.root.emit("pointerup", { pointerId: leftId });
-    b.root.emit("pointerup", { pointerId: rightId });
-    step(call, 0.025, { ...b.buttons.read(), call: true });
-  }
-  assert.ok(call.callReadyAt > 0);
-  assert.equal(call.hop, null);
-});
-test("two mobile chords accept staggered finger starts and endings", () => {
+test("two distinct touch taps trigger a hop while a double brake stays silent", () => {
   const g = createGame(0, 17);
   g.phase = "playing";
   g.crowd = [];
   g.animals = [];
-  const f = fixture({ onCancel: () => cancelCallGesture(g) });
-  const tick = () => step(g, 0.025, { ...f.buttons.read(), call: true });
-  f.left.emit("pointerdown", { pointerId: 61 });
-  tick();
-  f.right.emit("pointerdown", { pointerId: 62 });
-  tick();
-  f.root.emit("pointerup", { pointerId: 61 });
-  tick();
-  f.root.emit("pointerup", { pointerId: 62 });
-  tick();
-  f.right.emit("pointerdown", { pointerId: 63 });
-  tick();
-  f.left.emit("pointerdown", { pointerId: 64 });
-  tick();
-  assert.equal(g.callRipple?.mode, "recognized");
-  assert.equal(g.hopReadyAt, 0);
-  f.root.emit("pointerup", { pointerId: 63 });
-  f.root.emit("pointerup", { pointerId: 64 });
+  const f = fixture();
+  for (const id of [31, 32]) {
+    f.right.emit("pointerdown", { pointerId: id });
+    step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
+    f.root.emit("pointerup", { pointerId: id });
+    step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
+  }
+  assert.ok(g.hopReadyAt > 0);
+  for (const [leftId, rightId] of [[41, 42], [43, 44]]) {
+    f.left.emit("pointerdown", { pointerId: leftId });
+    f.right.emit("pointerdown", { pointerId: rightId });
+    step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
+    f.root.emit("pointerup", { pointerId: leftId });
+    f.root.emit("pointerup", { pointerId: rightId });
+    step(g, 0.025, { ...f.buttons.read(), hopEnabled: true });
+  }
+  assert.equal(g.callReadyAt, 0);
+  assert.equal(g.callRipple, null);
 });
+
 test("document release outside a control works even if capture is unavailable", () => {
   const f = fixture();
   f.left.setPointerCapture = () => {

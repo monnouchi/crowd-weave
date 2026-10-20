@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame, step } from '../logic.js';
 import { moveAnimals } from '../crowd.js';
 
-const chord = { left: true, right: true, call: true };
-const released = { left: false, right: false, call: true };
+const released = { left: false, right: false };
 
 test('a dog patrols the neighborhood and rainy approach, a cat patrols near the cafe', () => {
   const kinds = ['dog', null, 'cat', 'dog', null];
@@ -26,23 +25,23 @@ test('a dog patrols the neighborhood and rainy approach, a cat patrols near the 
   }
 });
 
-test('animals are solid, score normal contact, and never yield to the courtesy call', () => {
-  const g = createGame(0, 17);
-  g.phase = 'playing';
-  g.crowd = [];
-  const dog = g.animals[0];
-  g.player.x = dog.x;
-  dog.speed = 0;
-  dog.y = g.player.y - 23;
-  step(g, 0.025, released);
-  assert.equal(g.hits, 1);
-  assert.equal(g.lastContactId, dog.id);
-  const before = dog.x;
-  step(g, 0.025, chord);
-  step(g, 0.025, released);
-  step(g, 0.025, chord);
-  assert.equal(g.callReadyAt, 0);
-  assert.equal(dog.x, before);
-  assert.equal(dog.courtesy, undefined);
-  assert.ok(g.player.y > dog.y, 'the dog remains a solid obstacle');
+test('dogs and cats are solid and never yield to the courtesy call', () => {
+  for (const stage of [0, 2]) {
+    const g = createGame(stage, 17);
+    g.phase = 'playing';
+    g.crowd = [];
+    const animal = g.animals[0];
+    g.player.x = animal.x;
+    animal.speed = 0;
+    animal.y = g.player.y - 23;
+    step(g, 0.025, released);
+    assert.equal(g.hits, 1, animal.kind);
+    assert.equal(g.lastContactId, animal.id);
+    const before = animal.x;
+    step(g, 0.025, { ...released, call: true });
+    assert.equal(g.callReadyAt, 0);
+    assert.equal(animal.x, before);
+    assert.equal(animal.courtesy, undefined);
+    assert.ok(g.player.y > animal.y, `${animal.kind} remains solid`);
+  }
 });

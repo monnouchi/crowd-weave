@@ -18,6 +18,31 @@ export class TwoButtons {
   }
 }
 
+// Keep a short tap until the next simulation frame, without repeating a hold.
+export class OneShotControl {
+  constructor() {
+    this.held = false;
+    this.pending = false;
+  }
+  press() {
+    if (this.held) return;
+    this.held = true;
+    this.pending = true;
+  }
+  release() {
+    this.held = false;
+  }
+  take() {
+    const pressed = this.pending;
+    this.pending = false;
+    return pressed;
+  }
+  clear() {
+    this.held = false;
+    this.pending = false;
+  }
+}
+
 // Each pointer owns exactly one control until an explicit end/interruption.
 // Capture is an optimization; document-wide releases remain the fallback.
 // There is deliberately no timeout: a legitimate long hold must keep working.

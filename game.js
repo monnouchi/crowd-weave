@@ -47,6 +47,7 @@ import { visiblePerson } from "./crowd.js";
 import { drawFinale } from "./finale.js";
 import {
   TwoButtons,
+  OneShotControl,
   EnterLatch,
   primaryCommand,
   bindPointerControls,
@@ -106,6 +107,7 @@ window.visualViewport?.addEventListener("resize", resizeDrawingSurface);
 let game = createGame(),
   last = performance.now(),
   buttons = new TwoButtons(),
+  callInput = new OneShotControl(),
   noticeUntil = 0,
   records = [],
   playerPose = { lean: 0 };
@@ -177,6 +179,7 @@ compactResult.addEventListener("change", () => {
 function clearInput() {
   pointerControls.clear();
   buttons.clear();
+  callInput.clear();
   cancelCallGesture(game);
   cancelHopGesture(game);
   tilt.reset();
@@ -352,6 +355,11 @@ window.addEventListener("keydown", (e) => {
   }
   if (editable || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (k === "c" &&
+      !(e.target instanceof Element && e.target.closest("button,summary,a"))) {
+    e.preventDefault();
+    if (game.phase === "playing") callInput.press();
+  }
   if (controls.includes(k)) {
     e.preventDefault();
     if (game.phase === "playing" || game.phase === "countdown")
@@ -367,6 +375,7 @@ window.addEventListener("keyup", (e) => {
     enterLatch.release();
     return;
   }
+  if (e.key.toLowerCase() === "c") callInput.release();
   buttons.release("key:" + (e.key.length === 1 ? e.key.toLowerCase() : e.key));
 });
 window.addEventListener("blur", () => {
@@ -388,32 +397,44 @@ const pointerControls = bindPointerControls({
   controls: [
     [$("#left"), "left"],
     [$("#right"), "right"],
+    [$("#call"), "call"],
     [$("#brake"), "brake"],
   ],
   enabled: (side) =>
     (game.phase === "playing" || game.phase === "countdown") &&
-    (side !== "brake" || steeringMode === "tilt"),
+    (side !== "brake" || steeringMode === "tilt") &&
+    (side !== "call" || game.phase === "playing"),
   press: (id, side) =>
-    side === "brake" ? tilt.brakes.add(id) : buttons.press(id, side),
+    side === "brake" ? tilt.brakes.add(id) :
+      side === "call" ? callInput.press() : buttons.press(id, side),
   release: (id, side) =>
-    side === "brake" ? tilt.brakes.delete(id) : buttons.release(id),
+    side === "brake" ? tilt.brakes.delete(id) :
+      side === "call" ? callInput.release() : buttons.release(id),
   interrupted: setPaused,
   canceled: () => {
     cancelCallGesture(game);
+    callInput.clear();
     cancelHopGesture(game);
   },
 });
 window.addEventListener("pagehide", setPaused);
+$("#call").addEventListener("click", (event) => {
+  // Native keyboard activation has no pointerdown. Touch/mouse clicks already
+  // entered through the pointer handler and must not enqueue a second call.
+  if (event.detail !== 0 || game.phase !== "playing") return;
+  callInput.press();
+  callInput.release();
+});
 function input() {
   const keys = buttons.read();
-  if (steeringMode !== "tilt") return { ...keys, call: true };
+  if (steeringMode !== "tilt") return { ...keys, hopEnabled: true };
   const sensor = tilt.read(performance.now());
   if (tilt.brakes.size)
-    return { left: true, right: true, axis: 0, call: false };
-  if (keys.left || keys.right) return { ...keys, call: true };
+    return { left: true, right: true, axis: 0, hopEnabled: false };
+  if (keys.left || keys.right) return { ...keys, hopEnabled: true };
   return sensor.stale
-    ? { left: true, right: true, axis: 0, call: false }
-    : { ...sensor, call: true };
+    ? { left: true, right: true, axis: 0, hopEnabled: false }
+    : { ...sensor, hopEnabled: false };
 }
 function chooseMode(mode, message) {
   steeringMode = mode;
@@ -984,7 +1005,9 @@ function frame(now) {
   const previousX = game.player.x;
   const previousRegroup = game.party.regroup;
   const steering = input();
-  if (simulationDt > 0) step(game, simulationDt, steering);
+  if (simulationDt > 0) step(game, simulationDt, {
+    ...steering, call: callInput.take(),
+  });
   advanceJoining(game, dt, {
     active: !document.hidden && document.hasFocus(),
     reducedMotion: reducedMotion.matches,
@@ -1017,6 +1040,11 @@ function frame(now) {
   );
   $("#left").classList.toggle("held", steering.left);
   $("#right").classList.toggle("held", steering.right);
+  $("#call").disabled = game.phase !== "playing";
+  const callWait = Math.max(0, game.callReadyAt - game.worldTime);
+  $("#call").classList.toggle("cooling", callWait > 0);
+  $("#call-status").textContent = callWait > 0
+    ? `あと${callWait.toFixed(1)}秒` : "タップで声かけ";
   $("#motion").textContent =
     game.phase === "countdown"
       ? "準備中 · GO! で時計が動きます"

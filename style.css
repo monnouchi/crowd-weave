@@ -243,7 +243,34 @@ header > div {
   color: var(--ink);
   background: var(--ochre);
 }
-.steering span {
+.steering-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  pointer-events: none;
+}
+#call {
+  width: 124px;
+  min-height: 56px;
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.25;
+  background: #a65834;
+  border-color: #803f29;
+}
+#call small {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+#call.cooling {
+  background: #685d5a;
+  border-color: #544b49;
+}
+.steering #motion {
   font-size: 11px;
   line-height: 1.4;
   padding: 7px 10px;
@@ -834,7 +861,7 @@ main:has(.overlay.finale:not([hidden])) .hud {
   }
   .toolbar {
     top: auto;
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     right: 10px;
     gap: 4px;
   }
@@ -845,7 +872,7 @@ main:has(.overlay.finale:not([hidden])) .hud {
   }
   .settings {
     top: auto;
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     left: 10px;
     right: auto;
     width: calc(100% - 20px);
@@ -860,23 +887,26 @@ main:has(.overlay.finale:not([hidden])) .hud {
   }
   .settings[open] {
     pointer-events: auto;
-    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
-    max-height: calc(100dvh - 190px);
+    bottom: calc(190px + env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 240px);
   }
   main:has(#tilt-controls:not([hidden])) .settings[open] {
+    bottom: calc(260px + env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 320px);
+  }
+  main:has(#tilt-controls:not([hidden])) .toolbar {
     bottom: calc(204px + env(safe-area-inset-bottom, 0px));
-    max-height: calc(100dvh - 260px);
   }
   .steering button {
     width: 90px;
   }
-  .steering span {
+  .steering #motion {
     font-size: 10px;
     max-width: 112px;
     padding: 6px;
   }
   #notice {
-    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
   }
   #tilt-controls {
     bottom: calc(132px + env(safe-area-inset-bottom, 0px));
@@ -886,6 +916,18 @@ main:has(.overlay.finale:not([hidden])) .hud {
   }
   .initial #title {
     margin: 20px 0 18px;
+  }
+}
+@media (max-width: 359px) and (orientation: portrait) {
+  .steering button:not(#call) {
+    width: 76px;
+  }
+  #call {
+    width: 112px;
+    font-size: 12px;
+  }
+  .steering #motion {
+    max-width: 112px;
   }
 }
 @media (orientation: landscape) and (max-height: 500px) {
@@ -921,7 +963,7 @@ main:has(.overlay.finale:not([hidden])) .hud {
     width: 100px;
     min-height: 54px;
   }
-  .steering span {
+  .steering #motion {
     display: none;
   }
   .initial .card {
@@ -1082,7 +1124,7 @@ main[data-scene="party"] {
 }
 .toolbar button,
 .settings summary,
-.steering span {
+.steering #motion {
   background: #fbfaf5f2;
   border: 1px solid #a8bab5;
   border-radius: 7px;

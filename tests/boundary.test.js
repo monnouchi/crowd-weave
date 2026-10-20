@@ -10,16 +10,16 @@ function playing() {
   g.animals = [];
   return g;
 }
-const left = { left: true, right: false, call: true };
-const right = { left: false, right: true, call: true };
-const released = { left: false, right: false, call: true };
+const left = { left: true, right: false, hopEnabled: true };
+const right = { left: false, right: true, hopEnabled: true };
+const released = { left: false, right: false, hopEnabled: true };
 
 test('field edge produces one event at onset, then rearms only after moving away', () => {
   const g = playing();
   g.player.x = 30;
   step(g, 0, left);
   assert.equal(g.edgeBumpSerial, 0);
-  step(g, 0.025, { left: true, right: true, call: true });
+  step(g, 0.025, { left: true, right: true, hopEnabled: true });
   assert.equal(g.edgeBumpSerial, 0, 'braking at the edge is not a new hit');
   g.player.x = 31;
   step(g, 0.025, left);
