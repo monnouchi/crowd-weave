@@ -15,6 +15,7 @@ import {
   cancelCallGesture,
   cancelHopGesture,
   insideConcert,
+  goalPrompt,
   step,
   W,
   H,
@@ -784,16 +785,16 @@ function frame(now) {
     $("#share-actions").hidden = game.stage !== 4;
     if (game.stage < 4)
       $("#next-purpose").textContent =
-        `次の目的：${SCENES[game.stage + 1].intro}` +
-        ([0, 2].includes(game.stage)
-          ? " 赤は両押しで待とう。赤で横断開始は信号無視 +2秒。"
-          : "");
+        `次は${SCENES[game.stage + 1].place}へ。` +
+        ([0, 2].includes(game.stage) ? "赤信号では両押しで待とう。" : "");
     $("#next-purpose").hidden = game.stage === 4;
     panel(
       game.stage === 4 ? "全員、最前列へ！" : game.scene.arrival,
       game.stage === 4
         ? `全5区間を完走。${totals.clean ? "すきまの名案内！ 全員が一度も接触せず到着しました。" : "みんなで最前列！ 次は全員で接触ゼロに挑戦しよう。"}`
-        : `友だち${game.stage + 1}と合流し、友だちが${game.stage + 1}人になりました。${cleanStage ? "この区間は全員、無接触！" : "全員到着！ 次は接触ゼロを目指そう。"}`,
+        : cleanStage
+          ? "全員、接触せずに合流！"
+          : "人の動きを見て、次のすきまへ。",
       game.stage < 4 ? "次のステージへ →" : "もう一度遊ぶ →",
       `STAGE ${game.stage + 1} COMPLETE`,
     );
@@ -802,10 +803,7 @@ function frame(now) {
   audio.footsteps(walkingPoses.get("player"),
     game.phase === "playing" && steering.left !== steering.right && !game.hop);
   drawResultRoster();
-  $("#goal-callout").textContent =
-    game.arriving && game.phase !== "finished"
-      ? "友だち全員を待とう！"
-      : game.scene.bubble;
+  $("#goal-callout").textContent = goalPrompt(game);
   const callout = $("#goal-callout"),
     rect = canvas.getBoundingClientRect();
   const scale = worldProjector.scale;

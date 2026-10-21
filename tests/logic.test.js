@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGame, step, STAGES } from "../logic.js";
+import { createGame, goalFor, goalPrompt, step, STAGES } from "../logic.js";
 import {
   moveCrowd,
   makeCrowd,
@@ -16,6 +16,24 @@ const playing = (stage = 0) => {
   g.phase = "playing";
   return g;
 };
+test("near the destination, the callout points toward the usable entrance", () => {
+  for (let stage = 0; stage < 5; stage++) {
+    const g = playing(stage);
+    const goal = goalFor(stage);
+    g.player.y = 107;
+    g.player.x = goal.x - 1;
+    assert.equal(goalPrompt(g), "→ 右へ進もう");
+    g.player.x = goal.x + goal.w + 1;
+    assert.equal(goalPrompt(g), "← 左へ進もう");
+    g.player.x = goal.x + goal.w / 2;
+    assert.equal(goalPrompt(g), g.scene.bubble);
+    g.player.y = 146;
+    g.player.x = goal.x - 1;
+    assert.equal(goalPrompt(g), g.scene.bubble);
+    g.arriving = true;
+    assert.equal(goalPrompt(g), "友だち全員を待とう！");
+  }
+});
 test("automatic forward, left/right, simultaneous brake, bounds", () => {
   const g = playing();
   g.crowd = [];

@@ -31,6 +31,16 @@ export function insideConcert(game) {
 export function goalFor(stage) {
   return stage === 4 ? { x: 95, y: 20, w: 290, h: 65 } : GOAL;
 }
+export function goalPrompt(game) {
+  if (game.arriving && game.phase !== "finished")
+    return "友だち全員を待とう！";
+  if (game.player.y <= 145 && !game.arriving) {
+    const goal = goalFor(game.stage);
+    if (game.player.x < goal.x) return "→ 右へ進もう";
+    if (game.player.x > goal.x + goal.w) return "← 左へ進もう";
+  }
+  return game.scene.bubble;
+}
 export function arrivalPoint(stage, player) {
   return { x: stage === 4 ? player.x : 240, y: 84 };
 }

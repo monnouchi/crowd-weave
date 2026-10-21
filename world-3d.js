@@ -127,19 +127,22 @@ function routeBranch(ctx, p, branch) {
   ])
     for (let i = 1; i < points.length; i++)
       segment(ctx, p, [points[i - 1].x, points[i - 1].y, 0.9],
-        [points[i].x, points[i].y, 0.9], color, 4 * p.scale);
+        [points[i].x, points[i].y, 0.9], color,
+        Math.max(3, 6 * p.scale));
   for (const [x, y, label, color] of [
-    [248, branch.fork.y - 42, "近道・人混み", "#8c5445"],
+    [248, branch.fork.y - 42, "近道・混雑", "#8c5445"],
     [105, branch.fork.y - 72, "ゆったり道", "#326b61"],
   ]) {
     const at = p.point(x, y, 2);
+    const labelX = at.x + (x > 200 ? 10 : -10);
+    ctx.font = "bold 12px system-ui";
+    const labelWidth = label.length * 12 + 12;
     ctx.fillStyle = "#fbf7e6";
-    ctx.fillRect(at.x - 38 * p.scale, at.y - 12 * p.scale,
-      76 * p.scale, 17 * p.scale);
+    ctx.fillRect(labelX - labelWidth / 2, at.y - 13,
+      labelWidth, 19);
     ctx.fillStyle = color;
-    ctx.font = `bold ${Math.max(9, 11 * p.scale)}px system-ui`;
     ctx.textAlign = "center";
-    ctx.fillText(label, at.x, at.y);
+    ctx.fillText(label, labelX, at.y + 1);
   }
 }
 
