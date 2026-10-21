@@ -43,7 +43,7 @@ import {
   SCENES,
 } from "./logic.js";
 import { trafficViolations } from "./traffic.js";
-import { visiblePerson } from "./crowd.js";
+import { previewTurn, visiblePerson } from "./crowd.js";
 import { drawFinale } from "./finale.js";
 import {
   TwoButtons,
@@ -523,11 +523,17 @@ function person(p, player = false) {
     (!(player || p.friend) || !game.stun);
   const look = p.reaction
     ? { x: p.reaction.faceX, y: p.reaction.faceY }
+    : p.acknowledge
+      ? { x: p.acknowledge.faceX, y: p.acknowledge.faceY }
     : p.partner || p.state === "celebrating"
       ? { x: p.ux || 0, y: p.uy || -1 }
       : null;
   const pose = updateWalkingPose(old, p, visualDt, { canMove, look, reset });
   walkingPoses.set(key, { ...pose, cycle: p.cycle });
+  const turn = p.acknowledge
+    ? { x: p.acknowledge.faceX, y: p.acknowledge.faceY }
+    : !player && !p.friend && !p.partner ? previewTurn(p) : null;
+  const displayPose = turn ? { ...pose, ux: turn.x, uy: turn.y } : pose;
   let opacity =
     p.partner || p.background || p.friend || player
       ? 1
@@ -551,26 +557,48 @@ function person(p, player = false) {
     ctx.save();
     ctx.translate(0, -hopRise);
   }
+  ctx.save();
+  if (p.acknowledge && !reducedMotion.matches)
+    ctx.translate(0, 3 * Math.sin(Math.PI * Math.min(1,
+      (0.72 - p.acknowledge.remaining) / 0.5)));
   drawCharacter(ctx, p, {
-    pose,
+    pose: displayPose,
     player,
     overhead: true,
     contact: player && game.cooldown > 0 && game.lastContactMember === 0,
     lean: player ? playerPose.lean : 0,
     reducedMotion: reducedMotion.matches,
     opacity,
-    waving: p.partner,
+    waving: p.partner ||
+      ((player || p.friend) && game.worldTime <
+        Math.max(game.reunionUntil, game.cleanPassUntil)),
     wave: Math.sin((game.worldTime + (game.ambientTime || 0)) * 3) * 2,
     live: game.stage === 4,
     time: game.worldTime + (game.ambientTime || 0),
   });
+  ctx.restore();
+  if (p.acknowledge) {
+    ctx.save();
+    ctx.strokeStyle = "#518e76";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r + 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#f3edd4";
+    ctx.fillRect(p.x - 20, p.y - 39, 40, 16);
+    ctx.fillStyle = "#2e695c";
+    ctx.font = "bold 10px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("どうぞ", p.x, p.y - 27);
+    ctx.restore();
+  }
   if (hopRise) ctx.restore();
 }
 function animal(p) {
   const dog = p.kind === "dog";
   ctx.save();
   ctx.translate(p.x, p.y);
-  ctx.scale(p.vx < -0.2 ? -1 : 1, 1);
+  ctx.scale(p.vx < -0.2 ? -1 : 1, p.kind === "dog" && p.bracing ? 0.82 : 1);
   ctx.fillStyle = dog ? "#b88055" : "#7f9694";
   ctx.beginPath();
   ctx.ellipse(0, 0, dog ? 13 : 10, dog ? 8 : 6, 0, 0, Math.PI * 2);
@@ -779,6 +807,36 @@ function draw() {
   });
   paintFloor(ctx, game.scene, game.worldHeight);
   floorDetails(ctx, game.scene);
+  if (game.routeBranch) {
+    const branch = game.routeBranch;
+    ctx.save();
+    ctx.fillStyle = "#f2e5bb75";
+    ctx.fillRect(55, branch.merge.y - 15, 120,
+      branch.fork.y - branch.merge.y + 15);
+    ctx.fillStyle = "#d8bdb486";
+    ctx.fillRect(204, branch.merge.y, 72,
+      branch.fork.y - branch.merge.y);
+    for (const [points, color] of [
+      [branch.short, "#bd806c"], [branch.wide, "#4b897d"],
+    ]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      points.forEach((point, i) => i
+        ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#fbf7e6";
+    ctx.fillRect(192, branch.fork.y - 60, 112, 22);
+    ctx.fillRect(48, branch.fork.y - 94, 105, 22);
+    ctx.fillStyle = "#326b61";
+    ctx.font = "bold 12px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("ゆったり道", 57, branch.fork.y - 78);
+    ctx.fillStyle = "#8c5445";
+    ctx.fillText("近道・人混み", 200, branch.fork.y - 44);
+    ctx.restore();
+  }
   if (game.stage === 3) venueJourney(ctx);
   if (game.stage === 4)
     hallInterior(ctx, {
@@ -1003,7 +1061,8 @@ function frame(now) {
     insideConcert(game),
   );
   const previousX = game.player.x;
-  const previousRegroup = game.party.regroup;
+  const previousReunion = game.reunionSerial;
+  const previousCleanPass = game.cleanPassSerial;
   const steering = input();
   if (simulationDt > 0) step(game, simulationDt, {
     ...steering, call: callInput.take(),
@@ -1016,19 +1075,14 @@ function frame(now) {
     active: !document.hidden && document.hasFocus(),
     reducedMotion: reducedMotion.matches,
   });
-  if (game.party.regroup < 0.1) game.party.chimed = false;
-  if (
-    game.party.members.length &&
-    previousRegroup < 0.95 &&
-    game.party.regroup >= 0.95 &&
-    !game.party.chimed
-  ) {
-    game.party.chimed = true;
-    if (game.hits === hits) {
-      audio.effect("regroup");
-      noticeUntil = now + 1000;
-      $("#notice").textContent = "隊列が整った！";
-    }
+  if (game.cleanPassSerial > previousCleanPass) {
+    audio.effect("cleanPass");
+    noticeUntil = now + 1200;
+    $("#notice").textContent = "人混みを無接触で突破！";
+  } else if (game.reunionSerial > previousReunion) {
+    audio.effect("regroup");
+    noticeUntil = now + 1000;
+    $("#notice").textContent = "仲間が追いついた！";
   }
   const movementDt = Math.max(0, Math.min(0.05, dt));
   visualDt = movementDt;

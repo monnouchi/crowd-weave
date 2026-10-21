@@ -32,13 +32,31 @@ export function moveAnimals(animals, dt) {
     const span = (animal.maxX - animal.minX) / 2;
     if (span <= 0) {
       animal.vx = 0;
+      animal.bracing = false;
       continue;
     }
     const previous = animal.x;
     const phase = animal.time * animal.speed / span;
+    // A dog lowers its stance shortly before reversing its patrol direction.
+    animal.bracing = animal.kind === "dog" &&
+      Math.sin(phase) * Math.cos(phase) > 0 &&
+      Math.abs(Math.cos(phase)) < 0.4;
     animal.x = (animal.minX + animal.maxX) / 2 + span * Math.sin(phase);
     animal.vx = dt ? (animal.x - previous) / dt : 0;
   }
+}
+
+// Visual-only direction cue: look into the next leg before reaching a corner.
+export function previewTurn(p) {
+  if (!p.active || p.anchor || p.state !== "walking" || p.reaction ||
+      p.courtesy || !p.route?.[p.leg + 1]) return null;
+  const corner = p.route[p.leg], next = p.route[p.leg + 1];
+  const intoX = corner.x - p.x, intoY = corner.y - p.y;
+  const outX = next.x - corner.x, outY = next.y - corner.y;
+  const into = Math.hypot(intoX, intoY), out = Math.hypot(outX, outY);
+  if (into < 16 || into > 48 || out < 12) return null;
+  const dot = (intoX * outX + intoY * outY) / (into * out);
+  return dot < 0.7 ? { x: outX / out, y: outY / out } : null;
 }
 export const PLACES = {
   north: "北口・コンコース",
@@ -523,6 +541,11 @@ export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
           crowd.some((q) => q !== p && q.active &&
             Math.hypot(q.x - targetX, q.y - p.y) < p.r + q.r + 5)) continue;
       p.courtesy = { targetX, remaining: 1.1, ux: p.ux, uy: p.uy };
+      const dx = player.x - p.x, dy = player.y - p.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      p.acknowledge = {
+        remaining: 0.72, faceX: dx / distance, faceY: dy / distance,
+      };
       p.reaction = null;
       moved++;
       break;
@@ -654,6 +677,10 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
       }
     }
   crowd.forEach((p, i) => {
+    if (p.acknowledge) {
+      p.acknowledge.remaining = Math.max(0, p.acknowledge.remaining - dt);
+      if (!p.acknowledge.remaining) p.acknowledge = null;
+    }
     if (!p.active) {
       p.wait -= dt;
       if (

@@ -1,4 +1,4 @@
-import { visiblePerson } from "./crowd.js";
+import { previewTurn, visiblePerson } from "./crowd.js";
 import { drawCallRipple } from "./character.js";
 import { activeCallRipple, HOP_DISTANCE, insideConcert, joiningFriend } from "./logic.js";
 import {
@@ -113,6 +113,34 @@ function station(ctx, p) {
     segment(ctx, p, [x, -40, 75.2], [x + 23, -40, 75.2],
       "#f0d6a0", 5 * p.scale);
   groundRect(ctx, p, 160, 25, 320, 96, "#c2d9d1");
+}
+
+function routeBranch(ctx, p, branch) {
+  if (!branch) return;
+  groundRect(ctx, p, 55, branch.merge.y - 15, 175, branch.fork.y,
+    "#f2e5bb75");
+  groundRect(ctx, p, 204, branch.merge.y, 276, branch.fork.y,
+    "#d8bdb486");
+  for (const [points, color] of [
+    [branch.short, "#bd806c"],
+    [branch.wide, "#4b897d"],
+  ])
+    for (let i = 1; i < points.length; i++)
+      segment(ctx, p, [points[i - 1].x, points[i - 1].y, 0.9],
+        [points[i].x, points[i].y, 0.9], color, 4 * p.scale);
+  for (const [x, y, label, color] of [
+    [248, branch.fork.y - 42, "近道・人混み", "#8c5445"],
+    [105, branch.fork.y - 72, "ゆったり道", "#326b61"],
+  ]) {
+    const at = p.point(x, y, 2);
+    ctx.fillStyle = "#fbf7e6";
+    ctx.fillRect(at.x - 38 * p.scale, at.y - 12 * p.scale,
+      76 * p.scale, 17 * p.scale);
+    ctx.fillStyle = color;
+    ctx.font = `bold ${Math.max(9, 11 * p.scale)}px system-ui`;
+    ctx.textAlign = "center";
+    ctx.fillText(label, at.x, at.y);
+  }
 }
 
 function cafeTable(ctx, p, x, y) {
@@ -416,11 +444,13 @@ function animal(ctx, p, actor) {
       segment(ctx, p, [x + legX, y + legY, 10],
         [x + legX + dir * 2, y + legY, 2],
         dog ? "#765b48" : "#526d6c", 2.8 * p.scale);
+  const brace = dog && actor.bracing;
   drawBox(ctx, p, x - (dog ? 12 : 10), y - (dog ? 7 : 6),
-    x + (dog ? 12 : 10), y + (dog ? 7 : 6), 8, dog ? 20 : 17,
+    x + (dog ? 12 : 10), y + (dog ? 7 : 6), brace ? 5 : 8,
+    brace ? 15 : dog ? 20 : 17,
     coat, dog ? "#956744" : "#647e7c", dog ? "#956744" : "#647e7c");
   const hx = x + dir * (dog ? 13 : 11);
-  const head = p.point(hx, y, dog ? 20 : 18);
+  const head = p.point(hx, y, brace ? 16 : dog ? 20 : 18);
   disk(ctx, head.x, head.y, (dog ? 6.6 : 5.7) * p.scale,
     (dog ? 6.6 : 5.7) * p.scale, coat, "#4a5753");
   for (const side of [-1, 1]) {
@@ -431,7 +461,7 @@ function animal(ctx, p, actor) {
       [earX - dir, earY + side, dog ? 27 : 26],
     ], coat);
   }
-  const nose = p.point(hx + dir * 5, y, dog ? 18 : 16);
+  const nose = p.point(hx + dir * 5, y, brace ? 14 : dog ? 18 : 16);
   disk(ctx, nose.x, nose.y, 1.8 * p.scale, 1.8 * p.scale, "#2d4142");
   const tailX = x - dir * (dog ? 12 : 10);
   segment(ctx, p, [tailX, y, dog ? 17 : 15],
@@ -498,9 +528,18 @@ function people(ctx, p, game, reducedMotion, poses) {
       : actor.partner ? "partner" : actor.background || actor.band || actor.clerk
         ? null : `crowd:${actor.id}`;
     const pose = key ? poses?.get(key) : null;
+    const look = actor.acknowledge
+      ? { x: actor.acknowledge.faceX, y: actor.acknowledge.faceY }
+      : !player && !friend ? previewTurn(actor) : null;
+    const bow = actor.acknowledge
+      ? Math.sin(Math.PI * Math.min(1,
+        (0.72 - actor.acknowledge.remaining) / 0.5)) : 0;
     const drawn = drawPerson(ctx, p, actor, {
       player, friend, hit,
-      pose, reducedMotion,
+      pose: look && pose ? { ...pose, ux: look.x, uy: look.y } : pose,
+      reducedMotion, bow,
+      wave: (player || actor.friend) &&
+        game.worldTime < Math.max(game.reunionUntil, game.cleanPassUntil),
       baseZ: actor.band ? 31 : player && game.hop && !reducedMotion
         ? 5 * Math.sin(Math.PI * (1 - game.hop.remaining / HOP_DISTANCE)) : 0,
     });
@@ -525,6 +564,17 @@ function people(ctx, p, game, reducedMotion, poses) {
       ctx.font = `800 ${Math.max(10, 14 * p.scale)}px system-ui`;
       ctx.textAlign = "center";
       ctx.fillText("!", at.x, at.y + 4 * p.scale);
+    }
+    if (actor.acknowledge) {
+      groundCircle(ctx, p, actor.x, actor.y, actor.r + 8,
+        null, "#518e76", 2.5 * p.scale);
+      const at = p.point(actor.x, actor.y, 57);
+      disk(ctx, at.x, at.y, Math.max(16, 26 * p.scale),
+        Math.max(9, 11 * p.scale), "#f3edd4");
+      ctx.fillStyle = "#2e695c";
+      ctx.font = `bold ${Math.max(9, 11 * p.scale)}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText("どうぞ", at.x, at.y + 3 * p.scale);
     }
   }
 }
@@ -565,7 +615,10 @@ export function drawWorld3D(ctx, game, { width, height, top, bottom,
   const p = game.stage === 0
     ? drawStageOne3D(ctx, game, { width, height, viewport, includePeople: false })
     : makeProjector(width, height, game.player.y, viewport);
-  if (game.stage === 1) station(ctx, p);
+  if (game.stage === 1) {
+    station(ctx, p);
+    routeBranch(ctx, p, game.routeBranch);
+  }
   else if (game.stage === 2) cafe(ctx, p);
   else if (game.stage === 3) venue(ctx, p);
   else if (game.stage === 4) hall(ctx, p, game);

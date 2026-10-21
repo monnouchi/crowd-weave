@@ -161,6 +161,19 @@ test("fresh game audio is silent before a start choice", () => {
   assert.equal(f.voices.length, 0);
 });
 
+test("clean crowd crossing plays a brief quiet cue and respects mute", () => {
+  const a = new GameAudio(), f = fakeContext();
+  a.context = f.context;
+  a.muted = false;
+  a.effect("cleanPass");
+  assert.deepEqual(f.voices.map((voice) => voice.frequency.value), [523, 659]);
+  assert.ok(Math.max(...f.voices.map((voice) => voice.stopAt)) < 0.31);
+  a.toggle();
+  const count = f.voices.length;
+  a.effect("cleanPass");
+  assert.equal(f.voices.length, count);
+});
+
 test("each joined companion adds a bounded quiet musical part and mute cancels all", () => {
   const counts = [];
   for (let stage = 0; stage < 5; stage++) {

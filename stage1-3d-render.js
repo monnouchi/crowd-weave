@@ -274,7 +274,7 @@ export function personFrame(p, pose = null) {
 
 export function drawPerson(ctx, projector, p, {
   player = false, friend = false, hit = false, baseZ = 0,
-  pose = null, reducedMotion = false,
+  pose = null, reducedMotion = false, bow = 0, wave = false,
 } = {}) {
   const { x, y } = p;
   const scale = projector.scale;
@@ -313,17 +313,18 @@ export function drawPerson(ctx, projector, p, {
   face(ctx, projector, corners.map(([side, front]) => at(side, front, 30)), shirt);
   let rightHand;
   for (const side of [-1, 1]) {
-    const grip = at(side * 12, stride * side * 0.45, 17);
+    const grip = wave && side === -1
+      ? at(-17, -2, 42) : at(side * 12, stride * side * 0.45, 17);
     segment(ctx, projector, at(side * 8, 0, 27), grip, shirt, 4 * scale);
     const hand = projector.point(...grip);
     disk(ctx, hand.x, hand.y, 2.2 * scale, 2.2 * scale, appearance.skin);
     if (side === 1) rightHand = grip;
   }
-  const head = projector.point(...at(0, 0, 39));
+  const head = projector.point(...at(0, 0, 39 - bow * 3));
   disk(ctx, head.x, head.y, 7.2 * scale, 7.2 * scale, appearance.skin, "#5b554a");
-  const hair = projector.point(...at(0, -3, 41));
+  const hair = projector.point(...at(0, -3, 41 - bow * 3));
   disk(ctx, hair.x, hair.y, 6.8 * scale, 4.5 * scale, appearance.hair);
-  const nose = projector.point(...at(0, 7, 38));
+  const nose = projector.point(...at(0, 7, 38 - bow * 3));
   disk(ctx, nose.x, nose.y, 1.8 * scale, 1.8 * scale, appearance.skin);
   if (player) {
     ctx.fillStyle = "#f6f0dd";

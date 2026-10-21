@@ -12,6 +12,7 @@ export function createParty(count, player) {
     distance: 0,
     regroup: 0,
     chimed: false,
+    reunionArmed: false,
     trail: [
       { x: player.x, y: player.y + tail, s: -tail },
       { x: player.x, y: player.y, s: 0 },
@@ -90,6 +91,10 @@ export function moveParty(
   { braking = false, stunned = false, arriving = false, resolveFollower } = {},
 ) {
   appendTrail(party, player);
+  if (!braking) party.reunionArmed = false;
+  else if (party.members.some((member, i) =>
+    party.distance - member.s > (i + 1) * PARTY_SPACING + 12))
+    party.reunionArmed = true;
   party.regroup = Math.max(
     0,
     Math.min(1, party.regroup + dt * (braking ? 1.25 : -0.8)),
@@ -153,6 +158,13 @@ export function moveParty(
     ) - 10;
   while (party.trail.length > 2 && party.trail[1].s < earliest)
     party.trail.shift();
+}
+export function regroupReady(party) {
+  return party.members.length > 0 && party.regroup >= 0.95 &&
+    party.members.every((member, i) =>
+      !member.docked &&
+      party.distance - member.s <=
+        (i + 1) * (PARTY_SPACING - 6 * party.regroup) + 7);
 }
 export function partyArrived(party) {
   return party.members.every((m) => m.docked);

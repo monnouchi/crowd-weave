@@ -200,6 +200,10 @@ export class GameAudio {
       this.tone(330, 0.16, 0.012, 0, "sine");
       this.tone(440, 0.22, 0.014, 0.11, "sine");
     }
+    if (kind === "cleanPass") {
+      this.tone(523, 0.11, 0.011, 0, "sine");
+      this.tone(659, 0.18, 0.013, 0.1, "sine");
+    }
     if (kind === "brake") this.tone(220, 0.08, 0.012);
     if (kind === "boundary")
       this.tone(470, 0.075, 0.0045, 0, "square", false, 330);

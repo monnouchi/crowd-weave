@@ -6,7 +6,7 @@ import {
   trafficSpecs,
   vehicleContact,
 } from "./traffic.js";
-import { PARTY_SPACING, createParty, moveParty, partyArrived } from "./party.js";
+import { PARTY_SPACING, createParty, moveParty, partyArrived, regroupReady } from "./party.js";
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
@@ -438,6 +438,26 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   if (stage === 3) extendVenue(crowd, crossings);
   extendJourney(crowd, stage, seed, config);
   placePassingPair(crowd, stage);
+  const pair = crowd.find((person) => person.anchor);
+  const mergeY = Math.max(pair.y - 45,
+    ...crossings.map((crossing) => crossing.bottom + 20));
+  // The station offers a marked central shortcut and a wider detour that
+  // naturally leaves more room for the friend following the player's trail.
+  const routeBranch = stage === 1 ? {
+    fork: { x: 240, y: pair.y + 190 },
+    merge: { x: 240, y: mergeY },
+    short: [{ x: 240, y: pair.y + 190 }, { x: 240, y: mergeY }],
+    wide: [
+      { x: 240, y: pair.y + 190 },
+      { x: 110, y: pair.y + 70 },
+      { x: 110, y: Math.max(pair.y - 35, mergeY + 10) },
+      { x: 240, y: mergeY },
+    ],
+  } : null;
+  const cleanPass = crossings.length ? null : {
+    y: pair.y, entered: false, startHits: 0,
+    spoiled: false, finished: false,
+  };
   return {
     stage,
     phase: "ready",
@@ -474,6 +494,11 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     callHeld: false,
     callReadyAt: 0,
     callRipple: null,
+    reunionSerial: 0,
+    reunionUntil: 0,
+    cleanPass,
+    cleanPassSerial: 0,
+    cleanPassUntil: 0,
     hopHeldSide: 0,
     hopTapSide: 0,
     hopTapAt: null,
@@ -484,6 +509,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     edgeBumpSerial: 0,
     seed,
     crowd,
+    routeBranch,
     animals: createAnimals(stage, crowd),
   };
 }
@@ -491,6 +517,7 @@ export function step(g, dt, input) {
   if (g.phase !== "playing") return;
   dt = Math.max(0, Math.min(dt, 0.05));
   const previousViolationId = g.violationEvent?.id;
+  const hitsBeforeStep = g.hits;
   g.elapsed += dt;
   g.worldTime += dt;
   if (!activeSpeech(g)) g.speech = null;
@@ -686,6 +713,33 @@ export function step(g, dt, input) {
       g.violationEvent.message, 1.8);
   }
   separationSpeech(g);
+  if (g.party.regroup < 0.1) g.party.chimed = false;
+  if (g.phase === "playing" && !g.stun && !g.cooldown &&
+      g.party.reunionArmed && !g.party.chimed && regroupReady(g.party)) {
+    g.party.chimed = true;
+    g.reunionSerial++;
+    g.reunionUntil = g.worldTime + 0.9;
+  }
+  const pass = g.cleanPass;
+  if (pass && !pass.finished) {
+    if (!pass.entered && g.player.y <= pass.y + 130 &&
+        g.player.y > pass.y - 80) {
+      pass.entered = true;
+      pass.startHits = hitsBeforeStep;
+    }
+    if (pass.entered) {
+      if (g.hits > pass.startHits) pass.spoiled = true;
+      if (g.player.y < pass.y - 80 &&
+          g.party.members.every((member) => member.y < pass.y - 80)) {
+        pass.finished = true;
+        if (!pass.spoiled && g.phase === "playing" &&
+            g.crowd.some((person) => person.anchor && person.active)) {
+          g.cleanPassSerial++;
+          g.cleanPassUntil = g.worldTime + 0.85;
+        }
+      }
+    }
+  }
   if (
     g.arriving &&
     partyArrived(g.party) &&

@@ -620,7 +620,8 @@ function frame(now) {
     insideConcert(game),
   );
   const previousX = game.player.x;
-  const previousRegroup = game.party.regroup;
+  const previousReunion = game.reunionSerial;
+  const previousCleanPass = game.cleanPassSerial;
   const steering = input();
   if (simulationDt > 0) step(game, simulationDt, {
     ...steering, call: callInput.take(),
@@ -633,19 +634,14 @@ function frame(now) {
     active: !document.hidden && document.hasFocus(),
     reducedMotion: reducedMotion.matches,
   });
-  if (game.party.regroup < 0.1) game.party.chimed = false;
-  if (
-    game.party.members.length &&
-    previousRegroup < 0.95 &&
-    game.party.regroup >= 0.95 &&
-    !game.party.chimed
-  ) {
-    game.party.chimed = true;
-    if (game.hits === hits) {
-      audio.effect("regroup");
-      noticeUntil = now + 1000;
-      $("#notice").textContent = "隊列が整った！";
-    }
+  if (game.cleanPassSerial > previousCleanPass) {
+    audio.effect("cleanPass");
+    noticeUntil = now + 1200;
+    $("#notice").textContent = "人混みを無接触で突破！";
+  } else if (game.reunionSerial > previousReunion) {
+    audio.effect("regroup");
+    noticeUntil = now + 1000;
+    $("#notice").textContent = "仲間が追いついた！";
   }
   const movementDt = Math.max(0, Math.min(0.05, dt));
   updateVisualPoses(movementDt);

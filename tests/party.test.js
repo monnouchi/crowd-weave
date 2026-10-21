@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createParty, moveParty, sampleTrail } from "../party.js";
+import { createParty, moveParty, regroupReady, sampleTrail } from "../party.js";
 import { createGame, step, GOAL } from "../logic.js";
 test("party grows one friend per completed scene with visible distinct numbers", () => {
   for (let i = 0; i < 5; i++) {
@@ -57,6 +57,55 @@ test("brake regroups the party, stun freezes it, and release never walks backwar
     moveParty(p, player, 0.05);
     assert.ok(p.members.every((m, k) => m.s >= last[k]));
   }
+});
+test("a blocked friend cannot trigger a reunion before physically catching up", () => {
+  const player = { x: 240, y: 600 };
+  const party = createParty(1, player);
+  party.members[0].s -= 40;
+  party.members[0].y += 40;
+  for (let i = 0; i < 45; i++)
+    moveParty(party, player, 0.025, {
+      braking: true, resolveFollower: () => 0,
+    });
+  assert.equal(party.reunionArmed, true);
+  assert.equal(regroupReady(party), false);
+  assert.equal(party.members[0].y, 670);
+  let previous = party.members[0].y;
+  for (let i = 0; i < 30; i++) {
+    moveParty(party, player, 0.025, { braking: true });
+    assert.ok(previous - party.members[0].y <= 140 * 0.025 + 0.01);
+    previous = party.members[0].y;
+  }
+  assert.equal(regroupReady(party), true);
+});
+
+test("the reunion wave occurs once on real catch-up and pauses with the game", () => {
+  const g = createGame(1, 17);
+  g.phase = "playing";
+  g.crowd = [];
+  g.animals = [];
+  g.player.y = 600;
+  g.party = createParty(1, g.player);
+  g.party.members[0].s -= 40;
+  g.party.members[0].y += 40;
+  for (let i = 0; i < 50; i++) step(g, 0.025, { left: true, right: true });
+  assert.equal(g.reunionSerial, 1);
+  assert.ok(g.reunionUntil > g.worldTime - 1);
+  assert.equal(g.hits, 0);
+  for (let i = 0; i < 50; i++) step(g, 0.025, { left: true, right: true });
+  assert.equal(g.reunionSerial, 1);
+  g.phase = "paused";
+  const frozen = g.worldTime;
+  step(g, 1, {});
+  assert.equal(g.worldTime, frozen);
+  assert.equal(createGame(1, 17).reunionSerial, 0);
+  const alreadyTogether = createGame(1, 17);
+  alreadyTogether.phase = "playing";
+  alreadyTogether.crowd = [];
+  alreadyTogether.animals = [];
+  for (let i = 0; i < 50; i++)
+    step(alreadyTogether, 0.025, { left: true, right: true });
+  assert.equal(alreadyTogether.reunionSerial, 0);
 });
 function fixture() {
   const g = createGame(2);

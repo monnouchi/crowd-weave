@@ -33,6 +33,7 @@ test('one call press opens a person-only gap and confirms with a ripple', () => 
     x: from.x, y: from.y, progress: 0, mode: 'recognized',
   });
   assert.ok(g.crowd.every((p) => p.courtesy));
+  assert.ok(g.crowd.every((p) => p.acknowledge));
   const before = g.crowd.map((p) => p.x);
   for (let i = 0; i < 24; i++) step(g, 0.025, idle);
   assert.ok(activeCallRipple(g)?.progress > 0.8);
@@ -40,6 +41,23 @@ test('one call press opens a person-only gap and confirms with a ripple', () => 
   assert.ok(g.crowd[1].x > before[1] + 20);
   for (let i = 0; i < 35; i++) step(g, 0.025, idle);
   assert.equal(activeCallRipple(g), null);
+});
+
+test('only people who actually give way look back and bow briefly', () => {
+  const g = crowded();
+  g.crowd.push({ ...g.crowd[0], id: 950, x: 85,
+    route: [{ x: 85, y: g.player.y - 30 }] });
+  pressCall(g);
+  assert.ok(g.crowd.slice(0, 2).every((p) => p.acknowledge));
+  assert.equal(g.crowd[2].acknowledge, undefined);
+  const face = g.crowd[0].acknowledge;
+  assert.ok(face.faceY > 0, 'the responder faces the caller behind them');
+  g.phase = 'paused';
+  step(g, 1, idle);
+  assert.equal(g.crowd[0].acknowledge, face);
+  g.phase = 'playing';
+  for (let i = 0; i < 31; i++) step(g, 0.025, idle);
+  assert.equal(g.crowd[0].acknowledge, null);
 });
 
 test('both-side brake, including double taps and signal waits, never calls', () => {

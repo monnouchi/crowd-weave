@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, step } from '../logic.js';
-import { moveAnimals } from '../crowd.js';
+import { moveAnimals, previewTurn } from '../crowd.js';
 
 const released = { left: false, right: false };
 
@@ -42,6 +42,42 @@ test('dogs and cats are solid and never yield to the courtesy call', () => {
     assert.equal(g.callReadyAt, 0);
     assert.equal(animal.x, before);
     assert.equal(animal.courtesy, undefined);
+    assert.equal(animal.acknowledge, undefined);
     assert.ok(g.player.y > animal.y, `${animal.kind} remains solid`);
   }
+});
+
+test('a dog braces before reversing while its patrol range and collider stay fixed', () => {
+  const dog = createGame(0, 17).animals[0];
+  const r = dog.r;
+  let sawBraceBeforeTurn = false;
+  let previousDirection = 1;
+  for (let i = 0; i < 250; i++) {
+    moveAnimals([dog], 0.025);
+    const direction = Math.sign(dog.vx);
+    if (dog.bracing && direction === previousDirection) sawBraceBeforeTurn = true;
+    if (direction < 0) break;
+    previousDirection = direction;
+  }
+  assert.ok(sawBraceBeforeTurn);
+  assert.equal(dog.r, r);
+  assert.ok(dog.x >= dog.minX && dog.x <= dog.maxX);
+  const cat = createGame(2, 17).animals[0];
+  for (let i = 0; i < 250; i++) {
+    moveAnimals([cat], 0.025);
+    assert.equal(cat.bracing, false);
+  }
+});
+
+test('a pedestrian looks into the next leg before a real turn, without moving', () => {
+  const p = { active: true, anchor: false, state: 'walking',
+    x: 100, y: 130, leg: 0,
+    route: [{ x: 100, y: 100 }, { x: 160, y: 100 }] };
+  const before = structuredClone(p);
+  assert.deepEqual(previewTurn(p), { x: 1, y: 0 });
+  assert.deepEqual(p, before);
+  assert.equal(previewTurn({ ...p, y: 165 }), null);
+  assert.equal(previewTurn({ ...p, state: 'waiting' }), null);
+  assert.equal(previewTurn({ ...p, anchor: true }), null);
+  assert.equal(previewTurn({ ...p, route: [{ x: 100, y: 100 }] }), null);
 });
