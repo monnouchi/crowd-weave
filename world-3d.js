@@ -569,12 +569,14 @@ function people(ctx, p, game, reducedMotion, poses) {
       groundCircle(ctx, p, actor.x, actor.y, actor.r + 8,
         null, "#518e76", 2.5 * p.scale);
       const at = p.point(actor.x, actor.y, 57);
-      disk(ctx, at.x, at.y, Math.max(16, 26 * p.scale),
+      const side = actor.x < game.player.x ? -1 : 1;
+      const labelX = Math.max(22, Math.min(p.width - 22, at.x + side * 24));
+      disk(ctx, labelX, at.y, Math.max(16, 26 * p.scale),
         Math.max(9, 11 * p.scale), "#f3edd4");
       ctx.fillStyle = "#2e695c";
       ctx.font = `bold ${Math.max(9, 11 * p.scale)}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText("どうぞ", at.x, at.y + 3 * p.scale);
+      ctx.fillText("どうぞ", labelX, at.y + 3 * p.scale);
     }
   }
 }

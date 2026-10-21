@@ -579,17 +579,19 @@ function person(p, player = false) {
   ctx.restore();
   if (p.acknowledge) {
     ctx.save();
+    const side = p.x < game.player.x ? -1 : 1;
+    const labelX = Math.max(22, Math.min(458, p.x + side * 26));
     ctx.strokeStyle = "#518e76";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r + 8, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = "#f3edd4";
-    ctx.fillRect(p.x - 20, p.y - 39, 40, 16);
+    ctx.fillRect(labelX - 20, p.y - 39, 40, 16);
     ctx.fillStyle = "#2e695c";
     ctx.font = "bold 10px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("どうぞ", p.x, p.y - 27);
+    ctx.fillText("どうぞ", labelX, p.y - 27);
     ctx.restore();
   }
   if (hopRise) ctx.restore();
