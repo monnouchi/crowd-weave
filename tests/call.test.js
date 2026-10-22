@@ -5,7 +5,6 @@ import {
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { OneShotControl } from '../input.js';
-import { drawCallRipple } from '../character.js';
 
 const idle = { left: false, right: false };
 function crowded(stage = 0) {
@@ -142,16 +141,4 @@ test('pause, restart and canceled input leave no stale call', () => {
   assert.equal(createGame(0, 17).callHeld, false);
   assert.equal(createGame(1, 17).callReadyAt, 0);
   assert.equal(createGame(1, 17).callRipple, null);
-});
-
-test('an unavailable call draws a smaller, cooler single ripple', () => {
-  const strokes = [];
-  const ctx = { save() {}, restore() {}, beginPath() {}, arc() {},
-    stroke() { strokes.push(this.strokeStyle); } };
-  drawCallRipple(ctx, 20, 20, 1, 0.2, false, false);
-  const recognized = strokes.splice(0);
-  drawCallRipple(ctx, 20, 20, 1, 0.2, false, true);
-  assert.equal(recognized.length, 4);
-  assert.equal(strokes.length, 2);
-  assert.notEqual(strokes[1], recognized[1]);
 });

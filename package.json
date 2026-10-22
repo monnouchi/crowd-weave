@@ -8,5 +8,5 @@
     "build:pages": "node scripts/build-pages.js"
   },
   "license": "MIT",
-  "description": "ライブへ行こう！ — 人混みをよけ、友だちと合流しながら自宅からライブ会場へ向かうゲーム"
+  "description": "雑踏突破 — 人波の呼吸を読み、一声で道をひらいて友だちとライブへ向かう一人称ゲーム"
 }

@@ -2,257 +2,68 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <meta
-      name="description"
-      content="人混みをよけて、待ち合わせへ。自宅からライブ会場へ向かう全5ステージの人流ゲーム。スマホとキーボードで遊べます。"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#151c25" />
+    <meta name="description" content="雑踏突破。人波のすきまを読み、一声で道をひらく。一人称視点で友だちとライブを目指す、全5区間のブラウザゲーム。" />
     <link rel="canonical" href="https://monnouchi.github.io/crowd-weave/" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ja_JP" />
-    <meta property="og:title" content="ライブへ行こう！ / Crowd Weave" />
-    <meta
-      property="og:description"
-      content="人の流れに、すきまを見つけよう。人混みをよけて待ち合わせへ向かう友だちと合流しながらライブ会場を目指す全5ステージのゲーム。"
-    />
-    <meta
-      property="og:url"
-      content="https://monnouchi.github.io/crowd-weave/"
-    />
-    <meta
-      property="og:image"
-      content="https://monnouchi.github.io/crowd-weave/og.png?v=spatial-20261012"
-    />
+    <meta property="og:title" content="雑踏突破 | 人波をぬけて、ライブへ" />
+    <meta property="og:description" content="人波のすきまを読み、一声で道をひらく。一人称視点の全5区間ブラウザゲーム。" />
+    <meta property="og:url" content="https://monnouchi.github.io/crowd-weave/" />
+    <meta property="og:image" content="https://monnouchi.github.io/crowd-weave/og.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta
-      property="og:image:alt"
-      content="ライブへ行こう！のタイトルと、住宅街からライブ会場へ歩く実際のゲーム画面"
-    />
+    <meta property="og:image:alt" content="雑踏突破。人波の間に見える待ち合わせ場所を、一人称視点のゲーム画面で描いた画像" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="ライブへ行こう！ / Crowd Weave" />
-    <meta
-      name="twitter:description"
-      content="人の流れに、すきまを見つけよう。自宅からライブ会場へ向かう全5ステージの人流ゲーム。"
-    />
-    <meta
-      name="twitter:image"
-      content="https://monnouchi.github.io/crowd-weave/og.png?v=spatial-20261012"
-    />
-    <meta
-      name="twitter:image:alt"
-      content="ライブへ行こう！のタイトルと人混みをよけて歩くゲーム画面"
-    />
     <link rel="icon" href="data:," />
-    <title>ライブへ行こう！ | Crowd Weave</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>雑踏突破 | 人波をぬけて、ライブへ</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./src/main.js"></script>
   </head>
   <body>
-    <main>
-      <div class="hud">
-        <header>
-          <div>
-            <span class="eyebrow" id="scene-label">HOME / 01</span>
-            <h1>
-              <b id="game-name">ライブへ行こう！</b
-              ><span id="scene-purpose"
-                >家を出て、住宅街の角で友だちと合流</span
-              >
-            </h1>
-          </div>
-          <span class="badge" id="stage">STAGE 1 / 5 · ひとりで出発</span>
-        </header>
-        <section class="stats" aria-label="記録">
-          <div>
-            到着タイム<strong id="time">0.0<span>秒</span></strong>
-          </div>
-          <div>
-            接触<strong id="hits">0<span>回</span></strong>
-          </div>
-          <div>
-            目的地まで<strong id="distance">100<span>%</span></strong>
-          </div>
-        </section>
-        <div class="party-strip">
-          <strong id="party-count">自分 + 友だち0人</strong
-          ><span id="party-roster">ひとりで出発</span>
+    <main id="app">
+      <canvas id="world" tabindex="0" role="img" aria-label="目の高さから見た人混み。前へ進みながら人のすきまを探すゲーム画面"></canvas>
+      <div id="flash" aria-hidden="true"></div>
+
+      <header class="hud" aria-label="進行状況">
+        <div class="hud-line">
+          <span class="stage-number" id="stage-number">01 / 05</span>
+          <strong id="stage-name">夕暮れの路地</strong>
+          <span class="time" id="time">0:00</span>
+          <button id="sound" class="icon-button" type="button" aria-label="音を消す" aria-pressed="true" title="音のオン・オフ">♪</button>
+          <button id="pause" class="icon-button" type="button" aria-label="一時停止" title="一時停止">Ⅱ</button>
         </div>
-        <div id="traffic-status" hidden aria-label="横断歩道の信号"></div>
-      </div>
-      <div id="notice" role="status" aria-live="polite"></div>
-      <div class="stage">
-        <canvas
-          id="game"
-          tabindex="0"
-          aria-describedby="keyboard-help"
-          width="480"
-          height="680"
-          aria-label="人混みを避け、友だちと合流しながらライブ会場まで歩くゲーム"
-        ></canvas>
-        <div
-          id="overlay"
-          class="overlay initial"
-          role="dialog"
-          aria-labelledby="title"
-          aria-describedby="message"
-        >
-          <div class="card">
-            <span class="eyebrow" id="label"></span>
-            <h2 id="title">ライブへ行こう！</h2>
-            <dl id="result-score" hidden>
-              <div>
-                <dt>到着タイム（加算込み）</dt>
-                <dd id="result-time"></dd>
-              </div>
-              <div>
-                <dt>接触</dt>
-                <dd id="result-hits"></dd>
-              </div>
-              <div>
-                <dt>信号無視</dt>
-                <dd id="result-violations"></dd>
-              </div>
-            </dl>
-            <div id="result-party" hidden>
-              <canvas
-                id="result-roster"
-                width="300"
-                height="82"
-                role="img"
-                aria-label="自分と友だち"
-              ></canvas>
-              <p id="result-party-label"></p>
-            </div>
-            <p id="next-purpose" hidden></p>
-            <p id="message">
-              人混みのすきまを通り、友だちとライブ会場を目指そう。
-            </p>
-            <section class="intro-only start-how" aria-label="最初の操作">
-              <strong>前へは自動で進みます</strong>
-              <div class="start-diagram" aria-hidden="true">
-                <span class="diagram-key">← 左</span>
-                <span class="diagram-walker">●<small>↑</small></span>
-                <span class="diagram-key">右 →</span>
-              </div>
-              <p class="touch-instructions">左右でよける · 中央のボタンで声かけ</p>
-              <p class="keyboard-instructions">← → キーでよける（A・D も可）· Cで声かけ</p>
-              <div class="brake-diagram">
-                <span class="diagram-key">← 左</span>
-                <span>＋</span>
-                <span class="diagram-key">右 →</span>
-                <span>同時に押すと停止</span>
-              </div>
-            </section>
-            <div class="start-actions">
-              <button id="action">はじめる</button>
-              <button
-                id="result-toggle"
-                class="secondary"
-                hidden
-                aria-expanded="false"
-                aria-controls="result-details"
-              >
-                詳細・共有
-              </button>
-            </div>
-            <div class="intro-only start-options">
-              <button id="start-sound" class="secondary" aria-pressed="false">
-                音：OFF
-              </button>
-              <details id="intro-guide">
-                <summary>くわしい遊びかた</summary>
-                <p>
-                  前をふさぐ人は左右から回り込もう。左または右を短く2回押すと横へホップします。近くの人には「すみませーん」ボタンで声をかけられます（PCはCキー）。犬猫には効きません。人にぶつかると少し止まり、到着タイムに2秒加算。友だちは同じ道をついてきます。信号が赤なら左右を同時に押して待ちましょう。
-                </p>
-              </details>
-            </div>
-            <section id="result-details" hidden aria-label="結果の詳細と共有">
-              <p id="result-detail-message"></p>
-              <div id="share-actions" hidden>
-                <button id="share" class="secondary">
-                  結果画像を共有・保存</button
-                ><button id="copy-result" class="secondary">文章コピー</button>
-                <p id="share-status" role="status"></p>
-              </div>
-              <button id="close-result-details" class="secondary">
-                詳細を閉じる
-              </button>
-            </section>
-            <p id="enter-hint" class="enter-hint">
-              Enterでも開始できます
-            </p>
-          </div>
+        <div id="progress" class="progress" role="progressbar" aria-label="目的地までの進行度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-fill"></span></div>
+        <div class="hud-detail"><span id="flow" aria-live="off">人波を見よう</span><span id="hits">接触 0</span></div>
+      </header>
+
+      <div id="cue" class="cue" role="status" aria-live="polite"></div>
+      <div id="road-warning" class="road-warning" role="status" aria-live="polite" hidden></div>
+      <div id="hint" class="hint">左右でよける　両押しで待つ</div>
+
+      <nav id="controls" class="controls" aria-label="移動と声かけ">
+        <button id="left" class="steer" type="button" aria-label="左へ移動">←<small>左</small></button>
+        <button id="call" class="call" type="button" aria-label="すみませーんと声をかける"><span>すみませーん</span><small id="call-label">声をかける</small></button>
+        <button id="right" class="steer" type="button" aria-label="右へ移動">→<small>右</small></button>
+      </nav>
+
+      <section id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="overlay-title" aria-describedby="overlay-body">
+        <div class="overlay-card">
+          <span id="overlay-kicker" class="kicker">雑踏突破 / 01</span>
+          <div id="logo-wrap" class="logo-wrap"><img src="./logo.png" alt="" aria-hidden="true" /></div>
+          <h1 id="overlay-title">雑踏突破</h1>
+          <p id="overlay-body" class="overlay-lead">開演まで、あと少し。<br />友だちとライブの最前列へ。</p>
+          <p id="overlay-extra" class="overlay-extra">人波のすきまを読み、一声かけて道をひらこう。</p>
+          <div id="overlay-stats" class="overlay-stats" hidden><div><small>タイム</small><strong id="result-time">0:00</strong></div><div><small>接触</small><strong id="result-hits">0</strong></div></div>
+          <div id="overlay-guide" class="overlay-guide"><div><b>← →</b><span>左右によける</span></div><div><b>同時</b><span>待つ</span></div><div><b>声</b><span>人が道をあける</span></div></div>
+          <button id="action" class="action" type="button">歩き出す <span aria-hidden="true">↗</span></button>
+          <button id="secondary" class="secondary-action" type="button" hidden>この区間をやり直す</button>
+          <p id="overlay-foot" class="overlay-foot">PC は ← → / A D、C で声をかける。Esc で一時停止。</p>
         </div>
-        <div id="countdown" hidden role="status" aria-live="assertive">
-          <strong>GET READY</strong><small>↑ ゴールへ進もう</small>
-        </div>
-        <div id="goal-callout" hidden>こっちだよ！</div>
-        <svg id="speech-link" hidden aria-hidden="true"><path /></svg>
-        <div
-          id="speech-bubble"
-          hidden
-          role="status"
-          aria-live="polite"
-        ></div>
-      </div>
-      <div class="steering">
-        <button id="left" aria-label="左へ移動">← 左へ</button>
-        <div class="steering-center">
-          <button id="call" aria-label="すみませーんと声をかける" aria-describedby="call-status">
-            <span>すみませーん</span><small id="call-status">タップで声かけ</small>
-          </button>
-          <span id="motion">自動で前進 · 両押しで停止</span>
-        </div>
-        <button id="right" aria-label="右へ移動">右へ →</button>
-      </div>
-      <div id="tilt-controls" hidden>
-        <button id="recenter" class="secondary">正面合わせ</button
-        ><button id="brake">押している間ブレーキ</button>
-      </div>
-      <div class="toolbar">
-        <button
-          id="sound"
-          disabled
-          class="secondary"
-          aria-label="音のオン・オフ"
-          aria-pressed="false"
-        >
-          音：OFF</button
-        ><button id="pause" class="secondary" disabled>一時停止</button
-        ><button id="restart" class="secondary" disabled>やり直す</button>
-      </div>
-      <details class="settings">
-        <summary>操作ガイド・設定</summary>
-        <section class="input-modes" aria-label="スマホの操作方法">
-          <div>
-            <button id="mode-buttons" class="secondary" aria-pressed="true">
-              左右ボタン</button
-            ><button id="mode-tilt" class="secondary" aria-pressed="false">
-              傾きで操作
-            </button>
-          </div>
-          <p id="tilt-status" role="status">
-            操作方法を選べます。傾き操作は対応したスマホで利用できます。
-          </p>
-        </section>
-        <p class="guide-rules">
-          人への接触と赤信号での横断開始は＋2秒。自分や友だちが車・自転車に触れると、その区間から再挑戦です。
-        </p>
-        <footer>
-          <p>
-            <span id="keyboard-help" class="keyboard-instructions">PC：← → / A D · Cで声かけ · Enterで次へ · Escで一時停止</span>
-            <span id="touch-help" class="touch-instructions">スマホ：左右でよける · 同時で停止 · 中央で声かけ</span>
-          </p>
-        </footer>
-      </details>
-      <p class="license">
-        <a href="./LICENSE">MIT License</a> · © 2026 monnouchi
-      </p>
+      </section>
+      <p class="sr-only" id="screen-reader-update" aria-live="polite"></p>
     </main>
-    <script type="module" src="game.js"></script>
   </body>
 </html>
