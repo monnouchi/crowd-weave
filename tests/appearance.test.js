@@ -37,10 +37,16 @@ test("destination side walls are physical while either edge of the entrance work
       game.traffic = null;
       game.player.x = x;
       game.player.y = 112;
-      for (let frame = 0; frame < 700 && game.phase === "playing"; frame++)
+      let beforeFollowers = [];
+      for (let frame = 0; frame < 700 && game.phase === "playing"; frame++) {
+        beforeFollowers = game.party.members.map((person) => ({ x: person.x, y: person.y }));
         step(game, 0.025, {});
+      }
       assert.equal(game.phase, "finished");
-      assert.ok(game.party.members.every((person) => person.docked));
+      assert.ok(game.party.members.every((person, index) =>
+        Math.hypot(person.x - beforeFollowers[index].x,
+          person.y - beforeFollowers[index].y) < 8),
+      "arrival never warps a companion");
     }
   }
 });

@@ -26,6 +26,8 @@
     <main id="app">
       <canvas id="world" tabindex="0" role="img" aria-label="目の高さから見た人混み。前へ進みながら人のすきまを探すゲーム画面"></canvas>
       <div id="flash" aria-hidden="true"></div>
+      <div id="voice-effect" class="voice-effect" aria-hidden="true"></div>
+      <template id="voice-template"><div class="voice-burst"><span class="voice-glow"></span><span class="voice-wave first"></span><span class="voice-wave second"></span><strong class="voice-phrase">すみませーん！</strong></div></template>
 
       <header class="hud" aria-label="進行状況">
         <div class="hud-line">
@@ -55,9 +57,14 @@
           <div id="logo-wrap" class="logo-wrap"><img src="./logo.png" alt="" aria-hidden="true" /></div>
           <h1 id="overlay-title">雑踏突破</h1>
           <p id="overlay-body" class="overlay-lead">開演まで、あと少し。<br />友だちとライブの最前列へ。</p>
-          <p id="overlay-extra" class="overlay-extra">人波のすきまを読み、一声かけて道をひらこう。</p>
+          <p id="overlay-extra" class="overlay-extra">すきまを読み、何度でも声をかけよう。</p>
           <div id="overlay-stats" class="overlay-stats" hidden><div><small>タイム</small><strong id="result-time">0:00</strong></div><div><small>接触</small><strong id="result-hits">0</strong></div></div>
-          <div id="overlay-guide" class="overlay-guide"><div><b>← →</b><span>左右によける</span></div><div><b>同時</b><span>待つ</span></div><div><b>声</b><span>人が道をあける</span></div></div>
+          <div id="replay-meta" class="replay-meta" hidden>
+            <p id="result-record"></p>
+            <button id="share-seed" type="button">同じ配置の URL をコピー</button>
+            <input id="share-url" type="text" readonly aria-label="同じ配置の URL" hidden />
+          </div>
+          <div id="overlay-guide" class="overlay-guide"><div><b>← →</b><span>左右によける</span></div><div><b>同時</b><span>待つ</span></div><div><b>声</b><span>近くの人が応える</span></div></div>
           <button id="action" class="action" type="button">歩き出す <span aria-hidden="true">↗</span></button>
           <button id="secondary" class="secondary-action" type="button" hidden>この区間をやり直す</button>
           <p id="overlay-foot" class="overlay-foot">PC は ← → / A D、C で声をかける。Esc で一時停止。</p>

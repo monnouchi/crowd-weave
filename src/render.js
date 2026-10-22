@@ -1,4 +1,5 @@
 import { appearanceFor } from "./appearance.js";
+import { previewTurn } from "../crowd.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
 // z exists only here so every visible object obeys the same camera and depth.
@@ -225,28 +226,6 @@ function hallCeiling(ctx, c) {
   }
 }
 
-function flowMarks(ctx, c, game) {
-  const flow = game.flow;
-  if (!flow || !Number.isFinite(flow.zoneY)) return;
-  const y = flow.zoneY;
-  const lane = clamp(flow.lane ?? 240, 65, 415);
-  const open = clamp(flow.open ?? 0, 0, 1);
-  const wait = clamp(flow.anticipation ?? 0, 0, 1);
-  if (y < c.py - FAR || y > c.py + 30) return;
-  if (open > .05) {
-    const width = 14 + 24 * open;
-    const a = Math.round((.10 + .29 * open) * 255).toString(16).padStart(2, "0");
-    floorQuad(ctx, c, lane - width, y - 38, lane + width, y + 41, `#88f0d9${a}`, .37);
-    for (const x of [lane - width, lane + width])
-      worldLine(ctx, c, [x, y - 38, .5], [x, y + 41, .5], "#b5fbe0bc", 1.6);
-  } else if (wait > .05) {
-    for (const x of [lane - 40, lane + 40]) {
-      const a = Math.round((.13 + .27 * wait) * 255).toString(16).padStart(2, "0");
-      floorQuad(ctx, c, x - 2, y - 28, x + 2, y + 32, `#ffd486${a}`, .37);
-    }
-  }
-}
-
 function routeMarks(ctx, c, game) {
   const branch = game.routeBranch;
   if (!branch || c.stage !== 1) return;
@@ -384,18 +363,17 @@ function crossing(ctx, c, t, theme) {
   }
   floorQuad(ctx, c, t.left - 10, t.bottom + 14, t.right + 10, t.bottom + 17,
     t.canEnter ? "#98e6b7" : "#efcb83", .28);
-  const signalX = t.right + 30;
-  worldLine(ctx, c, [signalX, t.bottom + 7, 0], [signalX, t.bottom + 7, 95],
-    "#344d55", 3);
-  const lamp = screenPoint(c, signalX, t.bottom + 7, 94);
-  if (lamp && lamp.x > -40 && lamp.x < c.width + 40) {
-    const s = Math.max(.45, lamp.scale);
-    rect(ctx, lamp.x - 8 * s, lamp.y - 7 * s, 16 * s, 25 * s, "#263943", 3 * s);
-    ellipse(ctx, lamp.x, lamp.y + (t.canEnter ? 9 : 0) * s, 4 * s, 4 * s,
-      t.canEnter ? "#94e7b4" : "#ff9d8c");
-    ellipse(ctx, lamp.x, lamp.y + (t.canEnter ? 0 : 9) * s, 3.6 * s, 3.6 * s,
-      t.canEnter ? "#764d4b" : "#607269");
-  }
+  // A gantry puts the actual pedestrian lamps above the path. The old single
+  // curb lamp projected entirely off the right edge of portrait screens.
+  // Mount the heads over the near half of the zebra stripes. At the stopping
+  // line this keeps the lit icon below the fixed warning text on short phones.
+  const signalY = t.bottom - 35;
+  for (const x of [t.left - 18, t.right + 18])
+    worldLine(ctx, c, [x, signalY, 0], [x, signalY, 108], "#344d55", 3.4);
+  worldLine(ctx, c, [t.left - 18, signalY, 108],
+    [t.right + 18, signalY, 108], "#344d55", 3.6);
+  for (const x of [t.left + 22, (t.left + t.right) / 2, t.right - 22])
+    worldLine(ctx, c, [x, signalY, 108], [x, signalY, 83], "#344d55", 2.5);
   if (t.vehicle?.active && t.vehicle.x > -120 && t.vehicle.x < 600) {
     const v = t.vehicle;
     const p = screenPoint(c, v.x, v.y, 0);
@@ -416,18 +394,102 @@ function crossing(ctx, c, t, theme) {
   }
 }
 
+// Three fixed heads on one gantry keep at least one lamp in view across the
+// crossing's real left, middle and right walking lanes. Their positions still
+// obey the same world projection as people and road markings.
+export function pedestrianSignalProjections(game, t, view) {
+  if (!t) return [];
+  const c = camera(game, view);
+  const y = t.bottom - 35;
+  const redLit = !t.nominalGreen;
+  const walkLit = !!t.nominalGreen && (!t.blinking || !!t.blinkOn);
+  return [t.left + 22, (t.left + t.right) / 2, t.right - 22]
+    .map((x) => screenPoint(c, x, y, 70))
+    .filter((p) => p && p.depth >= 32 && p.depth < 650)
+    .map((p) => ({
+      x: p.x, y: p.y,
+      width: clamp(19 * p.scale, 27, 58),
+      height: clamp(31 * p.scale, 42, 86),
+      redLit, walkLit,
+    }))
+    .filter((p) => p.x + p.width / 2 >= 6 &&
+      p.x - p.width / 2 <= c.width - 6 &&
+      p.y + p.height / 2 >= 82 && p.y - p.height / 2 <= c.height - 115);
+}
+
+function signalIcon(ctx, x, y, radius, color, walking, lit) {
+  const fill = lit ? color : "#3c5360";
+  if (lit) ellipse(ctx, x, y, radius * 1.32, radius * 1.32,
+    walking ? "#6df5d653" : "#ff8d6c55");
+  ellipse(ctx, x, y, radius, radius, fill,
+    lit ? "#fff4d9" : "#597078", lit ? 1.3 : .8);
+  const figure = lit ? "#18343b" : "#253b45";
+  ellipse(ctx, x, y - radius * .38, radius * .21, radius * .21, figure);
+  ctx.beginPath();
+  ctx.moveTo(x, y - radius * .14);
+  ctx.lineTo(x, y + radius * .28);
+  if (walking) {
+    ctx.moveTo(x, y + radius * .22);
+    ctx.lineTo(x - radius * .4, y + radius * .7);
+    ctx.moveTo(x, y + radius * .22);
+    ctx.lineTo(x + radius * .45, y + radius * .45);
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + radius * .46, y + radius * .14);
+  } else {
+    ctx.moveTo(x, y + radius * .22);
+    ctx.lineTo(x - radius * .28, y + radius * .68);
+    ctx.moveTo(x, y + radius * .22);
+    ctx.lineTo(x + radius * .28, y + radius * .68);
+    ctx.moveTo(x - radius * .43, y);
+    ctx.lineTo(x + radius * .43, y);
+  }
+  ctx.strokeStyle = figure;
+  ctx.lineWidth = Math.max(1.5, radius * .18);
+  ctx.lineCap = "round";
+  ctx.stroke();
+}
+
+function crossingSignals(ctx, c, game, view) {
+  for (const t of game.crossings || []) {
+    for (const head of pedestrianSignalProjections(game, t, view)) {
+      const { x, y, width, height, redLit, walkLit } = head;
+      const left = x - width / 2, top = y - height / 2;
+      rect(ctx, left - 2, top - 2, width + 4, height + 4, "#c4bfae",
+        Math.max(5, width * .15));
+      rect(ctx, left, top, width, height, "#172d39",
+        Math.max(4, width * .12));
+      const radius = Math.min(width * .29, height * .18);
+      signalIcon(ctx, x, top + height * .29, radius,
+        "#ff816a", false, redLit);
+      signalIcon(ctx, x, top + height * .72, radius,
+        "#75efd3", true, walkLit);
+    }
+  }
+}
+
+export function worldLabelCenterX(projectedX, labelWidth, viewportWidth,
+  pinEdge = false) {
+  // Keep the message near its world anchor; an actor already beyond the edge
+  // should not leave a detached speech bubble on screen.
+  if (!pinEdge && (projectedX < -24 || projectedX > viewportWidth + 24))
+    return null;
+  const half = Math.min(labelWidth / 2, Math.max(0, viewportWidth / 2 - 8));
+  return clamp(projectedX, 8 + half, viewportWidth - 8 - half);
+}
+
 function worldLabel(ctx, c, x, y, z, text, fill, ink,
-  size = 15, minDepth = 30, maxDepth = FAR) {
+  size = 15, minDepth = 30, maxDepth = FAR, pinEdge = false) {
   const p = screenPoint(c, x, y, z);
-  if (!p || p.depth < minDepth || p.depth > maxDepth ||
-    p.x < -120 || p.x > c.width + 120) return;
+  if (!p || p.depth < minDepth || p.depth > maxDepth) return;
   const fontSize = clamp(size * p.scale, 9, 29);
   ctx.font = `800 ${fontSize}px system-ui, sans-serif`;
   const w = ctx.measureText(text).width + fontSize * .9;
   const h = fontSize * 1.55;
-  rect(ctx, p.x - w / 2, p.y - h / 2, w, h, fill, Math.min(7, h * .2));
+  const labelX = worldLabelCenterX(p.x, w, c.width, pinEdge);
+  if (labelX == null) return;
+  rect(ctx, labelX - w / 2, p.y - h / 2, w, h, fill, Math.min(7, h * .2));
   ctx.fillStyle = ink; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(text, p.x, p.y + fontSize * .01);
+  ctx.fillText(text, labelX, p.y + fontSize * .01);
 }
 
 function destination(ctx, c, theme, game) {
@@ -603,6 +665,44 @@ function concertStage(ctx, c, game, view) {
   }
 }
 
+export function pedestrianFacing(actor) {
+  const ux = Number(actor.ux) || 0;
+  const uy = Number(actor.uy) || 0;
+  const direction = (x, y) => ({
+    profile: Math.abs(x) < .45 || Math.abs(x) <= Math.abs(y) * .78
+      ? 0 : Math.sign(x),
+    front: y > .18,
+  });
+  // Courtesy is still a real walk. The body must follow that velocity while
+  // the head can briefly glance toward the person who called.
+  const body = (actor.acknowledge && !actor.courtesy) || actor.state === "waiting"
+    ? { profile: 0, front: true } : direction(ux, uy);
+  if (actor.acknowledge && actor.courtesy) {
+    const preparing = actor.courtesy.phase === "prepare";
+    const weight = preparing
+      ? .42 + .38 * clamp(1 - (actor.courtesy.prepareRemaining || 0) / .12, 0, 1)
+      : .55 * clamp(actor.acknowledge.remaining / .72, 0, 1);
+    const headX = ux * (1 - weight) + (actor.acknowledge.faceX || 0) * weight;
+    const headY = uy * (1 - weight) + (actor.acknowledge.faceY || 0) * weight;
+    const head = direction(headX, headY);
+    return { ...body, headProfile: head.profile, headFront: head.front,
+      headLean: clamp((headX - ux) * 1.8, -1.6, 1.6), headGaze: headX };
+  }
+  const next = actor.acknowledge ? null : previewTurn(actor);
+  if (!next) return { ...body, headProfile: body.profile,
+    headFront: body.front, headLean: 0, headGaze: ux };
+  const corner = actor.route[actor.leg];
+  const distance = Math.hypot(corner.x - actor.x, corner.y - actor.y);
+  // The gaze eases into the next leg while the torso keeps following the
+  // present one. The route changes as the walker reaches the corner.
+  const look = clamp((48 - distance) / 32, 0, 1) * .85;
+  const headX = ux * (1 - look) + next.x * look;
+  const headY = uy * (1 - look) + next.y * look;
+  const head = direction(headX, headY);
+  return { ...body, headProfile: head.profile, headFront: head.front,
+    headLean: clamp((headX - ux) * 1.8, -1.6, 1.6), headGaze: headX };
+}
+
 function person(ctx, c, actor, game, view) {
   if (actor.active === false || !Number.isFinite(actor.x) || !Number.isFinite(actor.y)) return;
   const p = screenActor(c, actor.x, actor.y);
@@ -624,17 +724,21 @@ function person(ctx, c, actor, game, view) {
     ? ["#9b5974", "#617b9b", "#b2806e", "#788c84", "#ae9b75"][(actor.color ?? actor.id ?? 0) % 5]
     : ["#c57960", "#739081", "#b79668", "#7a8799", "#9c6d7e"][(actor.color ?? actor.id ?? 0) % 5]);
   const friend = actor.friend || actor.partner;
-  const face = actor.acknowledge || actor.uy > .18 || actor.state === "waiting";
+  const facing = pedestrianFacing(actor);
+  const face = facing.front;
+  const profile = facing.profile;
+  const headProfile = facing.headProfile;
   const moving = Math.abs(actor.vx || 0) + Math.abs(actor.vy || 0) > 8;
   const stride = !view.reducedMotion && moving ? Math.sin((actor.walk || game.worldTime * 15) * .28 + (actor.id || 0)) * 3.2 : 0;
-  const bow = actor.acknowledge ? 3 : 0;
+  const bow = actor.acknowledge
+    ? actor.courtesy?.phase === "prepare" ? 1.8 : 1.2 : 0;
   const outlined = friend ? "#fff0bd" : "#30444baa";
   ellipse(ctx, px, foot + 1.5 * s, 13 * s, Math.max(1, 3.1 * s), "#26363e43");
   if (game.callReady && game.callTargets?.includes(actor.id))
     ellipse(ctx, px, foot + .7 * s, Math.min(42, 18 * s),
       Math.min(12, Math.max(2, 4.6 * s)), "#85f0c32a", "#a5fbe0", 2);
   if (friend) ellipse(ctx, px, foot + .5 * s, 19 * s, Math.max(1, 5 * s), "#f6cd8251", "#ffe2a6", Math.max(1, s));
-  const sx = 3 * s;
+  const sx = profile ? 2.1 * s : 3 * s;
   function limb(x1, y1, x2, y2, width, color, outline = null) {
     ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
@@ -649,37 +753,51 @@ function person(ctx, c, actor, game, view) {
   ellipse(ctx, px + (5 + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
   const bodyTop = foot - 43 * s + bow * s;
   const bodyBot = foot - 18 * s;
-  rect(ctx, px - 10 * s, bodyTop, 20 * s, bodyBot - bodyTop,
-    outlined, 5 * s);
-  rect(ctx, px - 9 * s, bodyTop + s, 18 * s, bodyBot - bodyTop - 2 * s,
-    clothes, 4 * s);
-  if (face) {
+  const torsoWidth = profile ? 14 : 20;
+  rect(ctx, px - torsoWidth * s / 2, bodyTop, torsoWidth * s,
+    bodyBot - bodyTop, outlined, 5 * s);
+  rect(ctx, px - (torsoWidth / 2 - 1) * s, bodyTop + s,
+    (torsoWidth - 2) * s, bodyBot - bodyTop - 2 * s, clothes, 4 * s);
+  if (profile) {
+    rect(ctx, px - profile * 1.3 * s - .65 * s, bodyTop + 5 * s,
+      1.3 * s, 13 * s, "#f9e7c45c", .6 * s);
+  } else if (face) {
     rect(ctx, px - 1 * s, bodyTop + 6 * s, 2 * s, 14 * s, "#fff1cd45", s);
   } else {
     rect(ctx, px - 2.5 * s, bodyTop + 3 * s, 5 * s, 10 * s, "#273d4a44", s);
   }
-  const wave = actor.acknowledge || (friend && game.reunionUntil > game.worldTime);
-  limb(px - 9 * s, bodyTop + 5 * s,
-    px - 13 * s, bodyTop + (wave ? -7 : 19) * s,
+  const wave = (actor.acknowledge?.remaining || 0) > .56 ||
+    (friend && game.reunionUntil > game.worldTime);
+  const shoulder = profile ? 5.8 : 9;
+  const hand = profile ? 8 : 13;
+  limb(px - shoulder * s, bodyTop + 5 * s,
+    px - hand * s, bodyTop + (wave ? -7 : 19) * s,
     3.4 * s, clothes, outlined);
-  limb(px + 9 * s, bodyTop + 5 * s,
-    px + 13 * s, bodyTop + 19 * s,
+  limb(px + shoulder * s, bodyTop + 5 * s,
+    px + hand * s, bodyTop + 19 * s,
     3.4 * s, clothes, outlined);
-  ellipse(ctx, px - 13 * s, bodyTop + (wave ? -7 : 19) * s,
+  ellipse(ctx, px - hand * s, bodyTop + (wave ? -7 : 19) * s,
     2.4 * s, 3 * s, look.skin);
-  ellipse(ctx, px + 13 * s, bodyTop + 19 * s, 2.4 * s, 3 * s, look.skin);
+  ellipse(ctx, px + hand * s, bodyTop + 19 * s, 2.4 * s, 3 * s, look.skin);
   const headY = foot - (50 - bow) * s;
-  ellipse(ctx, px, headY, 7.6 * s, 9 * s, look.skin, "#3b3f4988", Math.max(.5, .65 * s));
+  const headX = px + (profile * 2.4 + facing.headLean) * s;
+  ellipse(ctx, headX, headY, (headProfile ? 7.1 : 7.6) * s, 9 * s,
+    look.skin, "#3b3f4988", Math.max(.5, .65 * s));
   ctx.fillStyle = look.hair;
   ctx.beginPath();
-  ctx.ellipse(px, headY - 4.5 * s, 8 * s, 5.5 * s, 0, Math.PI, TAU);
+  ctx.ellipse(headX, headY - 4.5 * s, 8 * s, 5.5 * s, 0, Math.PI, TAU);
   ctx.fill();
-  if (face && s > .6) {
-    const gaze = actor.acknowledge ? 0 : clamp((actor.ux || 0) * 1.4, -1.2, 1.2);
-    ellipse(ctx, px - 2.5 * s + gaze * s, headY + .4 * s, Math.max(.6, .65 * s), Math.max(.6, .65 * s), "#33434b");
-    ellipse(ctx, px + 2.5 * s + gaze * s, headY + .4 * s, Math.max(.6, .65 * s), Math.max(.6, .65 * s), "#33434b");
+  if (headProfile && s > .6) {
+    ellipse(ctx, headX + headProfile * 4.1 * s, headY + .35 * s,
+      Math.max(.6, .75 * s), Math.max(.6, .75 * s), "#33434b");
+    ellipse(ctx, headX + headProfile * 7.2 * s, headY + 2.4 * s,
+      Math.max(.8, 1.2 * s), Math.max(.7, 1.1 * s), look.skin);
+  } else if (facing.headFront && s > .6) {
+    const gaze = actor.acknowledge ? 0 : clamp(facing.headGaze * 1.4, -1.2, 1.2);
+    ellipse(ctx, headX - 2.5 * s + gaze * s, headY + .4 * s, Math.max(.6, .65 * s), Math.max(.6, .65 * s), "#33434b");
+    ellipse(ctx, headX + 2.5 * s + gaze * s, headY + .4 * s, Math.max(.6, .65 * s), Math.max(.6, .65 * s), "#33434b");
     if (actor.acknowledge) {
-      ctx.beginPath(); ctx.arc(px, headY + 2.7 * s, 2.1 * s, .1, Math.PI - .1);
+      ctx.beginPath(); ctx.arc(headX, headY + 2.7 * s, 2.1 * s, .1, Math.PI - .1);
       ctx.strokeStyle = "#83594e"; ctx.lineWidth = Math.max(.8, .6 * s); ctx.stroke();
     }
   }
@@ -702,9 +820,6 @@ function person(ctx, c, actor, game, view) {
       "#75ebc82a", "#8ff3d2", Math.max(1, 1.2 * s));
     if (p.depth < 150) worldLabel(ctx, c, actor.x, actor.y, 74,
       "どうぞ", "#e1f9e8", "#32645a", 13, 24);
-  } else if (actor.flowGate && (game.flow?.anticipation || 0) > .35 && p.depth < 205) {
-    ellipse(ctx, px, foot + .4 * s, 17 * s, Math.max(1, 4 * s),
-      "#f2d78b1f", "#f1d39699", Math.max(.7, s));
   }
   ctx.restore();
 }
@@ -738,7 +853,10 @@ function routeSign(ctx, c, game) {
   if (!b || c.stage !== 1) return;
   const y = b.fork?.y;
   if (!Number.isFinite(y) || y > c.py - 25 || y < c.py - 650) return;
-  worldLabel(ctx, c, 126, y - 33, 31, "ひろい道", "#275e65", "#e9fff4", 14, 25);
+  // The wider branch leaves the phone's narrow view as it approaches. Keep
+  // its label at the edge with an arrow until the fork is actually passed.
+  worldLabel(ctx, c, 126, y - 33, 31, "← ひろい道", "#275e65", "#e9fff4",
+    14, 25, FAR, true);
   worldLabel(ctx, c, 267, y - 33, 31, "近道", "#a46d4d", "#fff0cf", 14, 25);
 }
 
@@ -755,6 +873,20 @@ function rain(ctx, c, game, view) {
   ctx.restore();
 }
 
+export function reunionWave(game, view = {}) {
+  const remaining = (game.reunionUntil || 0) - (game.worldTime || 0);
+  if (remaining <= 0 || remaining > .9 || game.phase !== "playing") return null;
+  const width = Math.max(1, view.width || 390);
+  const height = Math.max(1, view.height || 700);
+  const progress = clamp((.9 - remaining) / .9, 0, 1);
+  const lift = view.reducedMotion ? .7 : Math.sin(progress * Math.PI);
+  return {
+    x: Math.min(width * .08, 32) + 8 * lift,
+    y: height - 71 - 64 * lift,
+    lift,
+  };
+}
+
 function foreground(ctx, c, game, view) {
   // Sleeves at the bottom are the only visible part of the player. They remain
   // steady while walking, reducing motion sickness and leaving the route clear.
@@ -765,6 +897,22 @@ function foreground(ctx, c, game, view) {
     { x: w * .18, y: base }, { x: -14, y: base }], sleeve);
   polygon(ctx, [{ x: w + 14, y: base - 82 }, { x: w * .89, y: base - 45 },
     { x: w * .82, y: base }, { x: w + 14, y: base }], sleeve);
+  const wave = reunionWave(game, view);
+  if (wave && wave.lift > .02) {
+    // A small player hand can be seen when a companion catches up. It stays
+    // on the edge of the frame, leaving the road and traffic lamp clear.
+    polygon(ctx, [{ x: -9, y: base - 78 }, { x: 11, y: base - 69 },
+      { x: wave.x + 7, y: wave.y + 14 },
+      { x: wave.x - 8, y: wave.y + 15 }], sleeve, "#245769", 1.8);
+    ctx.beginPath();
+    ctx.moveTo(wave.x - 8, wave.y + 14);
+    ctx.lineTo(wave.x + 7, wave.y + 14);
+    ctx.strokeStyle = "#214e60"; ctx.lineWidth = 2; ctx.stroke();
+    ellipse(ctx, wave.x, wave.y + 3, 8.8, 11.8, "#e5b796", "#966f62", 1.35);
+    for (const offset of [-4, 0, 4])
+      ellipse(ctx, wave.x + offset, wave.y - 7, 2.4, 5.5,
+        "#e5b796", "#966f62", .8);
+  }
   const pressure = clamp(Number(view.danger) || game.pressure || 0, 0, 1);
   if (pressure > .24) {
     const glow = ctx.createRadialGradient(w / 2, c.height * .65,
@@ -803,7 +951,6 @@ export function renderWorld(ctx, game, view = {}) {
   ground(ctx, c, theme, game);
   hallCeiling(ctx, c);
   routeMarks(ctx, c, game);
-  flowMarks(ctx, c, game);
   const items = [];
   const stride = c.stage === 0 ? 235 : c.stage === 4 ? 185 : 210;
   for (let i = -1; i < Math.ceil((game.worldHeight || 2200) / stride) + 1; i++) {
@@ -834,6 +981,9 @@ export function renderWorld(ctx, game, view = {}) {
     draw: () => routeSign(ctx, c, game) });
   items.sort((a, b) => a.y - b.y);
   for (const item of items) item.draw();
+  // High signal heads stay legible above foreground walkers. The supports and
+  // road still sort with the world, so this does not move the crossing itself.
+  crossingSignals(ctx, c, game, view);
   rain(ctx, c, game, view);
   foreground(ctx, c, game, view);
   ctx.restore();

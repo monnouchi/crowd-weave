@@ -1,6 +1,77 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, nextRunSeed, seedForRun, step } from "../logic.js";
+import {
+  BEST_STORAGE_KEY, MAX_LOCAL_BESTS, readLocalBest, recordLocalBest,
+  seedShareUrl,
+} from "../src/replay.js";
+
+function storage() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+}
+
+test("a faster replay for the same seed and stage becomes the local best", () => {
+  const local = storage();
+  assert.deepEqual(recordLocalBest(local,
+    { seed: 17, stage: 1, elapsed: 20, hits: 1 }), {
+    best: { seed: 17, stage: 1, elapsed: 20, hits: 1 },
+    improved: true, stored: true,
+  });
+  assert.equal(recordLocalBest(local,
+    { seed: 17, stage: 1, elapsed: 21, hits: 0 }).improved, false);
+  assert.equal(recordLocalBest(local,
+    { seed: 17, stage: 1, elapsed: 20, hits: 0 }).improved, true);
+  assert.deepEqual(readLocalBest(local, 17, 1),
+    { seed: 17, stage: 1, elapsed: 20, hits: 0 });
+  assert.equal(readLocalBest(local, 18, 1), null);
+  assert.equal(readLocalBest(local, 17, 2), null);
+  assert.equal(recordLocalBest(local,
+    { seed: 17, stage: 5, elapsed: 88, hits: 3 }).stored, true);
+  assert.equal(readLocalBest(local, 17, 5)?.elapsed, 88);
+});
+
+test("storage errors and corrupt contents do not stop a result", () => {
+  const blocked = {
+    getItem() { throw new Error("Storage blocked"); },
+    setItem() { throw new Error("Storage blocked"); },
+  };
+  const result = { seed: 0, stage: 0, elapsed: 12.3456, hits: 0 };
+  assert.deepEqual(recordLocalBest(blocked, result), {
+    best: { ...result, elapsed: 12.346 }, improved: true, stored: false,
+  });
+  assert.equal(readLocalBest(blocked, 0, 0), null);
+  const local = storage();
+  local.setItem(BEST_STORAGE_KEY, "{broken");
+  assert.equal(recordLocalBest(local, result).stored, true);
+  assert.equal(readLocalBest(local, 0, 0)?.elapsed, 12.346);
+});
+
+test("local best history is versioned, bounded, and contains only game data", () => {
+  const local = storage();
+  for (let seed = 0; seed < MAX_LOCAL_BESTS + 5; seed++)
+    recordLocalBest(local, { seed, stage: 0, elapsed: 10 + seed, hits: 0 });
+  const saved = JSON.parse(local.getItem(BEST_STORAGE_KEY));
+  assert.equal(saved.version, 1);
+  assert.equal(saved.records.length, MAX_LOCAL_BESTS);
+  assert.deepEqual(Object.keys(saved.records[0]).sort(),
+    ["elapsed", "hits", "seed", "stage"]);
+  assert.equal(readLocalBest(local, 0, 0), null);
+  assert.equal(readLocalBest(local, MAX_LOCAL_BESTS + 4, 0)?.hits, 0);
+});
+
+test("share URL keeps the game path and only the deterministic seed", () => {
+  assert.equal(seedShareUrl("https://example.test/crowd-weave/?v=old#scene", 17),
+    "https://example.test/crowd-weave/?seed=17");
+  assert.equal(seedShareUrl("http://127.0.0.1:4175/", 0xffffffff),
+    "http://127.0.0.1:4175/?seed=4294967295");
+  assert.throws(() => seedShareUrl("https://example.test/", -1), RangeError);
+  assert.throws(() => seedShareUrl("file:///tmp/index.html", 1), TypeError);
+});
+
 test("new runs avoid repeating entropy and fixed seeds reproduce all five scenes", () => {
   assert.equal(nextRunSeed(0xffffffff, 0xffffffff), 0);
   assert.equal(nextRunSeed(17, 2026), 2026);
@@ -18,6 +89,7 @@ test("new runs avoid repeating entropy and fixed seeds reproduce all five scenes
     assert.deepEqual(a, b);
   }
 });
+
 test("bounded variation changes destinations, pace, dwell, entry timing and venue groups while keeping each scene flow", () => {
   const games = [17, 2026, 97, 4004].map((seed) =>
     Array.from({ length: 5 }, (_, stage) =>

@@ -55,7 +55,8 @@ test('the central shortcut remains passable with the existing one-tap call', () 
     step(g, 0.025, input);
   }
   assert.ok(called);
-  assert.ok(g.callReadyAt > 0);
+  assert.equal(g.callSerial, 1);
+  assert.ok(g.callResponseCount > 0);
   assert.equal(g.hits, 0);
   assert.equal(g.player.x, 240);
   assert.equal(g.phase, 'playing');

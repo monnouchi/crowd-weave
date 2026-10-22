@@ -16,6 +16,7 @@ export const PUBLIC_FILES = Object.freeze([
   "traffic.js",
   "src/appearance.js",
   "src/main.js",
+  "src/replay.js",
   "src/run.js",
   "src/render.js",
   "src/audio.js",

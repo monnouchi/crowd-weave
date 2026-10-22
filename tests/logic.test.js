@@ -31,7 +31,7 @@ test("near the destination, the callout points toward the usable entrance", () =
     g.player.x = goal.x - 1;
     assert.equal(goalPrompt(g), g.scene.bubble);
     g.arriving = true;
-    assert.equal(goalPrompt(g), "友だち全員を待とう！");
+    assert.equal(goalPrompt(g), "到着！");
   }
 });
 test("automatic forward, left/right, simultaneous brake, bounds", () => {
@@ -291,7 +291,7 @@ test("background delta remains capped", () => {
   assert.equal(g.elapsed, 0.05);
 });
 
-test("meeting partner has a clear purpose, is not a crowd obstacle and cannot penalize arrival", () => {
+test("meeting partner is safe and the leader finishes without waiting for followers", () => {
   for (let stage = 0; stage < 5; stage++) {
     const g = playing(stage);
     assert.ok(g.scene.purpose && g.scene.bubble && g.scene.arrival);
@@ -301,14 +301,17 @@ test("meeting partner has a clear purpose, is not a crowd obstacle and cannot pe
     g.player.x = g.meetingPartner.x;
     g.player.y = g.meetingPartner.y;
     g.party = createParty(stage, g.player);
+    const followers = g.party.members.map((member) => ({ x: member.x, y: member.y }));
     step(g, 0.025, {});
-    if (stage > 0)
-      assert.equal(g.phase, "playing", "leader arrival alone does not finish");
-    for (let n = 0; n < 600 && g.phase === "playing"; n++) step(g, 0.025, {});
     assert.equal(g.phase, "finished");
+    assert.ok(g.party.members.every((member, index) =>
+      Math.hypot(member.x - followers[index].x,
+        member.y - followers[index].y) <= 8),
+    "companions keep their real positions instead of teleporting");
+    if (stage > 0) assert.ok(g.party.members.some((member) => !member.docked));
     assert.equal(g.hits, 0);
     assert.equal(g.meetingPartner.state, "met");
-    assert.ok(g.elapsed >= 0.025);
+    assert.equal(g.elapsed, 0.025);
   }
 });
 

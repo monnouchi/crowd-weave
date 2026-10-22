@@ -290,26 +290,34 @@ export class Soundscape {
     const now = c.currentTime;
     const minGap = {
       contact: 0.42, closePass: 0.45, danger: 1.3,
-      callEmpty: 0.3, reunion: 1, brake: 0.45,
+      reunion: 1, brake: 0.45,
     }[kind] || 0;
     if (now - (this.lastEvent.get(kind) ?? -Infinity) < minGap) return;
     this.lastEvent.set(kind, now);
+    const voiceTap = kind === "call" || kind === "callEmpty";
+    const sinceVoice = now - (this.lastEvent.get("voiceTap") ?? -Infinity);
+    // Every tap receives a cue. Closely stacked shouts use shorter, quieter
+    // voices so a fast five-tap burst stays below the limiter.
+    const voiceGain = sinceVoice < .08 ? .4 : sinceVoice < .24 ? .68 : 1;
+    if (voiceTap) this.lastEvent.set("voiceTap", now);
     const root = STAGES[this.stage].root;
     if (kind === "start") {
       this.tone(semitone(root, 12), now, 0.24, 0.018, "sine");
       this.tone(semitone(root, 19), now + 0.13, 0.34, 0.02, "triangle");
     } else if (kind === "call") {
-      // The rising question and airy opening signal a successful polite call.
-      this.tone(392, now, 0.17, 0.023, "sine", null,
+      // The rising voice is answered by a higher note when someone yields.
+      this.tone(392, now, 0.13, 0.026 * voiceGain, "sine", null,
         { endFrequency: 440 });
-      this.tone(523.25, now + 0.12, 0.27, 0.023, "triangle", null,
+      this.tone(523.25, now + 0.08, 0.2, 0.026 * voiceGain, "triangle", null,
         { endFrequency: 659.25 });
-      this.breath(now + 0.09, 0.45, 0.045, 950);
+      this.breath(now + 0.04, 0.34, 0.058 * voiceGain, 950);
+      this.tone(783.99, now + 0.2, 0.2, 0.015 * voiceGain, "sine");
       const responders = Math.max(1, Number(detail.count || detail.responders || 1));
       if (responders > 1)
-        this.tone(783.99, now + 0.34, 0.2, 0.009, "sine");
+        this.tone(987.77, now + 0.24, 0.14, 0.007 * voiceGain, "sine");
     } else if (kind === "callEmpty") {
-      this.tone(392, now, 0.1, 0.01, "sine");
+      this.tone(392, now, 0.085, 0.013 * voiceGain, "sine");
+      this.breath(now, 0.12, 0.012 * voiceGain, 760);
     } else if (kind === "contact") {
       this.tone(174.61, now, 0.22, 0.029, "triangle", null,
         { endFrequency: 123.47 });
@@ -317,6 +325,10 @@ export class Soundscape {
     } else if (kind === "closePass") {
       this.tone(659.25, now, 0.095, 0.009, "sine");
       this.tone(880, now + 0.07, 0.14, 0.009, "sine");
+      const streak = Math.min(3, Math.max(1, Number(detail.streak) || 1));
+      if (streak > 1)
+        this.tone(streak >= 3 ? 1318.51 : 1174.66,
+          now + 0.16, 0.13, streak >= 3 ? 0.007 : 0.005, "sine");
     } else if (kind === "reunion") {
       this.tone(440, now, 0.24, 0.016, "sine");
       this.tone(587.33, now + 0.13, 0.27, 0.016, "sine");

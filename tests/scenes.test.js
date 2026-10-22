@@ -188,7 +188,7 @@ test("longer cafe has six moving crossing waves and a passable meeting group eve
       step(clean, 0.05, { left: true, right: true });
     assert.equal(clean.phase, "finished");
     assert.equal(clean.hits, 0);
-    assert.ok(clean.party.members.every((p) => p.docked));
+    assert.ok(clean.party.members.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
     const straight = createGame(2, seed);
     straight.phase = "playing";
     for (let frame = 0; frame < 800 && straight.phase === "playing"; frame++)
@@ -210,7 +210,7 @@ test("all revised busy scenes retain all-member zero-contact routes across diffe
       assert.equal(g.phase, "finished");
       assert.equal(g.hits, 0);
       assert.equal(trafficViolations(g), 0);
-      assert.ok(g.party.members.every((p) => p.docked));
+      assert.ok(g.party.members.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
       if (stage === 4) {
         assert.ok(result.path.includes("L") || result.path.includes("R"));
         assert.equal(g.ticketChecked, true);

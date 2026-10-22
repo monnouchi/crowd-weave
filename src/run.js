@@ -1,4 +1,5 @@
 import { createGame, step, STAGES, SCENES } from "../logic.js";
+import { availableCourtesyTargets } from "../crowd.js";
 
 // Five short chapters of the same journey. The snippets are invitations from
 // people already on the way, rather than instructions interrupting the run.
@@ -8,21 +9,21 @@ export const STORY_STAGES = Object.freeze([
     place: "住宅街の角",
     message: "「角で待ってる。急がなくていいよ」",
     cue: "人の向きが変わる、その一拍を見よう。",
-    clear: "ひとり目と合流。歩幅がそろった。",
+    clear: "ひとり目と合流。次の道へ。",
   },
   {
     title: "改札の波",
     place: "最寄り駅",
     message: "「駅前にいるよ。人の流れがすごい！」",
     cue: "止まって待つと、道が開く瞬間がある。",
-    clear: "駅を抜けた。声が少し近くなる。",
+    clear: "駅を抜けた。次の待ち合わせへ。",
   },
   {
     title: "窓の明かり",
     place: "駅のカフェ",
     message: "「窓ぎわから見えてる。あと少し」",
     cue: "前の人に声をかけて、すきまをつくろう。",
-    clear: "カフェで合流。今度はみんなで。",
+    clear: "カフェに到着。次は会場へ。",
   },
   {
     title: "雨の向こう",
@@ -36,191 +37,174 @@ export const STORY_STAGES = Object.freeze([
     place: "ステージ前",
     message: "「前奏が聴こえる。最前列で待ってる！」",
     cue: "人波の呼吸に合わせて、最前へ。",
-    clear: "間に合った。みんなで、同じ音の中へ。",
+    clear: "間に合った。最前列に立った。",
   },
 ]);
 
-const GATE_WAVES = [
-  [865],
-  [850],
-  [1170, 910],
-  [1790, 1490, 1230],
-  [1480, 1160, 880],
+// These are scoring stretches, not actors or moving walls. Existing seeded
+// walkers pass through them on routes to destinations of their own.
+const BUSY_STRETCHES = [
+  [980, 760], [1030, 890, 730], [1330, 1150, 920],
+  [1970, 1750, 1500, 1260], [1580, 1270, 980],
 ];
-const GATE_BASE = [218, 262];
-const GATE_OPEN = [168, 312];
-const GATE_PERIOD = [5.2, 4.9, 4.6, 4.4, 4.2];
-const CALL_RECOVERY = 3.8;
 const MAX_DT = 0.05;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const smooth = (v) => {
-  const x = clamp(v, 0, 1);
-  return x * x * (3 - 2 * x);
-};
-const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-
-function candidateY(run, desired, otherGates) {
-  const choices = [];
-  for (let delta = -90; delta <= 90; delta += 5) {
-    const y = desired + delta;
-    if (y < 180 || y > run.startY - 140) continue;
-    if (otherGates.some((gate) => Math.abs(gate.y - y) < 175)) continue;
-    if (run.crossings.some((crossing) =>
-      y >= crossing.top - 95 && y <= crossing.bottom + 95)) continue;
-    const clearance = Math.min(...run.crowd.filter((p) => p.active).flatMap(
-      (p) => GATE_BASE.map((x) => Math.hypot(p.x - x, p.y - y)),
-    ));
-    choices.push({ y, clearance, score: clearance - Math.abs(delta) * 0.09 });
-  }
-  choices.sort((a, b) => b.score - a.score);
-  return choices.find((choice) => choice.clearance >= 42)?.y ?? null;
+function redirect(person, x, y, run) {
+  person.anchor = false;
+  person.habit = "direct";
+  person.state = "walking";
+  person.wait = 0;
+  person.flow = "along";
+  person.origin = "south";
+  person.destination = "north";
+  person.originName = "通りの手前";
+  person.destinationName = run.story.place;
+  const destinationX = clamp(x, 70, 410);
+  person.route = [
+    { x: destinationX, y: Math.max(105, y) },
+    { x: destinationX, y: -80 },
+  ];
+  person.entry = { x: person.x, y: run.startY + 75 };
+  person.leg = 0;
+  const dx = destinationX - person.x;
+  const dy = person.route[0].y - person.y;
+  const length = Math.hypot(dx, dy) || 1;
+  person.ux = dx / length;
+  person.uy = dy / length;
+  person.vx = person.ux * person.pace;
+  person.vy = person.uy * person.pace;
 }
 
-function makeGatePerson(template, id, x, y, side, gateId) {
-  return {
-    ...template,
-    id,
-    x,
-    y,
-    r: 13,
-    entry: { x, y },
-    route: [{ x, y }],
-    spot: { x, y },
-    leg: 0,
-    state: "meeting",
-    habit: "meeting",
-    active: true,
-    anchor: true,
-    flowGate: gateId,
-    flowSide: side,
-    courtesy: null,
-    acknowledge: null,
-    reaction: null,
-    vx: 0,
-    vy: 0,
-    ux: -side,
-    uy: 0,
-    wait: 0,
-    walk: 0,
-    color: id % 4,
-  };
+function sendAcrossFlow(person, run) {
+  // One resident walks diagonally from the side toward the shops. The player
+  // reads a merging path in the later stretch, distinct from overtaking the
+  // first commuter. Keeping the person northbound avoids head-on body shoves.
+  const positions = [
+    [340, 670], [350, 640], [330, 700],
+    [360, 615], [320, 725], [345, 585],
+  ];
+  const opening = positions.find(([x, y]) => run.crowd.every((other) =>
+    other === person || !other.active ||
+    Math.hypot(other.x - x, other.y - y) >= 42));
+  if (!opening) return false;
+  const [x, y] = opening;
+  const target = { x: 170, y: 300 };
+  const dx = target.x - x, dy = target.y - y;
+  const distance = Math.hypot(dx, dy);
+  Object.assign(person, {
+    x, y, anchor: false, habit: "direct", state: "walking", wait: 0,
+    flow: "crossing", origin: "east", destination: "north",
+    originName: "住宅街の東側", destinationName: "商店街",
+    route: [target, { x: 170, y: -80 }],
+    entry: { x: 340, y: run.startY + 75 }, leg: 0,
+    ux: dx / distance, uy: dy / distance,
+    vx: dx / distance * person.pace,
+    vy: dy / distance * person.pace,
+  });
+  return true;
 }
 
-function installGates(run) {
-  const original = run.crowd.filter((person) => person.anchor)
+function naturalizeCrowd(run) {
+  const anchors = run.crowd.filter((person) => person.anchor)
     .sort((a, b) => a.x - b.x);
-  const gates = [];
-  if (original.length >= 2) {
-    const y = (original[0].y + original[1].y) / 2;
-    original.slice(0, 2).forEach((person, index) => {
-      person.flowGate = 0;
-      person.flowSide = index ? 1 : -1;
-      person.flowOriginX = person.x;
-    });
-    gates.push({ id: 0, y, people: original.slice(0, 2),
-      base: original.slice(0, 2).map((p) => p.x),
-      open: [170, 310], offset: run.stage * 0.41,
-      heldUntil: 0, entered: false, completed: false, clean: false });
-  }
-  for (const desired of GATE_WAVES[run.stage] || []) {
-    if (original.length < 2) break;
-    const y = candidateY(run, desired, gates);
-    if (y === null) continue;
-    const id = gates.length;
-    const people = GATE_BASE.map((x, index) => makeGatePerson(
-      original[index], 3000 + run.stage * 20 + id * 2 + index,
-      x, y, index ? 1 : -1, id,
-    ));
-    run.crowd.push(...people);
-    gates.push({ id, y, people, base: [...GATE_BASE],
-      open: [...GATE_OPEN], offset: id * 1.71 + run.stage * 0.41,
-      heldUntil: 0, entered: false, completed: false, clean: false });
-  }
-  return gates.sort((a, b) => b.y - a.y);
-}
-
-function cycle(gate, time, period) {
-  const phase = ((time + gate.offset) / period) % 1;
-  let open = 0;
-  if (phase >= 0.22 && phase < 0.37)
-    open = smooth((phase - 0.22) / 0.15);
-  else if (phase >= 0.37 && phase < 0.68)
-    open = 1;
-  else if (phase >= 0.68 && phase < 0.83)
-    open = 1 - smooth((phase - 0.68) / 0.15);
-  const anticipation = phase >= 0.07 && phase < 0.37
-    ? smooth((phase - 0.07) / 0.23) : 0;
-  return { phase, open, anticipation };
-}
-
-function mayMoveGate(run, person, nextX, opening) {
-  const next = { x: nextX, y: person.y };
-  if (!opening && distance(next, run.player) < person.r + run.player.r + 12)
-    return false;
-  for (const member of run.party.members)
-    if (!opening && distance(next, member) < person.r + member.r + 8)
-      return false;
-  return run.crowd.every((other) => other === person ||
-    !other.active || other.flowGate === person.flowGate ||
-    distance(next, other) >= person.r + other.r + 2);
-}
-
-function driveGates(run, dt) {
-  const time = run.worldTime + dt;
-  const period = GATE_PERIOD[run.stage];
-  for (const gate of run._flowGates) {
-    const rhythm = cycle(gate, time, period);
-    const nearby = Math.abs(run.player.y - gate.y) < 55;
-    const insideOpenGate = gate.people[1].x - gate.people[0].x > 90;
-    const hold = time < gate.heldUntil || nearby && insideOpenGate &&
-      run.player.x > gate.people[0].x - 22 &&
-      run.player.x < gate.people[1].x + 22;
-    const wanted = hold ? 1 : rhythm.open;
-    gate.people.forEach((person, index) => {
-      if (person.courtesy) return;
-      const target = gate.base[index] +
-        (gate.open[index] - gate.base[index]) * wanted;
-      const delta = clamp(target - person.x, -98 * dt, 98 * dt);
-      if (Math.abs(delta) < 0.001) {
-        person.vx = 0;
-        return;
+  const anchorY = anchors.length
+    ? anchors.reduce((sum, person) => sum + person.y, 0) / anchors.length
+    : null;
+  // The pair inherited from the old overhead game now walks toward the
+  // destination. Their paths diverge *while advancing*, never in a timed
+  // left-right oscillation made solely to obstruct the player.
+  anchors.forEach((person, index) => {
+    if (run.stage === 0 && index === 0 && sendAcrossFlow(person, run))
+      return;
+    redirect(person, person.x + (index ? 72 : -72),
+      person.y - 210, run);
+  });
+  for (const person of run.crowd) {
+    // A real walker notices somebody approaching from behind. The ordinary
+    // crowd solver uses this reference only for the first-person run.
+    person.awarePlayer = run.player;
+    if (person.anchor || anchors.includes(person)) continue;
+    if (person.environment !== "party" &&
+        person.state === "meeting" &&
+        person.x > 125 && person.x < 355 &&
+        person.y > 160 && person.y < run.startY - 130) {
+      // The first street has one slower commuter already walking up the
+      // center. Passing them teaches the difference between reading a gap,
+      // steering around it, and asking for room. They keep moving north.
+      if (run.stage === 0 && person.y > run.startY - 330 &&
+          run.crowd.every((other) => other === person || !other.active ||
+            Math.hypot(other.x - 241, other.y - person.y) > 38)) {
+        person.x = 241;
+        redirect(person, 255, person.y - 165, run);
+        continue;
       }
-      const nextX = person.x + delta;
-      if (!mayMoveGate(run, person, nextX, Math.abs(target - gate.base[index]) >
-          Math.abs(person.x - gate.base[index]))) {
-        person.vx = 0;
-        return;
-      }
-      person.x = nextX;
-      person.vx = delta / dt;
-      person.ux = Math.sign(delta);
-      person.walk += Math.abs(delta);
-    });
+      const side = person.x < 240 ? -1 : 1;
+      redirect(person, person.x + side * 95, person.y - 165, run);
+      continue;
+    }
+    if (person.flow !== "crossing" || person.state !== "walking")
+      continue;
+    const target = person.route[person.leg];
+    if (!target) continue;
+    const dx = target.x - person.x;
+    if (Math.abs(dx) < 75 ||
+        Math.abs(target.y - person.y) >= Math.abs(dx) * .28) continue;
+    const direction = person.id % 4 < 2 ? -1 : 1;
+    let destinationY = clamp(person.y + direction *
+      Math.min(190, Math.max(95, Math.abs(dx) * .38)),
+    115, run.startY + 45);
+    for (const crossing of run.crossings)
+      if (destinationY > crossing.top - 45 &&
+          destinationY < crossing.bottom + 45)
+        destinationY = direction < 0
+          ? crossing.top - 50 : crossing.bottom + 50;
+    target.y = destinationY;
+    const dy = target.y - person.y;
+    const length = Math.hypot(dx, dy) || 1;
+    person.ux = dx / length;
+    person.uy = dy / length;
+    person.vx = person.ux * person.pace;
+    person.vy = person.uy * person.pace;
   }
+  return [anchorY, ...(BUSY_STRETCHES[run.stage] || [])]
+    .filter((y) => Number.isFinite(y))
+    .sort((a, b) => b - a)
+    .map((y, id) => ({ id, y, entered: false, completed: false,
+      populated: false, startHits: 0 }));
 }
 
 function updateFlow(run) {
-  const gate = run._flowGates.find((g) =>
-    g.y <= run.player.y + 65 && g.y >= run.player.y - 410);
-  if (!gate) {
-    run.flow = { active: false, phase: 0, open: 0,
-      anticipation: 0, zoneY: 0, lane: 240, waveIndex: -1, beat: 0 };
+  const people = run.crowd.filter((person) =>
+    person.active && !person.animal &&
+    person.y < run.player.y - 7 &&
+    person.y > run.player.y - 230 &&
+    Math.abs(person.x - run.player.x) < 108)
+    .sort((a, b) => b.y - a.y);
+  const nearest = people[0];
+  if (!nearest) {
+    run.flow = { active: false, phase: 0, open: 1,
+      anticipation: 0, zoneY: 0, lane: run.player.x,
+      waveIndex: -1, beat: 0 };
     return;
   }
-  const rhythm = cycle(gate, run.worldTime, GATE_PERIOD[run.stage]);
-  const actual = clamp((gate.people[1].x - gate.people[0].x - 44) / 96, 0, 1);
+  const clearance = Math.min(...people
+    .filter((person) => Math.abs(person.y - nearest.y) < 65)
+    .map((person) =>
+      Math.abs(person.x - run.player.x) - (person.r + run.player.r)));
+  const futureSide = Math.abs(nearest.x + nearest.vx * .55 - run.player.x);
+  const currentSide = Math.abs(nearest.x - run.player.x);
   run.flow = {
     active: true,
-    phase: rhythm.phase,
-    open: actual,
-    anticipation: rhythm.anticipation,
-    zoneY: gate.y,
-    zoneStartY: gate.y + 50,
-    zoneEndY: gate.y - 50,
-    lane: (gate.people[0].x + gate.people[1].x) / 2,
-    waveIndex: gate.id,
-    beat: Math.sin(rhythm.phase * Math.PI * 2),
+    phase: 0,
+    open: clamp((clearance + 10) / 42, 0, 1),
+    anticipation: clamp((futureSide - currentSide) / 24, 0, 1),
+    zoneY: nearest.y,
+    zoneStartY: nearest.y + 45,
+    zoneEndY: nearest.y - 45,
+    lane: run.player.x,
+    waveIndex: nearest.id,
+    beat: 0,
   };
 }
 
@@ -244,39 +228,13 @@ export function availableCallTargets(run) {
   if (run.arriving || run.crossings.some((crossing) =>
     run.player.y >= crossing.top - 55 &&
     run.player.y <= crossing.bottom + 65)) return [];
-  const ahead = run.crowd.filter((person) =>
-    person.active && !person.animal &&
-    person.y <= run.player.y - 8 &&
-    person.y >= run.player.y - 105 &&
-    Math.abs(person.x - run.player.x) < 68 &&
-    !run.crossings.some((crossing) =>
-      person.y >= crossing.top - 45 &&
-      person.y <= crossing.bottom + 45) &&
-    !(run.stage === 4 && person.y >= 640 && person.y <= 885));
-  ahead.sort((a, b) => b.y - a.y);
-  const targets = [];
-  for (const person of ahead) {
-    if (targets.length >= 4 || person.courtesy) continue;
-    const side = person.x < run.player.x ? -1 : 1;
-    for (const direction of [side, -side]) {
-      const targetX = person.x + direction * 38;
-      if (targetX < 55 || targetX > 425 ||
-          Math.abs(targetX - run.player.x) <=
-            Math.abs(person.x - run.player.x) ||
-          run.crowd.some((other) => other !== person && other.active &&
-            Math.hypot(other.x - targetX, other.y - person.y) <
-              person.r + other.r + 5)) continue;
-      targets.push(person.id);
-      break;
-    }
-  }
-  return targets;
+  return availableCourtesyTargets(run.crowd, run.player,
+    run.crossings, run.stage).map(({ person }) => person.id);
 }
 
 function updateCallAvailability(run) {
   run.callTargets = availableCallTargets(run);
-  run.callReady = run.phase === "playing" &&
-    run.worldTime >= run.callReadyAt && run.callTargets.length > 0;
+  run.callReady = run.phase === "playing" && run.callTargets.length > 0;
 }
 
 function syncTotals(run) {
@@ -299,7 +257,9 @@ export function createRun(stage = 0, seed = 1402485690, records = []) {
   run.braking = false;
   run.speed = 0;
   run.pressure = 0;
-  run._flowGates = installGates(run);
+  run.cleanStreak = 0;
+  run.bestStreak = 0;
+  run._crowdSections = naturalizeCrowd(run);
   updateFlow(run);
   updateCallAvailability(run);
   syncTotals(run);
@@ -339,47 +299,53 @@ export function updateRun(run, dt, controls = {}) {
   const before = {
     y: run.player.y,
     hits: run.hits,
-    callReadyAt: run.callReadyAt,
-    callStarted: run.callRipple?.started,
+    callSerial: run.callSerial,
     reunion: run.reunionSerial,
     violation: run.violationEvent?.id,
   };
   run.braking = !!controls.brake || !!(controls.left && controls.right);
-  driveGates(run, dt);
   step(run, dt, {
     left: run.braking ? true : !!controls.left,
     right: run.braking ? true : !!controls.right,
     call: !!controls.call,
+    callPulse: !!controls.callPulse,
     hopEnabled: false,
   });
   run.speed = Math.max(0, (before.y - run.player.y) / dt);
-  if (run.callRipple?.started !== before.callStarted) {
-    if (run.callReadyAt > before.callReadyAt) {
-      run.callReadyAt = run.worldTime + CALL_RECOVERY;
-      const responders = run.crowd.filter((person) =>
-        person.acknowledge?.remaining > 0).length;
-      for (const gate of run._flowGates)
-        if (gate.people.some((person) => person.courtesy || person.acknowledge))
-          gate.heldUntil = run.worldTime + 2.3;
-      run.events.push({ kind: "call", count: responders });
-    } else run.events.push({ kind: "callEmpty" });
+  if (run.callSerial !== before.callSerial)
+    run.events.push(run.callResponseCount > 0
+      ? { kind: "call", count: run.callResponseCount }
+      : { kind: "callEmpty" });
+  if (run.hits > before.hits) {
+    run.cleanStreak = 0;
+    run.events.push({ kind: "contact" });
   }
-  if (run.hits > before.hits) run.events.push({ kind: "contact" });
   if (run.reunionSerial > before.reunion)
     run.events.push({ kind: "reunion" });
   if (run.violationEvent?.id !== before.violation && run.violationEvent)
     run.events.push({ kind: "danger" });
-  for (const gate of run._flowGates) {
-    if (!gate.entered && run.player.y <= gate.y + 115 &&
-        run.player.y > gate.y - 65) {
-      gate.entered = true;
-      gate.startHits = run.hits;
+  for (const section of run._crowdSections) {
+    if (!section.entered && run.player.y <= section.y + 115 &&
+        run.player.y > section.y - 65) {
+      section.entered = true;
+      section.startHits = run.hits;
+      section.populated = run.crowd.filter((person) =>
+        person.active && Math.abs(person.y - section.y) < 125).length >= 2;
     }
-    if (gate.entered && !gate.completed && run.player.y < gate.y - 65) {
-      gate.completed = true;
-      gate.clean = run.hits === gate.startHits;
-      if (gate.clean && run.phase === "playing")
-        run.events.push({ kind: "closePass", gate: gate.id });
+    if (section.entered && !section.completed &&
+        run.player.y < section.y - 65) {
+      section.completed = true;
+      section.clean = run.hits === section.startHits;
+      const roadNear = run.crossings.some((crossing) =>
+        section.y >= crossing.top - 120 &&
+        section.y <= crossing.bottom + 120);
+      if (section.clean && section.populated &&
+          !roadNear && run.phase === "playing") {
+        run.cleanStreak++;
+        run.bestStreak = Math.max(run.bestStreak, run.cleanStreak);
+        run.events.push({ kind: "closePass", section: section.id,
+          streak: run.cleanStreak });
+      }
     }
   }
   updateFlow(run);
@@ -387,7 +353,8 @@ export function updateRun(run, dt, controls = {}) {
   updateCallAvailability(run);
   if (run.phase === "finished") {
     if (!run.records.some((record) => record.stage === run.stage))
-      run.records.push({ stage: run.stage, elapsed: run.elapsed, hits: run.hits });
+      run.records.push({ stage: run.stage, elapsed: run.elapsed,
+        hits: run.hits, bestStreak: run.bestStreak });
     run.events.push({ kind: run.stage === 4 ? "finale" : "stageClear" });
   }
   syncTotals(run);

@@ -6,7 +6,7 @@ import {
   trafficSpecs,
   vehicleContact,
 } from "./traffic.js";
-import { PARTY_SPACING, createParty, moveParty, partyArrived, regroupReady } from "./party.js";
+import { PARTY_SPACING, createParty, moveParty, regroupReady } from "./party.js";
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
@@ -32,8 +32,7 @@ export function goalFor(stage) {
   return stage === 4 ? { x: 95, y: 20, w: 290, h: 65 } : GOAL;
 }
 export function goalPrompt(game) {
-  if (game.arriving && game.phase !== "finished")
-    return "友だち全員を待とう！";
+  if (game.arriving) return "到着！";
   if (game.player.y <= 145 && !game.arriving) {
     const goal = goalFor(game.stage);
     if (game.player.x < goal.x) return "→ 右へ進もう";
@@ -92,7 +91,6 @@ export const STAGES = [
 ];
 const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
-export const CALL_COOLDOWN = 10;
 export const CALL_RIPPLE_DURATION = 0.65;
 export const HOP_TAP_WINDOW = 0.34;
 export const HOP_DISTANCE = 36;
@@ -112,7 +110,8 @@ export function activeCallRipple(g) {
 }
 function say(g, kind, speakerId, text, duration) {
   const current = activeSpeech(g);
-  if (current && SPEECH_PRIORITY[current.kind] >= SPEECH_PRIORITY[kind])
+  if (current && SPEECH_PRIORITY[current.kind] >= SPEECH_PRIORITY[kind] &&
+      !(kind === "call" && current.kind === "call"))
     return false;
   g.speech = {
     kind, speakerId, text, started: g.worldTime,
@@ -188,10 +187,12 @@ function updateHopGesture(g, input) {
 }
 function updateCallGesture(g, input) {
   if (input.call !== true) return cancelCallGesture(g);
-  // A held key or pointer can request only once until it is released.
-  if (g.callHeld) return;
-  g.callHeld = true;
-  const unavailable = g.worldTime < g.callReadyAt || g.arriving ||
+  // The browser sends one-shot pulses; a held direct key still fires once.
+  if (!input.callPulse && g.callHeld) return;
+  g.callHeld = !input.callPulse;
+  g.callSerial++;
+  g.callResponseCount = 0;
+  const unavailable = g.arriving ||
     g.crossings.some((t) => g.player.y >= t.top - 55 &&
       g.player.y <= t.bottom + 65);
   // The ripple acknowledges the completed input. A quieter color distinguishes
@@ -200,8 +201,8 @@ function updateCallGesture(g, input) {
     mode: unavailable ? "unavailable" : "recognized" };
   if (unavailable) return;
   const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage);
+  g.callResponseCount = moved;
   if (moved) {
-    g.callReadyAt = g.worldTime + CALL_COOLDOWN;
     say(g, "call", 0, "すみませーん！", 1.35);
   }
 }
@@ -503,6 +504,8 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     waitSpeechArmed: true,
     callHeld: false,
     callReadyAt: 0,
+    callSerial: 0,
+    callResponseCount: 0,
     callRipple: null,
     reunionSerial: 0,
     reunionUntil: 0,
@@ -634,29 +637,17 @@ export function step(g, dt, input) {
   ) {
     g.arriving = true;
     g.arrivalTarget = arrivalPoint(g.stage, g.player);
-    setArrivalSlots(g.party, g.stage, g.player);
-  }
-  if (g.arriving && g.party.members.length && !g.stun) {
-    const dx = g.arrivalTarget.x - g.player.x,
-      dy = 84 - g.player.y,
-      d = Math.hypot(dx, dy),
-      ratio = d ? Math.min(1, (100 * dt) / d) : 0;
-    g.player.x += dx * ratio;
-    g.player.y += dy * ratio;
   }
   moveParty(g.party, g.player, dt, {
     braking: !!(input.left && input.right),
     stunned: g.stun > 0,
-    arriving: g.arriving,
-    resolveFollower: g.arriving
-      ? undefined
-      : (member, next) => {
-          const result = followerProgress(member, next, member.r, people);
-          for (const id of result.contacts)
-            if (!blockedContacts.has(id) || blockedContacts.get(id) === 0)
-              blockedContacts.set(id, member.id);
-          return result.fraction;
-        },
+    resolveFollower: (member, next) => {
+      const result = followerProgress(member, next, member.r, people);
+      for (const id of result.contacts)
+        if (!blockedContacts.has(id) || blockedContacts.get(id) === 0)
+          blockedContacts.set(id, member.id);
+      return result.fraction;
+    },
   });
   for (const [id, memberId] of blockedContacts) {
     if (!memberId) continue;
@@ -742,20 +733,16 @@ export function step(g, dt, input) {
       if (g.player.y < pass.y - 80 &&
           g.party.members.every((member) => member.y < pass.y - 80)) {
         pass.finished = true;
-        if (!pass.spoiled && g.phase === "playing" &&
-            g.crowd.some((person) => person.anchor && person.active)) {
+        if (!pass.spoiled && g.phase === "playing") {
           g.cleanPassSerial++;
           g.cleanPassUntil = g.worldTime + 0.85;
         }
       }
     }
   }
-  if (
-    g.arriving &&
-    partyArrived(g.party) &&
-    (!g.party.members.length ||
-      Math.hypot(g.player.x - g.arrivalTarget.x, g.player.y - 84) < 0.01)
-  ) {
+  // The race ends when YOU reach the marked destination. Companions retain
+  // their actual positions; the result never waits for their docking path.
+  if (g.arriving) {
     g.phase = "finished";
     g.meetingPartner.state = "met";
   }

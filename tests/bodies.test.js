@@ -80,7 +80,10 @@ test("a follower stalled by a bystander regroups without piling up forever", () 
   assert.equal(g.hits, 1);
   assert.equal(g.lastContactMember, 1);
   assert.ok(bystander.x > 300, "the bystander gives the delayed friend room");
-  assert.ok(g.party.members.every((member) => member.docked));
+  const finalFollowers = g.party.members.map((member) => [member.x, member.y]);
+  step(g, 0.05, {});
+  assert.deepEqual(g.party.members.map((member) => [member.x, member.y]), finalFollowers,
+    "the result preserves companions' real positions");
   assert.ok(maxTrail < 128);
 });
 
@@ -125,7 +128,7 @@ test("dense audience still clears after contact and every friend can finish", ()
   }
   assert.equal(g.phase, "finished");
   assert.ok(g.hits > 0, "a crowded route retains the contact penalty");
-  assert.ok(g.party.members.every((member) => member.docked));
+  assert.ok(g.party.members.every((member) => Number.isFinite(member.x) && Number.isFinite(member.y)));
   assert.ok(maxTrail < 128, "friends regroup instead of accumulating a stuck trail");
 });
 
@@ -142,6 +145,6 @@ test("all stages still have a contact-free route at the capped low frame rate", 
       step(g, 0.05, { left: true, right: true });
     assert.equal(g.phase, "finished", `stage ${stage + 1}`);
     assert.equal(g.hits, 0);
-    assert.ok(g.party.members.every((member) => member.docked));
+    assert.ok(g.party.members.every((member) => Number.isFinite(member.x) && Number.isFinite(member.y)));
   }
 });

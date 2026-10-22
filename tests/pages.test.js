@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const expected = [
   "LICENSE", "bodies.js", "crowd.js", "index.html",
   "input.js", "logic.js", "logo.png", "og.png", "party.js", "style.css",
-  "traffic.js", "src/appearance.js", "src/audio.js", "src/main.js", "src/render.js", "src/run.js",
+  "traffic.js", "src/appearance.js", "src/audio.js", "src/main.js", "src/render.js", "src/replay.js", "src/run.js",
 ];
 
 async function fixture(t) {

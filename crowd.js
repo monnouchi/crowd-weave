@@ -514,44 +514,114 @@ export function reactToContact(p, player) {
     dy = player.y - p.y,
     d = Math.hypot(dx, dy);
   p.reaction = {
-    remaining: 0.7,
+    remaining: p.awarePlayer ? 0.38 : 0.7,
     faceX: d ? dx / d : -p.ux,
     faceY: d ? dy / d : -p.uy,
   };
+  if (p.awarePlayer) p.contactAvoidTarget = player;
   p.vx = 0;
   p.vy = 0;
 }
-// A polite call changes only nearby pedestrians. The crossing, fixed walls and
-// vehicles retain their normal rules, and non-human obstacles never yield.
-export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
-  let moved = 0;
+const COURTESY = Object.freeze({
+  reach: 38,
+  minStep: 24,
+  minGain: 15,
+  left: 55,
+  right: 425,
+  bodyGap: 3,
+  prepare: 0.12,
+  duration: 1.1,
+  lateralSpeed: 95,
+  travelFactor: 0.72,
+});
+
+function courtesyChoice(p, crowd, player, reserved) {
+  const choices = [];
+  for (const direction of [-1, 1]) {
+    const targetX = Math.max(COURTESY.left,
+      Math.min(COURTESY.right, p.x + direction * COURTESY.reach));
+    if (Math.abs(targetX - p.x) < COURTESY.minStep ||
+        Math.abs(targetX - player.x) - Math.abs(p.x - player.x) <
+          COURTESY.minGain) continue;
+    let clearance = 110;
+    for (const q of crowd) {
+      if (q === p || !q.active) continue;
+      for (const fraction of [0.45, 1]) {
+        // Check the swept shoulder path as well as the destination. A free
+        // endpoint alone could send somebody straight through another walker.
+        const look = COURTESY.prepare +
+          Math.abs(targetX - p.x) / COURTESY.lateralSpeed * fraction;
+        const px = p.x + (targetX - p.x) * fraction;
+        const py = p.y + (p.state === "walking" ?
+          p.uy * p.pace * COURTESY.travelFactor * look : 0);
+        const qx = q.x + (q.vx || 0) * Math.min(look, 0.25);
+        const qy = q.y + (q.vy || 0) * Math.min(look, 0.25);
+        clearance = Math.min(clearance,
+          Math.hypot(qx - px, qy - py) - p.r - q.r);
+      }
+    }
+    for (const { person, targetX: otherX } of reserved)
+      clearance = Math.min(clearance,
+        Math.hypot(otherX - targetX, person.y - p.y) - p.r - person.r);
+    if (clearance < COURTESY.bodyGap) continue;
+    const wallRoom = Math.min(targetX - COURTESY.left,
+      COURTESY.right - targetX);
+    const playerGain = Math.abs(targetX - player.x) -
+      Math.abs(p.x - player.x);
+    // Open pedestrian space dominates; wall room and the route's direction
+    // break ties so a person steps into a plausible gap.
+    const routeX = p.route?.[p.leg]?.x ?? p.x;
+    const towardRoute = Math.sign(routeX - p.x) === direction ? 1 : 0;
+    choices.push({ targetX, score:
+      Math.min(clearance, 90) * 0.65 +
+      Math.min(wallRoom, 100) * 0.24 +
+      playerGain * 0.22 + towardRoute * 2 });
+  }
+  choices.sort((a, b) => b.score - a.score);
+  return choices[0]?.targetX;
+}
+
+// Keep the button's availability in sync with the actual courtesy action.
+// A person already stepping aside can acknowledge another call without being
+// pushed progressively toward a wall.
+export function availableCourtesyTargets(crowd, player, crossings = [], stage = 0) {
   const ahead = crowd.filter((p) =>
     p.active && !p.animal && p.y <= player.y - 8 &&
     p.y >= player.y - 105 && Math.abs(p.x - player.x) < 68 &&
     !crossings.some((t) => p.y >= t.top - 45 && p.y <= t.bottom + 45) &&
     !(stage === 4 && p.y >= 640 && p.y <= 885));
   ahead.sort((a, b) => b.y - a.y);
+  const targets = [];
   for (const p of ahead) {
-    if (moved >= 4 || p.courtesy) continue;
-    const side = p.x < player.x ? -1 : 1;
-    for (const direction of [side, -side]) {
-      const targetX = p.x + direction * 38;
-      if (targetX < 55 || targetX > 425 ||
-          Math.abs(targetX - player.x) <= Math.abs(p.x - player.x) ||
-          crowd.some((q) => q !== p && q.active &&
-            Math.hypot(q.x - targetX, q.y - p.y) < p.r + q.r + 5)) continue;
-      p.courtesy = { targetX, remaining: 1.1, ux: p.ux, uy: p.uy };
-      const dx = player.x - p.x, dy = player.y - p.y;
-      const distance = Math.hypot(dx, dy) || 1;
-      p.acknowledge = {
-        remaining: 0.72, faceX: dx / distance, faceY: dy / distance,
-      };
-      p.reaction = null;
-      moved++;
-      break;
+    if (targets.length >= 4) break;
+    if (p.courtesy) {
+      targets.push({ person: p, targetX: p.courtesy.targetX });
+      continue;
     }
+    const targetX = courtesyChoice(p, crowd, player, targets);
+    if (targetX !== undefined) targets.push({ person: p, targetX });
   }
-  return moved;
+  return targets;
+}
+// A polite call changes only nearby pedestrians. The crossing, fixed walls and
+// vehicles retain their normal rules, and non-human obstacles never yield.
+export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
+  const targets = availableCourtesyTargets(crowd, player, crossings, stage);
+  for (const { person: p, targetX } of targets) {
+    if (p.courtesy) p.courtesy.remaining = COURTESY.duration;
+    else p.courtesy = {
+      targetX, remaining: COURTESY.duration,
+      phase: "prepare", prepareRemaining: COURTESY.prepare,
+      direction: Math.sign(targetX - p.x), ux: p.ux, uy: p.uy,
+    };
+    const dx = player.x - p.x, dy = player.y - p.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    p.acknowledge = {
+      remaining: 0.72, faceX: dx / distance, faceY: dy / distance,
+    };
+    p.reaction = null;
+  }
+  return targets.length;
 }
 export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
   const crossings = traffic;
@@ -590,6 +660,18 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
         const push = (1 - distance / 38) * 48 * p.yielding;
         vx += (rx / distance) * push;
         vy += (ry / distance) * push;
+      }
+    }
+    if (p.awarePlayer) {
+      const behind = p.awarePlayer.y - p.y;
+      const side = p.x - p.awarePlayer.x;
+      if (behind > 8 && behind < 105 && Math.abs(side) < 47) {
+        const direction = Math.sign(side) || (p.id % 2 ? 1 : -1);
+        const room = direction < 0 ? p.x - 55 : 425 - p.x;
+        // A small, anticipatory shoulder adjustment keeps the person's route
+        // legible. The explicit call still creates a much larger gap.
+        vx += direction * Math.min(28, Math.max(0, room)) *
+          (1 - behind / 105) * (1 - Math.abs(side) / 47);
       }
     }
     if (p.archetype === "curious-child")
@@ -706,25 +788,60 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
     }
     if (p.reaction) {
       p.reaction.remaining = Math.max(0, p.reaction.remaining - dt);
-      if (p.reaction.remaining === 0) p.reaction = null;
+      if (p.reaction.remaining === 0) {
+        p.reaction = null;
+        if (p.contactAvoidTarget) {
+          const targetX = p.courtesy?.targetX ??
+            courtesyChoice(p, crowd, p.contactAvoidTarget, []);
+          if (targetX !== undefined) {
+            if (p.courtesy) p.courtesy.remaining = Math.max(
+              p.courtesy.remaining, 0.85);
+            else p.courtesy = {
+              targetX, remaining: 0.85,
+              phase: "yield", prepareRemaining: 0,
+              direction: Math.sign(targetX - p.x), ux: p.ux, uy: p.uy,
+            };
+          }
+          p.contactAvoidTarget = null;
+        }
+      }
       return;
     }
     if (p.courtesy) {
       const aside = p.courtesy;
       aside.remaining -= dt;
-      const dx = aside.targetX - p.x;
-      const move = Math.sign(dx) * Math.min(Math.abs(dx), 95 * dt);
-      const clear = crowd.every((q) => q === p || !q.active ||
-        Math.hypot(q.x - (p.x + move), q.y - p.y) >= p.r + q.r + 1);
-      if (clear) {
-        p.x += move;
-        p.vx = dt ? move / dt : 0;
-        p.vy = 0;
-        p.ux = Math.sign(move) || p.ux;
-        p.uy = 0;
-        p.walk += Math.abs(move);
+      const preparing = aside.phase === "prepare";
+      if (preparing) {
+        aside.prepareRemaining = Math.max(0,
+          (aside.prepareRemaining ?? 0) - dt);
+        if (aside.prepareRemaining === 0) aside.phase = "yield";
       }
-      if (aside.remaining <= 0 || Math.abs(aside.targetX - p.x) < 0.1) {
+      const dx = aside.targetX - p.x;
+      const travel = p.state === "walking"
+        ? p.pace * COURTESY.travelFactor * dt : 0;
+      let moveX = preparing ? aside.ux * travel :
+        Math.sign(dx) * Math.min(Math.abs(dx), COURTESY.lateralSpeed * dt);
+      let moveY = aside.uy * travel;
+      const clear = (x, y) => crowd.every((q) => q === p || !q.active ||
+        Math.hypot(q.x - x, q.y - y) >= p.r + q.r + 1);
+      if (!clear(p.x + moveX, p.y + moveY)) {
+        // A moving neighbour can close the planned gap. Keep walking along
+        // the original route if possible instead of freezing in place.
+        if (moveY && clear(p.x, p.y + moveY)) moveX = 0;
+        else if (moveX && clear(p.x + moveX, p.y)) moveY = 0;
+        else moveX = moveY = 0;
+      }
+      p.x += moveX;
+      p.y += moveY;
+      p.vx = dt ? moveX / dt : 0;
+      p.vy = dt ? moveY / dt : 0;
+      const distance = Math.hypot(moveX, moveY);
+      if (distance > 0.001) {
+        p.ux = moveX / distance;
+        p.uy = moveY / distance;
+      }
+      p.walk += distance;
+      if (aside.remaining <= 0) {
         p.ux = aside.ux;
         p.uy = aside.uy;
         p.courtesy = null;
@@ -773,6 +890,11 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
       p.trafficWait = true;
     }
     Object.assign(p, velocities[i]);
+    if (Math.hypot(p.vx, p.vy) > 1) {
+      const speed = Math.hypot(p.vx, p.vy);
+      p.ux = p.vx / speed;
+      p.uy = p.vy / speed;
+    }
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.walk += Math.hypot(p.vx, p.vy) * dt;
@@ -808,10 +930,15 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
         return;
       }
       if (p.leg < p.route.length - 1) {
-        p.state = p.habit;
-        p.wait = p.pauseDuration;
-        p.vx = 0;
-        p.vy = 0;
+        if (p.awarePlayer && p.habit === "direct") {
+          p.leg++;
+          aim(p);
+        } else {
+          p.state = p.habit;
+          p.wait = p.pauseDuration;
+          p.vx = 0;
+          p.vy = 0;
+        }
       } else {
         p.active = false;
         p.state = "entry";

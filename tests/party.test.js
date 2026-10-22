@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createParty, moveParty, regroupReady, sampleTrail } from "../party.js";
-import { createGame, step, GOAL } from "../logic.js";
+import { createGame, step } from "../logic.js";
 test("party grows one friend per completed scene with visible distinct numbers", () => {
   for (let i = 0; i < 5; i++) {
     const g = createGame(i);
@@ -160,28 +160,16 @@ test("one pedestrian overlapping two party members is one contact event", () => 
   );
   assert.deepEqual(g.touchingIds, [78]);
 });
-test("arrival waits for last friend and finishes with every member inside the goal", () => {
+test("arrival finishes immediately while companions remain on their actual trail", () => {
   const g = createGame(4);
   g.crowd = [];
   g.phase = "playing";
   for (let i = 0; i < 600 && !g.arriving; i++) step(g, 0.05, {});
   assert.equal(g.arriving, true);
-  assert.equal(g.phase, "playing");
-  assert.ok(g.party.members.some((m) => !m.docked));
-  const leadTime = g.elapsed;
-  for (let i = 0; i < 200 && g.phase === "playing"; i++) step(g, 0.025, {});
   assert.equal(g.phase, "finished");
-  assert.ok(g.elapsed > leadTime);
-  assert.ok(
-    g.party.members.every(
-      (m) =>
-        m.docked &&
-        m.x >= GOAL.x &&
-        m.x <= GOAL.x + GOAL.w &&
-        m.y >= GOAL.y &&
-        m.y <= GOAL.y + GOAL.h,
-    ),
-  );
+  assert.ok(g.party.members.some((m) => !m.docked));
+  assert.ok(g.party.members.every((m) =>
+    Number.isFinite(m.x) && Number.isFinite(m.y) && m.y > g.player.y));
   assert.equal(g.hits, 0);
   const frozen = structuredClone(g);
   step(g, 0.05, {});

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeCallRipple, activeSpeech, CALL_COOLDOWN, CALL_RIPPLE_DURATION,
+  activeCallRipple, activeSpeech, CALL_RIPPLE_DURATION,
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { OneShotControl } from '../input.js';
@@ -27,7 +27,9 @@ test('one call press opens a person-only gap and confirms with a ripple', () => 
   const from = { ...g.player };
   pressCall(g);
   assert.equal(activeSpeech(g)?.text, 'すみませーん！');
-  assert.equal(g.callReadyAt, g.worldTime + CALL_COOLDOWN);
+  assert.equal(g.callReadyAt, 0);
+  assert.equal(g.callSerial, 1);
+  assert.equal(g.callResponseCount, 2);
   assert.deepEqual(activeCallRipple(g), {
     x: from.x, y: from.y, progress: 0, mode: 'recognized',
   });
@@ -77,20 +79,33 @@ test('both-side brake, including double taps and signal waits, never calls', () 
   assert.equal(g.player.x, original.x);
 });
 
-test('a held call cannot repeat; each cooldown tap gives unavailable feedback', () => {
+test('a held call fires once, while every released tap can renew a response', () => {
   const g = crowded();
   pressCall(g);
   const serial = g.speechSequence;
-  const ready = g.callReadyAt;
+  const callSerial = g.callSerial;
   const first = g.callRipple;
   for (let i = 0; i < 8; i++) pressCall(g);
   assert.equal(g.callRipple, first);
+  assert.equal(g.callSerial, callSerial);
   step(g, 0.025, idle);
   pressCall(g);
-  assert.equal(g.callRipple.mode, 'unavailable');
+  assert.equal(g.callRipple.mode, 'recognized');
   assert.ok(g.callRipple.started > first.started);
-  assert.equal(g.callReadyAt, ready);
-  assert.equal(g.speechSequence, serial);
+  assert.equal(g.callReadyAt, 0);
+  assert.equal(g.callSerial, callSerial + 1);
+  assert.ok(g.callResponseCount >= 1);
+  assert.ok(g.speechSequence > serial);
+});
+
+test('adjacent one-shot taps each fire even without an intervening false frame', () => {
+  const g = crowded();
+  step(g, 0.025, { ...idle, call: true, callPulse: true });
+  assert.equal(g.callSerial, 1);
+  assert.ok(g.callResponseCount >= 1);
+  step(g, 0.025, { ...idle, call: true, callPulse: true });
+  assert.equal(g.callSerial, 2);
+  assert.ok(g.callResponseCount >= 1);
 });
 
 test('short taps survive frames; holding and clearing a control do not queue calls', () => {
@@ -117,6 +132,7 @@ test('no nearby people confirms a call; restricted crossing cannot move a crowd'
   empty.crowd = [];
   pressCall(empty);
   assert.equal(empty.callReadyAt, 0);
+  assert.equal(empty.callResponseCount, 0);
   assert.equal(activeCallRipple(empty)?.mode, 'recognized');
   assert.equal(activeSpeech(empty), null);
   const road = crowded(1);
@@ -124,6 +140,7 @@ test('no nearby people confirms a call; restricted crossing cannot move a crowd'
   road.crowd.forEach((p) => p.y = road.player.y - 30);
   pressCall(road);
   assert.equal(road.callReadyAt, 0);
+  assert.equal(road.callResponseCount, 0);
   assert.equal(road.crowd.some((p) => p.courtesy), false);
   assert.equal(activeCallRipple(road)?.mode, 'unavailable');
 });

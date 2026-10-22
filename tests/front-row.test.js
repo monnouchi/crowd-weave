@@ -31,7 +31,7 @@ test("front row spans the hall, with all arrival positions on the audience side 
       assert.ok(p.y - p.r >= FRONT_BARRIER_Y);
       assert.ok(p.x - p.r >= 36 && p.x + p.r <= 444);
     }
-    assert.ok(g.party.members.every((m) => m.docked));
+    assert.ok(g.party.members.every((m) => Number.isFinite(m.x) && Number.isFinite(m.y)));
     for (const m of g.party.members)
       assert.ok(
         Math.hypot(m.x - g.meetingPartner.x, m.y - g.meetingPartner.y) >=
