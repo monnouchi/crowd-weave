@@ -273,7 +273,7 @@ function start(stage = 0) {
   walkingPoses.clear();
   $("#goal-callout").textContent = game.scene.bubble;
   $("#scene-purpose").textContent = game.traffic
-    ? `${game.scene.weather ? "雨の" : ""}${game.scene.place}へ · 赤は両押しで停止`
+    ? `${game.scene.weather ? "雨の" : ""}${game.scene.place}へ`
     : game.scene.purpose;
   $("#scene-label").textContent =
     `${["HOME", "STATION", "CAFÉ", "VENUE", "LIVE"][stage]} / 0${stage + 1}`;

@@ -929,6 +929,16 @@ main:has(.overlay.finale:not([hidden])) .hud {
   .party-strip span {
     display: none;
   }
+  .party-strip {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    padding: 0;
+    line-height: 1.2;
+  }
+  .party-strip strong {
+    white-space: nowrap;
+  }
   #scene-purpose {
     width: 100%;
   }
