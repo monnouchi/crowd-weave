@@ -1,4 +1,5 @@
 import { appearanceFor } from "./appearance.js";
+import { drawRadar } from "./radar-view.js";
 import { previewTurn } from "../crowd.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
@@ -986,5 +987,6 @@ export function renderWorld(ctx, game, view = {}) {
   crossingSignals(ctx, c, game, view);
   rain(ctx, c, game, view);
   foreground(ctx, c, game, view);
+  drawRadar(ctx, game, { width: c.width, height: c.height });
   ctx.restore();
 }
