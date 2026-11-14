@@ -584,12 +584,16 @@ function courtesyChoice(p, crowd, player, reserved) {
 // Keep the button's availability in sync with the actual courtesy action.
 // A person already stepping aside can acknowledge another call without being
 // pushed progressively toward a wall.
-export function availableCourtesyTargets(crowd, player, crossings = [], stage = 0) {
-  const ahead = crowd.filter((p) =>
+function courtesyPeopleAhead(crowd, player, crossings, stage) {
+  return crowd.filter((p) =>
     p.active && !p.animal && p.y <= player.y - 8 &&
     p.y >= player.y - 105 && Math.abs(p.x - player.x) < 68 &&
     !crossings.some((t) => p.y >= t.top - 45 && p.y <= t.bottom + 45) &&
     !(stage === 4 && p.y >= 640 && p.y <= 885));
+}
+
+export function availableCourtesyTargets(crowd, player, crossings = [], stage = 0) {
+  const ahead = courtesyPeopleAhead(crowd, player, crossings, stage);
   ahead.sort((a, b) => b.y - a.y);
   const targets = [];
   for (const p of ahead) {
@@ -602,6 +606,13 @@ export function availableCourtesyTargets(crowd, player, crossings = [], stage = 
     if (targetX !== undefined) targets.push({ person: p, targetX });
   }
   return targets;
+}
+
+// Diagnostic only: do not alter the crowd or its courtesy reservations.
+export function courtesyUnavailableReason(crowd, player, crossings = [], stage = 0) {
+  if (!courtesyPeopleAhead(crowd, player, crossings, stage).length) return "nobody";
+  return availableCourtesyTargets(crowd, player, crossings, stage).length
+    ? null : "noRoom";
 }
 // A polite call changes only nearby pedestrians. The crossing, fixed walls and
 // vehicles retain their normal rules, and non-human obstacles never yield.

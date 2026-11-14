@@ -1,5 +1,5 @@
 import { createGame, step, STAGES, SCENES } from "../logic.js";
-import { availableCourtesyTargets } from "../crowd.js";
+import { availableCourtesyTargets, courtesyUnavailableReason } from "../crowd.js";
 
 // Five short chapters of the same journey. The snippets are invitations from
 // people already on the way, rather than instructions interrupting the run.
@@ -229,12 +229,22 @@ function updatePressure(run) {
 // Mirror the courtesy action's feasibility checks without changing anyone's
 // route or reserving a gap. The button can promise a response only when a
 // person can really take a step aside at this instant.
-export function availableCallTargets(run) {
-  if (run.arriving || run.crossings.some((crossing) =>
+function playerNearCrossing(run) {
+  return run.crossings.some((crossing) =>
     run.player.y >= crossing.top - 55 &&
-    run.player.y <= crossing.bottom + 65)) return [];
+    run.player.y <= crossing.bottom + 65);
+}
+
+export function availableCallTargets(run) {
+  if (run.arriving || playerNearCrossing(run)) return [];
   return availableCourtesyTargets(run.crowd, run.player,
     run.crossings, run.stage).map(({ person }) => person.id);
+}
+
+function callUnavailableReason(run) {
+  if (run.arriving) return null;
+  if (playerNearCrossing(run)) return "crossing";
+  return courtesyUnavailableReason(run.crowd, run.player, run.crossings, run.stage);
 }
 
 function updateCallAvailability(run) {
@@ -317,10 +327,12 @@ export function updateRun(run, dt, controls = {}) {
     hopEnabled: false,
   });
   run.speed = Math.max(0, (before.y - run.player.y) / dt);
-  if (run.callSerial !== before.callSerial)
+  if (run.callSerial !== before.callSerial) {
+    const reason = run.callResponseCount > 0 ? null : callUnavailableReason(run);
     run.events.push(run.callResponseCount > 0
       ? { kind: "call", count: run.callResponseCount }
-      : { kind: "callEmpty" });
+      : reason ? { kind: "callEmpty", reason } : { kind: "callEmpty" });
+  }
   if (run.hits > before.hits) {
     run.cleanStreak = 0;
     run.events.push({ kind: "contact" });

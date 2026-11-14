@@ -372,7 +372,11 @@ function consumeEvents() {
     if (!kind) continue;
     sound.event(kind, event);
     if (kind === "call") { playVoiceEffect(true); cue("道がひらいた！", 1.1); }
-    else if (kind === "callEmpty") { playVoiceEffect(false); cue("近くの人に声をかけよう", 1.1); }
+    else if (kind === "callEmpty") {
+      playVoiceEffect(false);
+      const reasons = { crossing: "横断歩道の近くでは届かない", nobody: "前に人がいない", noRoom: "よける余地がない" };
+      cue(reasons[event?.reason] || "近くの人に声をかけよう", 1.1);
+    }
     else if (kind === "contact") { cue("おっと、ゆっくり", .85); contactUntil = performance.now() + 250; }
     else if (kind === "closePass") cue(Number(event.streak) >= 2 ? "続けて、すきまを抜けた！" : "すきまを抜けた", .85);
     else if (kind === "reunion") cue("追いついた！", 1.1);

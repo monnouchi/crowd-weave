@@ -5,6 +5,8 @@ import {
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { OneShotControl } from '../input.js';
+import { courtesyUnavailableReason } from '../crowd.js';
+import { createRun, beginRun, updateRun } from '../src/run.js';
 
 const idle = { left: false, right: false };
 function crowded(stage = 0) {
@@ -143,6 +145,33 @@ test('no nearby people confirms a call; restricted crossing cannot move a crowd'
   assert.equal(road.callResponseCount, 0);
   assert.equal(road.crowd.some((p) => p.courtesy), false);
   assert.equal(activeCallRipple(road)?.mode, 'unavailable');
+});
+
+test('failed calls report crossing suppression and an empty ahead window', () => {
+  const road = createRun(1, 17);
+  road.player.y = road.crossings[0].bottom + 35;
+  beginRun(road);
+  updateRun(road, 0.025, { brake: true, call: true });
+  assert.ok(road.events.some((event) =>
+    event.kind === 'callEmpty' && event.reason === 'crossing'));
+
+  const empty = createRun(0, 17);
+  empty.crowd = [];
+  beginRun(empty);
+  updateRun(empty, 0.025, { brake: true, call: true });
+  assert.ok(empty.events.some((event) =>
+    event.kind === 'callEmpty' && event.reason === 'nobody'));
+});
+
+test('courtesy diagnostic distinguishes blocked people and leaves state unchanged', () => {
+  const player = { x: 100, y: 600 };
+  const person = { id: 1, x: 55, y: 550, r: 13, active: true, animal: false };
+  const crowd = [person];
+  const before = structuredClone(crowd);
+  assert.equal(courtesyUnavailableReason(crowd, player), 'noRoom');
+  assert.deepEqual(crowd, before);
+  assert.equal(courtesyUnavailableReason(crowd, { x: 240, y: 600 }), 'nobody');
+  assert.equal(courtesyUnavailableReason([{ ...person, x: 100 }], player), null);
 });
 
 test('pause, restart and canceled input leave no stale call', () => {
