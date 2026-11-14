@@ -132,7 +132,7 @@ function cue(text, duration = 2) {
   $("cue").classList.add("show");
   cueUntil = performance.now() + duration * 1000;
 }
-function setOverlay({ kicker, title, body, extra = "", action, stats = false, guide = false, replay = false, secondary = false, secondaryLabel = "この区間をやり直す", foot = "" }) {
+function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats = false, guide = false, replay = false, secondary = false, secondaryLabel = "この区間をやり直す", foot = "" }) {
   resetVoiceEffect();
   $("overlay-kicker").textContent = kicker;
   $("overlay-title").textContent = title;
@@ -141,6 +141,8 @@ function setOverlay({ kicker, title, body, extra = "", action, stats = false, gu
   $("overlay-body").textContent = body;
   $("overlay-extra").textContent = extra;
   $("overlay-extra").hidden = !extra;
+  $("overlay-intro").textContent = intro;
+  $("overlay-intro").hidden = !intro;
   $("overlay-guide").hidden = !guide;
   $("overlay-stats").hidden = !stats;
   $("replay-meta").hidden = !replay;
@@ -153,7 +155,7 @@ function setOverlay({ kicker, title, body, extra = "", action, stats = false, gu
   $("action").firstChild.textContent = `${action} `;
   $("overlay").hidden = false;
   $("controls").inert = true;
-  $("screen-reader-update").textContent = `${title}。${body}`;
+  $("screen-reader-update").textContent = `${title}。${body}${intro ? ` ${intro}` : ""}`;
   $("action").focus({ preventScroll: true });
 }
 function closeOverlay() {
@@ -168,8 +170,9 @@ function showReady() {
     title: run.stage === 0 ? "雑踏突破" : storyName(),
     body: run.stage === 0 ? "開演まで、あと少し。友だちとライブの最前列へ。" : meta.message || run.scene?.intro || "人波を読んで、次の待ち合わせへ。",
     extra: run.stage === 0 ? "すきまを読み、何度でも声をかけよう。" : meta.cue || "道を譲ってくれた人の間を抜けよう。",
+    intro: meta.intro || "",
     action: "歩き出す", guide: run.stage === 0,
-    foot: run.stage === 0 ? "PC は ← → / A D、C で声をかける。Esc で一時停止。" : "左右でよける · 両押しで待つ · 声で道をひらく",
+    foot: run.stage === 0 ? "PC は ← → / A D、左右同時か Space 長押しで待つ。C で声、Esc で一時停止。" : "左右でよける · 左右同時か Space 長押しで待つ · 声で道をひらく",
   });
 }
 function resultTotals() {
@@ -355,6 +358,7 @@ function updateHud() {
     run.braking ? "止まって流れを見よう" :
     run.callReady ? "前の人に声が届く" :
     run.pressure > .5 ? "前の人の歩幅を見よう" : "進む人の向きを見よう";
+  $("waiting").hidden = run.phase !== "playing" || !run.braking;
   $("call-label").textContent = run.callReady ? "今、声が届く" : "いつでも呼べる";
   $("call").classList.toggle("ready", !!run.callReady);
   $("hint").hidden = run.stage > 0 && run.worldTime > 7;

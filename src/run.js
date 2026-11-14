@@ -9,6 +9,7 @@ export const STORY_STAGES = Object.freeze([
     place: "住宅街の角",
     message: "「角で待ってる。急がなくていいよ」",
     cue: "人の向きが変わる、その一拍を見よう。",
+    intro: "犬は声をかけても道を譲りません。",
     clear: "ひとり目と合流。次の道へ。",
   },
   {
@@ -16,6 +17,7 @@ export const STORY_STAGES = Object.freeze([
     place: "最寄り駅",
     message: "「駅前にいるよ。人の流れがすごい！」",
     cue: "止まって待つと、道が開く瞬間がある。",
+    intro: "横断歩道は青で渡ろう。赤で入ると時間が加算され、車や自転車に触れるとこの区間からやり直し。",
     clear: "駅を抜けた。次の待ち合わせへ。",
   },
   {
@@ -23,6 +25,7 @@ export const STORY_STAGES = Object.freeze([
     place: "駅のカフェ",
     message: "「窓ぎわから見えてる。あと少し」",
     cue: "前の人に声をかけて、すきまをつくろう。",
+    intro: "猫と、横切る人の流れに気をつけよう。",
     clear: "カフェに到着。次は会場へ。",
   },
   {
@@ -30,6 +33,7 @@ export const STORY_STAGES = Object.freeze([
     place: "会場前",
     message: "「雨が上がる前に来て。入口で待つよ」",
     cue: "信号と人の流れを、どちらも見よう。",
+    intro: "雨の中、二つの横断歩道を渡ろう。",
     clear: "会場の灯りが見えた。最後の扉へ。",
   },
   {
@@ -37,6 +41,7 @@ export const STORY_STAGES = Object.freeze([
     place: "ステージ前",
     message: "「前奏が聴こえる。最前列で待ってる！」",
     cue: "人波の呼吸に合わせて、最前へ。",
+    intro: "ロビーの受付を通り、ライブの最前列へ。",
     clear: "間に合った。最前列に立った。",
   },
 ]);
