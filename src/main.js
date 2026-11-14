@@ -2,7 +2,7 @@ import { TwoButtons, bindPointerControls } from "../input.js";
 import { createRun, beginRun, updateRun, advanceRun, retryRun, restartRun, pauseRun, resumeRun, STORY_STAGES } from "./run.js";
 import { renderWorld } from "./render.js";
 import { Soundscape } from "./audio.js";
-import { recordLocalBest, seedShareUrl } from "./replay.js";
+import { recordLocalBest, recordCourseResults, seedShareUrl } from "./replay.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("world");
@@ -166,6 +166,7 @@ function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats
   $("overlay-intro").textContent = intro;
   $("overlay-intro").hidden = !intro;
   $("overlay-guide").hidden = !guide;
+  $("stage-select").hidden = true;
   $("overlay-stats").hidden = !stats;
   $("replay-meta").hidden = !replay;
   $("share-url").hidden = true;
@@ -197,6 +198,7 @@ function showReady() {
     action: "歩き出す", guide: run.stage === 0,
     foot: run.stage === 0 ? "PC：←→ か A D でよける／両押し か Space 長押しで待つ／C で「すみませーん」／Esc でひと休み" : "左右でよける · 左右同時か Space 長押しで待つ · 声で道をひらく",
   });
+  $("stage-select").hidden = !(run.stage === 0 && run.startStage === 0 && run.phase === "ready");
 }
 function resultTotals() {
   const records = Array.isArray(run.records) ? run.records : [];
@@ -216,10 +218,16 @@ function showFinished() {
     seed: run.runSeed, stage: final ? 5 : run.stage,
     elapsed: totals.elapsed, hits: totals.hits,
   });
+  const course = recordCourseResults(browserStorage(), {
+    stage: run.stage, elapsed: run.elapsed, hits: run.hits,
+    total: totals, totalEligible: final && run.startStage === 0,
+  });
   const streak = final
     ? Math.max(0, ...run.records.map((record) => Number(record.bestStreak) || 0))
     : run.bestStreak || 0;
   $("result-time").textContent = clock(totals.elapsed);
+  $("result-time-label").textContent = final && run.startStage > 0
+    ? `タイム（${run.records.length}区間分）` : "タイム";
   $("result-hits").textContent = String(totals.hits);
   const next = STORY_STAGES?.[run.stage + 1];
   setOverlay({
@@ -239,7 +247,8 @@ function showFinished() {
     : "";
   const streakText = streak > 1 ? `人波を無接触で ${streak} 区間連続突破`
     : streak === 1 ? "人波を無接触で 1 区間突破" : "";
-  $("result-record").textContent = [bestText, streakText].filter(Boolean).join("\n");
+  const courseText = course ? `${course.improved ? "通しベスト更新！" : "通しベスト"} ${clock(course.best.elapsed)} ／ 接触${course.best.hits}` : "";
+  $("result-record").textContent = [bestText, courseText, streakText].filter(Boolean).join("\n");
 }
 function showGameOver() {
   setOverlay({
@@ -292,6 +301,18 @@ function action() {
   }
 }
 $("action").addEventListener("click", action);
+STORY_STAGES.forEach((stage, index) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  const label = document.createElement("span");
+  label.textContent = `${index + 1} ${stage.place}`;
+  button.append(label);
+  button.addEventListener("click", () => {
+    setRun(createRun(index, newSeed()));
+    showReady();
+  });
+  $("stage-select").append(button);
+});
 $("secondary").addEventListener("click", () => {
   if (run.phase !== "paused" && run.phase !== "finished") return;
   setRun(retryRun(run));

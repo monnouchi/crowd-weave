@@ -59,13 +59,14 @@
           <p id="overlay-body" class="overlay-lead">開演まで、あと少し。<br />友だちとライブの最前列へ。</p>
           <p id="overlay-extra" class="overlay-extra">すきまを読み、何度でも声をかけよう。</p>
           <p id="overlay-intro" class="overlay-intro" hidden></p>
-          <div id="overlay-stats" class="overlay-stats" hidden><div><small>タイム</small><strong id="result-time">0:00</strong></div><div><small>接触</small><strong id="result-hits">0</strong></div></div>
+          <div id="overlay-stats" class="overlay-stats" hidden><div><small id="result-time-label">タイム</small><strong id="result-time">0:00</strong></div><div><small>接触</small><strong id="result-hits">0</strong></div></div>
           <div id="replay-meta" class="replay-meta" hidden>
             <p id="result-record"></p>
             <button id="share-seed" type="button">同じ配置の URL をコピー</button>
             <input id="share-url" type="text" readonly aria-label="同じ配置の URL" hidden />
           </div>
           <div id="overlay-guide" class="overlay-guide"><div><b>← →</b><span>左右によける</span></div><div><b>ホップ</b><span>同じ方向を素早く2回押す<br />1回ずつ離して押そう</span></div><div><b>待つ</b><span>左右を同時に長押し<br />または Space を長押し</span></div><div><b>声</b><span>足元に輪がある人が<br />声に応える</span></div></div>
+          <div id="stage-select" class="stage-select" hidden></div>
           <button id="action" class="action" type="button"><span class="action-label">歩き出す </span><span class="wind" aria-hidden="true"><i></i><i></i><i></i></span></button>
           <button id="secondary" class="secondary-action" type="button" hidden>この区間をやり直す</button>
           <p id="overlay-foot" class="overlay-foot">PC：←→ か A D でよける／両押し か Space 長押しで待つ／C で「すみませーん」／Esc でひと休み</p>

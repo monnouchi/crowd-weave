@@ -266,12 +266,13 @@ function syncTotals(run) {
     sum + record.hits, 0) + (recorded ? 0 : run.hits);
 }
 
-export function createRun(stage = 0, seed = 1402485690, records = []) {
+export function createRun(stage = 0, seed = 1402485690, records = [], startStage = stage) {
   if (!Number.isInteger(stage) || stage < 0 || stage >= STAGES.length)
     throw new RangeError("Invalid stage");
   const stageSeed = (seed + stage * 97) >>> 0;
   const run = createGame(stage, stageSeed);
   run.runSeed = seed >>> 0;
+  run.startStage = startStage;
   run.records = records.map((record) => ({ ...record }));
   run.events = [];
   run.story = STORY_STAGES[stage];
@@ -388,13 +389,13 @@ export function updateRun(run, dt, controls = {}) {
 export function advanceRun(run) {
   if (run.phase !== "finished" || run.stage >= STORY_STAGES.length - 1)
     return run;
-  return createRun(run.stage + 1, run.runSeed, run.records);
+  return createRun(run.stage + 1, run.runSeed, run.records, run.startStage);
 }
 
 export function retryRun(run) {
   return createRun(run.stage, run.runSeed, run.records.filter(
     (record) => record.stage < run.stage,
-  ));
+  ), run.startStage);
 }
 
 export function restartRun(seed = 1402485690) {

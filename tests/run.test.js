@@ -18,6 +18,21 @@ const tick = (run, seconds, controls = {}) => {
     updateRun(run, 0.05, controls);
 };
 
+test("a selected starting stage survives advancing and retrying", () => {
+  const run = createRun(2, 17);
+  assert.equal(run.stage, 2);
+  assert.equal(run.startStage, 2);
+  assert.deepEqual(run.records, []);
+  assert.equal(run.story, STORY_STAGES[2]);
+  run.records.push({ stage: 2, elapsed: 10, hits: 0 });
+  run.phase = "finished";
+  const next = advanceRun(run);
+  assert.equal(next.stage, 3);
+  assert.equal(next.startStage, 2);
+  assert.equal(retryRun(next).startStage, 2);
+  assert.equal(restartRun(17).startStage, 0);
+});
+
 test("chapter introductions describe new encounters and crossing consequences", () => {
   const intros = STORY_STAGES.map((stage) => stage.intro);
   assert.match(intros[0], /ワンちゃん.*声.*譲ってくれない/);

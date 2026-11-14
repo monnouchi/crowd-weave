@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createGame, nextRunSeed, seedForRun, step } from "../logic.js";
 import {
   BEST_STORAGE_KEY, MAX_LOCAL_BESTS, readLocalBest, recordLocalBest,
-  seedShareUrl,
+  seedShareUrl, COURSE_BEST_STORAGE_KEY, readCourseBest, recordCourseBest, recordCourseResults,
 } from "../src/replay.js";
 
 function storage() {
@@ -13,6 +13,37 @@ function storage() {
     setItem: (key, value) => values.set(key, value),
   };
 }
+
+test("course bests combine seeds without changing seed bests", () => {
+  const local = storage();
+  for (const [seed, elapsed] of [[17, 20], [18, 18], [19, 19]]) {
+    recordLocalBest(local, { seed, stage: 2, elapsed, hits: 1 });
+    recordCourseResults(local, { stage: 2, elapsed, hits: 1 });
+  }
+  assert.deepEqual(readCourseBest(local, 2), { stage: 2, elapsed: 18, hits: 1 });
+  assert.equal(readLocalBest(local, 17, 2).elapsed, 20);
+  assert.equal(JSON.parse(local.getItem(COURSE_BEST_STORAGE_KEY)).records.length, 1);
+  assert.equal(recordCourseBest(local, { stage: 2, elapsed: 18, hits: 0 }).improved, true);
+});
+
+test("only a full journey records a course total, while every clear records its stage", () => {
+  const local = storage();
+  for (let stage = 2; stage <= 4; stage++) {
+    const line = recordCourseResults(local, { stage, elapsed: 10 + stage, hits: 0,
+      total: { elapsed: 39, hits: 0 }, totalEligible: false });
+    assert.equal(line.kind, "stage");
+    assert.equal(readCourseBest(local, stage).elapsed, 10 + stage);
+  }
+  assert.equal(readCourseBest(local, 5), null);
+  const line = recordCourseResults(local, { stage: 4, elapsed: 13, hits: 1,
+    total: { elapsed: 60, hits: 2 }, totalEligible: true });
+  assert.equal(line.kind, "total");
+  assert.equal(readCourseBest(local, 4).elapsed, 13);
+  assert.deepEqual(readCourseBest(local, 5), { stage: 5, elapsed: 60, hits: 2 });
+  assert.equal(recordCourseResults(null, { stage: 0, elapsed: 1, hits: 0 }), null);
+  const blocked = { getItem() { throw Error(); }, setItem() { throw Error(); } };
+  assert.equal(recordCourseResults(blocked, { stage: 0, elapsed: 1, hits: 0 }), null);
+});
 
 test("a faster replay for the same seed and stage becomes the local best", () => {
   const local = storage();

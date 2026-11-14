@@ -1,6 +1,7 @@
 // Only game results live here. The browser's storage can be disabled, full, or
 // unavailable; none of those conditions should interrupt a run.
 export const BEST_STORAGE_KEY = "zatto-stage-bests-v1";
+export const COURSE_BEST_STORAGE_KEY = "zatto-course-bests-v1";
 export const MAX_LOCAL_BESTS = 40;
 
 function validSeed(seed) {
@@ -65,6 +66,54 @@ export function recordLocalBest(storage, result) {
   } catch {
     return { best: current, improved: true, stored: false };
   }
+}
+
+function validCourseResult(result) {
+  return result && validStage(result.stage) &&
+    Number.isFinite(result.elapsed) && result.elapsed >= 0 &&
+    Number.isInteger(result.hits) && result.hits >= 0;
+}
+
+function readCourseRecords(storage) {
+  try {
+    const parsed = JSON.parse(storage?.getItem(COURSE_BEST_STORAGE_KEY) || "null");
+    if (parsed?.version !== 1 || !Array.isArray(parsed.records)) return [];
+    return parsed.records.slice(0, MAX_LOCAL_BESTS).filter(validCourseResult)
+      .map(({ stage, elapsed, hits }) => ({ stage, elapsed: Math.round(elapsed * 1000) / 1000, hits }));
+  } catch {
+    return [];
+  }
+}
+
+export function readCourseBest(storage, stage) {
+  if (!validStage(stage)) return null;
+  return readCourseRecords(storage).find((record) => record.stage === stage) || null;
+}
+
+export function recordCourseBest(storage, result) {
+  if (!validCourseResult(result)) return { best: null, improved: false, stored: false };
+  const current = { stage: result.stage, elapsed: Math.round(result.elapsed * 1000) / 1000, hits: result.hits };
+  const records = readCourseRecords(storage);
+  const previous = records.find((record) => record.stage === current.stage);
+  if (previous && !isFaster(current, previous))
+    return { best: previous, improved: false, stored: true };
+  const next = [current, ...records.filter((record) => record.stage !== current.stage)]
+    .slice(0, MAX_LOCAL_BESTS);
+  try {
+    storage?.setItem(COURSE_BEST_STORAGE_KEY, JSON.stringify({ version: 1, records: next }));
+    return { best: current, improved: true, stored: !!storage };
+  } catch {
+    return { best: current, improved: true, stored: false };
+  }
+}
+
+export function recordCourseResults(storage, { stage, elapsed, hits, total, totalEligible }) {
+  const stageResult = recordCourseBest(storage, { stage, elapsed, hits });
+  const useTotal = stage === 4 && totalEligible;
+  const result = useTotal
+    ? recordCourseBest(storage, { stage: 5, elapsed: total?.elapsed, hits: total?.hits })
+    : stageResult;
+  return result.stored && result.best ? { kind: useTotal ? "total" : "stage", ...result } : null;
 }
 
 export function seedShareUrl(href, seed) {
