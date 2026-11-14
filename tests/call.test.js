@@ -5,7 +5,7 @@ import {
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { OneShotControl } from '../input.js';
-import { courtesyUnavailableReason } from '../crowd.js';
+import { courtesyCallWindow, courtesyUnavailableReason } from '../crowd.js';
 import { createRun, beginRun, updateRun } from '../src/run.js';
 
 const idle = { left: false, right: false };
@@ -23,6 +23,34 @@ function crowded(stage = 0) {
 function pressCall(g, steering = idle) {
   step(g, 0.025, { ...steering, call: true });
 }
+
+test('call window measures the best available position without mutating state', () => {
+  const g = crowded();
+  g.crowd = [{ ...g.crowd[0], x: g.player.x, y: g.player.y - 56 }];
+  const before = structuredClone({ crowd: g.crowd, player: g.player });
+  const window = courtesyCallWindow(g.crowd, g.player);
+  assert.ok(window > 0.95 && window <= 1);
+  assert.equal(courtesyCallWindow(g.crowd, g.player), window);
+  assert.deepEqual({ crowd: g.crowd, player: g.player }, before);
+
+  g.crowd[0].y = g.player.y - 105;
+  assert.ok(courtesyCallWindow(g.crowd, g.player) < 0.05);
+  g.crowd[0].y = g.player.y - 56;
+  g.crowd[0].x = g.player.x + 67;
+  assert.ok(courtesyCallWindow(g.crowd, g.player) < 0.1);
+  g.crowd[0].y = g.player.y - 120;
+  assert.equal(courtesyCallWindow(g.crowd, g.player), null);
+  assert.equal(courtesyCallWindow([], g.player), null);
+});
+
+test('run exposes a call window consistent with availability while playing', () => {
+  const run = createRun(0, 17);
+  beginRun(run);
+  updateRun(run, 0.025, idle);
+  assert.equal(run.callWindow === null, !run.callReady);
+  if (run.callWindow !== null)
+    assert.ok(run.callWindow >= 0 && run.callWindow <= 1);
+});
 
 test('one call press opens a person-only gap and confirms with a ripple', () => {
   const g = crowded();

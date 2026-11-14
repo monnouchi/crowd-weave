@@ -608,6 +608,17 @@ export function availableCourtesyTargets(crowd, player, crossings = [], stage = 
   return targets;
 }
 
+export function courtesyCallWindow(crowd, player, crossings = [], stage = 0) {
+  const targets = availableCourtesyTargets(crowd, player, crossings, stage);
+  if (!targets.length) return null;
+  const clamp = (value) => Math.max(0, Math.min(1, value));
+  return Math.max(...targets.map(({ person }) => {
+    const dy = player.y - person.y;
+    const dx = Math.abs(person.x - player.x);
+    return clamp(1 - Math.abs(dy - 56.5) / 48.5) * clamp(1 - dx / 68);
+  }));
+}
+
 // Diagnostic only: do not alter the crowd or its courtesy reservations.
 export function courtesyUnavailableReason(crowd, player, crossings = [], stage = 0) {
   if (!courtesyPeopleAhead(crowd, player, crossings, stage).length) return "nobody";

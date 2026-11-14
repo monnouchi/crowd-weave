@@ -384,6 +384,7 @@ function updateHud() {
     run.pressure > .5 ? "前の人の歩幅を見よう" : "進む人の向きを見よう";
   $("waiting").hidden = run.phase !== "playing" || !run.braking;
   $("call-label").textContent = run.callReady ? "今、声が届く" : "いつでも呼べる";
+  $("call-gauge-fill").style.width = run.callWindow === null ? "0%" : Math.round(run.callWindow * 100) + "%";
   $("call").classList.toggle("ready", !!run.callReady);
   $("hint").hidden = run.stage > 0 && run.worldTime > 7;
   const held = controls.read();

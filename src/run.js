@@ -1,5 +1,5 @@
 import { createGame, step, STAGES, SCENES } from "../logic.js";
-import { availableCourtesyTargets, courtesyUnavailableReason } from "../crowd.js";
+import { availableCourtesyTargets, courtesyCallWindow, courtesyUnavailableReason } from "../crowd.js";
 
 // Five short chapters of the same journey. The snippets are invitations from
 // people already on the way, rather than instructions interrupting the run.
@@ -241,6 +241,11 @@ export function availableCallTargets(run) {
     run.crossings, run.stage).map(({ person }) => person.id);
 }
 
+function availableCallWindow(run) {
+  if (run.arriving || playerNearCrossing(run)) return null;
+  return courtesyCallWindow(run.crowd, run.player, run.crossings, run.stage);
+}
+
 function callUnavailableReason(run) {
   if (run.arriving) return null;
   if (playerNearCrossing(run)) return "crossing";
@@ -250,6 +255,7 @@ function callUnavailableReason(run) {
 function updateCallAvailability(run) {
   run.callTargets = availableCallTargets(run);
   run.callReady = run.phase === "playing" && run.callTargets.length > 0;
+  run.callWindow = availableCallWindow(run);
 }
 
 function syncTotals(run) {
@@ -274,6 +280,7 @@ export function createRun(stage = 0, seed = 1402485690, records = []) {
   run.pressure = 0;
   run.cleanStreak = 0;
   run.bestStreak = 0;
+  run.callWindow = null;
   run._crowdSections = naturalizeCrowd(run);
   updateFlow(run);
   updateCallAvailability(run);
