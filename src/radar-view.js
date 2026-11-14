@@ -22,7 +22,7 @@ export function radarLayout(view = {}) {
 }
 
 function panelPath(ctx, { x, y, width, height }) {
-  const r = 11;
+  const r = 14;
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + width - r, y);
@@ -58,18 +58,41 @@ export function drawRadar(ctx, run, view = {}) {
     data.ahead * scale;
   const px = (x) => cx + x * scale;
   const py = (y) => cy - y * scale;
+  const chipPath = (x, y) => {
+    const width = 37, height = 16, r = 8;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
 
   ctx.save();
+  ctx.save();
+  ctx.translate(4, 5);
   panelPath(ctx, panel);
-  ctx.fillStyle = "rgba(12, 29, 38, .9)";
+  ctx.fillStyle = "rgba(23, 57, 63, .55)";
   ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "rgba(228, 245, 229, .82)";
+  ctx.restore();
+  panelPath(ctx, panel);
+  ctx.fillStyle = "rgba(18, 40, 48, .92)";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#1D4048";
   ctx.stroke();
-  ctx.fillStyle = "#eff8e8";
+  chipPath(panel.x + 6, panel.y + 4);
+  ctx.fillStyle = "#2E6B74";
+  ctx.fill();
+  ctx.fillStyle = "#FFF6E8";
   ctx.font = `800 ${panel.width <= 104 ? 10 : 11}px system-ui, sans-serif`;
   ctx.textAlign = "left";
-  ctx.fillText("周囲", panel.x + 10, panel.y + 14);
+  ctx.fillText("周囲", panel.x + 11, panel.y + 15);
   ctx.textAlign = "right";
   ctx.fillStyle = "#a7e5d5";
   ctx.fillText("前 ↑", panel.x + panel.width - 9, panel.y + 14);
@@ -166,7 +189,7 @@ export function drawRadar(ctx, run, view = {}) {
   ctx.restore();
 
   ctx.fillStyle = "#ecf2e2";
-  ctx.font = `700 ${panel.width <= 104 ? 9 : 10}px system-ui, sans-serif`;
+  ctx.font = `700 ${panel.width <= 104 ? 10 : 11}px system-ui, sans-serif`;
   ctx.textAlign = "left";
   ctx.fillText("○ 人   ◆ 動物", panel.x + 9,
     panel.y + panel.height - 20);

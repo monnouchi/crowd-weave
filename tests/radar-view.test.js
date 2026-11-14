@@ -62,3 +62,31 @@ test("radar draws only during play and does not change the seeded run", () => {
     animals: run.animals, crossings: run.crossings }, playing);
   assert.notDeepEqual(playing, before, "test really moved the player near the road");
 });
+
+test("radar draws the teal panel and title chip", () => {
+  const run = createRun(1, 17);
+  run.phase = "playing";
+  const { ctx: base } = drawingContext();
+  const events = [];
+  const ctx = new Proxy(base, {
+    get(target, name) {
+      if (name === "fill") return () => events.push(["fill", target.fillStyle]);
+      if (name === "fillText") return (value) => events.push(["text", value]);
+      return target[name];
+    },
+    set(target, name, value) {
+      if (name === "fillStyle" || name === "strokeStyle")
+        events.push([name, value]);
+      target[name] = value;
+      return true;
+    },
+  });
+
+  drawRadar(ctx, run, { width: 320, height: 568 });
+  assert.ok(events.some(([name, value]) => name === "strokeStyle" && value === "#1D4048"));
+  assert.ok(events.some(([name, value]) => name === "fill" && value === "rgba(18, 40, 48, .92)"));
+  assert.ok(events.some(([name, value]) => name === "fill" && value === "rgba(23, 57, 63, .55)"));
+  const chip = events.findIndex(([name, value]) => name === "fill" && value === "#2E6B74");
+  const title = events.findIndex(([name, value]) => name === "text" && value === "周囲");
+  assert.ok(chip >= 0 && title > chip, "title chip is filled before its text");
+});
