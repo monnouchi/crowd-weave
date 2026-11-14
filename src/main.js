@@ -132,8 +132,30 @@ function cue(text, duration = 2) {
   $("cue").classList.add("show");
   cueUntil = performance.now() + duration * 1000;
 }
+function spawnConfetti() {
+  if (reducedMotion.matches) return;
+  const layer = $("confetti");
+  layer.replaceChildren();
+  const colors = ["#EF7D4E", "#F4B942", "#1D4048", "#FFF6E8"];
+  let seed = 42;
+  const next = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  for (let i = 0; i < 36; i++) {
+    const piece = document.createElement("i");
+    piece.style.background = colors[i % colors.length];
+    piece.style.left = `${(i + next()) / 36 * 100}%`;
+    piece.style.animationDuration = `${2.4 + next() * 1.2}s`;
+    piece.style.animationDelay = `${next() * .5}s`;
+    piece.style.width = `${4 + next() * 3}px`;
+    piece.style.height = `${8 + next() * 5}px`;
+    layer.append(piece);
+  }
+}
 function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats = false, guide = false, replay = false, secondary = false, secondaryLabel = "この区間をやり直す", foot = "" }) {
   resetVoiceEffect();
+  $("confetti").replaceChildren();
   $("overlay-kicker").textContent = kicker;
   $("overlay-title").textContent = title;
   $("logo-wrap").hidden = title !== "雑踏突破";
@@ -159,6 +181,7 @@ function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats
   $("action").focus({ preventScroll: true });
 }
 function closeOverlay() {
+  $("confetti").replaceChildren();
   $("overlay").hidden = true;
   $("controls").inert = false;
   canvas.focus({ preventScroll: true });
@@ -210,6 +233,7 @@ function showFinished() {
     action: final ? "もう一度歩く" : "次の区間へ", stats: true, replay: true,
     secondary: !final, secondaryLabel: "この区間を再挑戦",
   });
+  if (final) spawnConfetti();
   const bestText = result.stored && result.best
     ? `${result.improved ? "自己ベスト更新" : "自己ベスト"} ${clock(result.best.elapsed)} ／ 接触${result.best.hits}`
     : "";

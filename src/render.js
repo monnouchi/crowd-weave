@@ -952,8 +952,12 @@ function person(ctx, c, actor, game, view) {
   }
   if (actor.glowStick && c.stage === 4) {
     const color = ["#8ae9da", "#ffd58c", "#edabdf"][(actor.id || 0) % 3];
-    const tipX = px + (13.6 + stride * .3) * s, tipY = bodyTop - 4 * s;
-    limb(px + 13.6 * s, bodyTop + 14 * s, tipX, tipY, 3.2 * s, color);
+    const finished = game.phase === "finished";
+    const sway = finished && !view.reducedMotion
+      ? Math.sin((game.worldTime || 0) * 2.2 + (actor.id || 0) * .7) * 2.2 : 0;
+    const tipX = px + (13.6 + stride * .3 + sway) * s;
+    const tipY = bodyTop - (finished ? 15 : 4) * s;
+    limb(px + 13.6 * s, bodyTop + (finished ? 2 : 14) * s, tipX, tipY, 3.2 * s, color);
     ellipse(ctx, tipX, tipY, 5 * s, 5 * s, color + "33");
     ellipse(ctx, tipX, tipY, 2 * s, 2 * s, color);
   }

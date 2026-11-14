@@ -221,9 +221,9 @@ test("hair and outfit choices change the person drawing calls", () => {
     assert.notDeepEqual(callsFor("crop", outfit), baseline, outfit);
 });
 
-function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true, worldTime = 1 } = {}) {
+function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true, worldTime = 1, phase = "playing" } = {}) {
   const run = createRun(stage, 17);
-  run.phase = "playing";
+  run.phase = phase;
   run.player.x = 240;
   run.player.y = playerY;
   run.crowd = crowd;
@@ -285,4 +285,18 @@ test("audience glow sticks have a tip and halo without radial gradients and free
   };
   assert.deepEqual(glowEllipses(frozen), glowEllipses(render(true, 8)));
   assert.notDeepEqual(glowEllipses(render(false, 1)), glowEllipses(render(false, 8)));
+});
+
+
+test("finished audience raises glow sticks even with reduced motion", () => {
+  const actor = { id: 0, x: 240, y: 900, active: true, glowStick: true };
+  const tip = (phase, worldTime) => {
+    const calls = recordedScene(4, { playerY: 1000, crowd: [actor], phase, worldTime });
+    const halo = calls.findIndex((call) => call.name === "fill" && call.fill === "#8ae9da33");
+    assert.ok(halo > 0);
+    assert.equal(calls[halo - 1].name, "ellipse");
+    return calls[halo - 1].args;
+  };
+  assert.ok(tip("finished", 1)[1] < tip("playing", 1)[1]);
+  assert.deepEqual(tip("finished", 1), tip("finished", 8));
 });

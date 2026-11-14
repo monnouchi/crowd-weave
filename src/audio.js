@@ -283,6 +283,35 @@ export class Soundscape {
     source.stop(start + duration + 0.01);
   }
 
+  cheer(at, duration) {
+    const c = this.context;
+    if (!c || !this.noiseBuffer || this.muted || this.paused) return;
+    const source = c.createBufferSource();
+    const filter = c.createBiquadFilter();
+    const gain = c.createGain();
+    source.buffer = this.noiseBuffer;
+    filter.type = "bandpass";
+    filter.Q.value = 0.7;
+    const start = Math.max(c.currentTime, at);
+    filter.frequency.setValueAtTime(600, start);
+    filter.frequency.linearRampToValueAtTime(1500, start + duration);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.028, start + duration * 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.master);
+    this.voices.add(source);
+    source.onended = () => {
+      this.voices.delete(source);
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
+    source.start(start);
+    source.stop(start + duration + 0.01);
+  }
+
   event(kind, detail = {}) {
     const c = this.context;
     if (!c || c.state === "closed" || this.muted || this.paused) return;
@@ -352,6 +381,7 @@ export class Soundscape {
           this.tone(semitone(root, interval), now + notes.length * beat - beat,
             1.7, 0.011, "sine"));
         this.breath(now + 1.15, 1.2, 0.035, 1400);
+        this.cheer(now + 1.7, 1.5);
       }
     }
   }
