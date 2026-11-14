@@ -721,7 +721,7 @@ function person(ctx, c, actor, game, view) {
   ctx.save();
   ctx.globalAlpha *= edgeOpacity;
   const look = appearanceFor(actor);
-  const clothes = actor.shirt || (c.stage === 4
+  const clothes = actor.appearanceId === 12 ? "#cda65e" : actor.shirt || (c.stage === 4
     ? ["#9b5974", "#617b9b", "#b2806e", "#788c84", "#ae9b75"][(actor.color ?? actor.id ?? 0) % 5]
     : ["#c57960", "#739081", "#b79668", "#7a8799", "#9c6d7e"][(actor.color ?? actor.id ?? 0) % 5]);
   const friend = actor.friend || actor.partner;
@@ -752,13 +752,36 @@ function person(ctx, c, actor, game, view) {
     4 * s, "#344954", "#283d48");
   ellipse(ctx, px - (5 + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
   ellipse(ctx, px + (5 + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
+  const headY = foot - (50 - bow) * s;
+  const headX = px + (profile * 2.4 + facing.headLean) * s;
+  if (look.style === "long")
+    rect(ctx, headX - 7 * s, headY - 3 * s, 14 * s, 23 * s, look.hair, 5 * s);
   const bodyTop = foot - 43 * s + bow * s;
   const bodyBot = foot - 18 * s;
-  const torsoWidth = profile ? 14 : 20;
+  const torsoWidth = (profile ? 14 : 20) * look.width;
   rect(ctx, px - torsoWidth * s / 2, bodyTop, torsoWidth * s,
     bodyBot - bodyTop, outlined, 5 * s);
   rect(ctx, px - (torsoWidth / 2 - 1) * s, bodyTop + s,
     (torsoWidth - 2) * s, bodyBot - bodyTop - 2 * s, clothes, 4 * s);
+  if (look.outfit === "coat") {
+    rect(ctx, px - torsoWidth * s / 2, bodyBot - 3 * s, torsoWidth * s,
+      13 * s, outlined, 3 * s);
+    rect(ctx, px - (torsoWidth / 2 - 1) * s, bodyBot - 3 * s,
+      (torsoWidth - 2) * s, 11 * s, clothes, 2 * s);
+    limb(px, bodyTop + 9 * s, px, bodyBot + 7 * s, Math.max(.7, s), "#344954aa");
+  } else if (look.outfit === "skirt") {
+    polygon(ctx, [{ x: px - torsoWidth * .4 * s, y: bodyBot - 4 * s },
+      { x: px + torsoWidth * .4 * s, y: bodyBot - 4 * s },
+      { x: px + torsoWidth * .7 * s, y: bodyBot + 9 * s },
+      { x: px - torsoWidth * .7 * s, y: bodyBot + 9 * s }], clothes, outlined, Math.max(1, s));
+  } else if (look.outfit === "cardigan") {
+    polygon(ctx, [{ x: px - 5 * s, y: bodyTop + s }, { x: px + 5 * s, y: bodyTop + s },
+      { x: px, y: bodyTop + 11 * s }], "#f5e4bd");
+  } else if (look.outfit === "jacket") {
+    limb(px, bodyTop + 5 * s, px, bodyBot - 2 * s, Math.max(.7, s), "#e9dfc2");
+    polygon(ctx, [{ x: px - 5 * s, y: bodyTop + s }, { x: px, y: bodyTop + 6 * s },
+      { x: px + 5 * s, y: bodyTop + s }], "#e9dfc2");
+  }
   if (profile) {
     rect(ctx, px - profile * 1.3 * s - .65 * s, bodyTop + 5 * s,
       1.3 * s, 13 * s, "#f9e7c45c", .6 * s);
@@ -767,27 +790,54 @@ function person(ctx, c, actor, game, view) {
   } else {
     rect(ctx, px - 2.5 * s, bodyTop + 3 * s, 5 * s, 10 * s, "#273d4a44", s);
   }
+  const specialFriend = actor.partner || actor.newFriend;
+  const close = game.player && Math.hypot(actor.x - game.player.x, actor.y - game.player.y) < 100;
   const wave = (actor.acknowledge?.remaining || 0) > .56 ||
-    (friend && game.reunionUntil > game.worldTime);
+    (friend && game.reunionUntil > game.worldTime) ||
+    (specialFriend && (close || game.arriving || game.phase === "finished"));
+  const waveOffset = wave && specialFriend && !view.reducedMotion
+    ? Math.sin((game.worldTime || 0) * 5) * 1.5 : 0;
+  const sleeve = look.outfit === "cardigan" ? "#ad906d" : clothes;
   const shoulder = profile ? 5.8 : 9;
   const hand = profile ? 8 : 13;
   limb(px - shoulder * s, bodyTop + 5 * s,
-    px - hand * s, bodyTop + (wave ? -7 : 19) * s,
-    3.4 * s, clothes, outlined);
+    px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
+    3.4 * s, sleeve, outlined);
   limb(px + shoulder * s, bodyTop + 5 * s,
     px + hand * s, bodyTop + 19 * s,
-    3.4 * s, clothes, outlined);
-  ellipse(ctx, px - hand * s, bodyTop + (wave ? -7 : 19) * s,
+    3.4 * s, sleeve, outlined);
+  ellipse(ctx, px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
     2.4 * s, 3 * s, look.skin);
   ellipse(ctx, px + hand * s, bodyTop + 19 * s, 2.4 * s, 3 * s, look.skin);
-  const headY = foot - (50 - bow) * s;
-  const headX = px + (profile * 2.4 + facing.headLean) * s;
+  if (specialFriend) {
+    const hx = px - (hand + waveOffset) * s, hy = bodyTop + (wave ? -7 : 19) * s;
+    const glow = c.stage === 4 ? ["#8ae9da", "#ffd58c", "#edabdf"][Math.abs(actor.id || 0) % 3] : "#ffd58c";
+    limb(hx, hy, hx, hy - 9 * s, 1.8 * s, "#fff0bd");
+    ellipse(ctx, hx, hy - 9 * s, 3 * s, 3 * s, glow + "66");
+    ellipse(ctx, hx, hy - 9 * s, 1.5 * s, 1.5 * s, glow);
+  }
   ellipse(ctx, headX, headY, (headProfile ? 7.1 : 7.6) * s, 9 * s,
     look.skin, "#3b3f4988", Math.max(.5, .65 * s));
-  ctx.fillStyle = look.hair;
-  ctx.beginPath();
-  ctx.ellipse(headX, headY - 4.5 * s, 8 * s, 5.5 * s, 0, Math.PI, TAU);
-  ctx.fill();
+  if (look.style === "bob" || look.style === "long") {
+    for (const side of [-1, 1]) {
+      if (headProfile && side === headProfile) continue;
+      rect(ctx, headX + (side < 0 ? -8 : 5) * s, headY - 4 * s,
+        3 * s, (look.style === "bob" ? 12 : 15) * s, look.hair, 1.5 * s);
+    }
+  }
+  if (look.style === "thinning") {
+    for (const side of [-1, 1]) ellipse(ctx, headX + side * 6.5 * s,
+      headY - 3 * s, 1.6 * s, 3.5 * s, look.hair);
+  } else {
+    ctx.fillStyle = look.hair;
+    ctx.beginPath();
+    ctx.ellipse(headX, headY - (look.style === "short" ? 4 : 4.5) * s,
+      (look.style === "short" ? 7 : 8) * s, (look.style === "short" ? 3.5 : 5.5) * s, 0, Math.PI, TAU);
+    ctx.fill();
+    if (look.style === "bun") ellipse(ctx, headX, headY - 10 * s, 3.2 * s, 3.2 * s, look.hair);
+    if (look.style === "curls") for (const dx of [-6, -2, 2, 6])
+      ellipse(ctx, headX + dx * s, headY - 8 * s, 2.8 * s, 2.8 * s, look.hair);
+  }
   if (headProfile && s > .6) {
     ellipse(ctx, headX + headProfile * 4.1 * s, headY + .35 * s,
       Math.max(.6, .75 * s), Math.max(.6, .75 * s), "#33434b");
@@ -804,12 +854,27 @@ function person(ctx, c, actor, game, view) {
   }
   if (actor.umbrella && c.stage === 3) {
     const uY = foot - 68 * s;
-    limb(px + 14 * s, bodyTop + 19 * s, px + 14 * s, uY + 5 * s,
-      1.3 * s, "#eff2e8");
-    polygon(ctx, [{ x: px - 19 * s, y: uY + 3 * s }, { x: px - 14 * s, y: uY - 3 * s },
-      { x: px, y: uY - 9 * s }, { x: px + 14 * s, y: uY - 3 * s },
-      { x: px + 20 * s, y: uY + 3 * s }],
-    actor.id % 2 ? "#659aabdd" : "#e6c59bdd", "#e8ede7", Math.max(.8, s));
+    const tilt = (profile || Math.sign(actor.vx || actor.ux || 0)) * 3 * s;
+    const ux = px + tilt;
+    limb(px + 14 * s, bodyTop + 19 * s, ux, uY - 8 * s, 1.3 * s, "#eff2e8");
+    const colors = ["#e6c59b", "#659aab", "#e88a75", "#9a8fc7", "#7fbfa8"];
+    const id = Math.abs(actor.id || 0);
+    ctx.save(); ctx.translate(ux, uY);
+    ctx.rotate((profile || Math.sign(actor.vx || actor.ux || 0)) * .08);
+    ctx.translate(-ux, -uY);
+    ctx.beginPath(); ctx.moveTo(ux - 20 * s, uY + 3 * s);
+    ctx.quadraticCurveTo(ux - 17 * s, uY - 10 * s, ux, uY - 10 * s);
+    ctx.quadraticCurveTo(ux + 17 * s, uY - 10 * s, ux + 20 * s, uY + 3 * s);
+    for (let i = 0; i < 3; i++) {
+      const x = ux + (20 - i * 40 / 3) * s;
+      ctx.quadraticCurveTo(x - 20 / 3 * s, uY - 1 * s, x - 40 / 3 * s, uY + 3 * s);
+    }
+    ctx.closePath(); ctx.fillStyle = colors[id % 5]; ctx.fill();
+    ctx.strokeStyle = "#e8ede7"; ctx.lineWidth = Math.max(.8, s); ctx.stroke();
+    for (const dx of [-13, 0, 13]) limb(ux, uY - 9 * s, ux + dx * s, uY + 2 * s,
+      Math.max(.6, .6 * s), "#e8ede788");
+    limb(ux, uY - 10 * s, ux, uY - 12 * s, Math.max(.8, s), "#eff2e8");
+    ctx.restore();
   }
   if (actor.glowStick && c.stage === 4) {
     const color = ["#8ae9da", "#ffd58c", "#edabdf"][(actor.id || 0) % 3];
@@ -825,25 +890,42 @@ function person(ctx, c, actor, game, view) {
   ctx.restore();
 }
 
-function animal(ctx, c, a) {
+function animal(ctx, c, a, view) {
   if (a.active === false) return;
   const p = screenActor(c, a.x, a.y);
   if (!p || p.depth > FAR || p.depth < 10 || p.x < -100 || p.x > c.width + 100) return;
   const s = Math.min(17, p.scale);
   const dog = a.kind === "dog";
   const coat = dog ? "#a67857" : "#696d73";
+  const span = (a.maxX - a.minX) / 2;
+  const phase = span > 0 ? (a.time || 0) * a.speed / span : 0;
+  const direction = Math.abs(a.vx || 0) > .001 ? Math.sign(a.vx) :
+    span > 0 ? (Math.abs(Math.cos(phase)) < .001 ? (a.x >= (a.minX + a.maxX) / 2 ? -1 : 1) : Math.sign(Math.cos(phase))) : 1;
+  const time = view.reducedMotion ? 0 : (a.time || 0);
+  const stride = !view.reducedMotion && !a.bracing && Math.abs(a.vx || 0) > .1 ? Math.sin(time * 12) * 3 : 0;
   ellipse(ctx, p.x, p.y + s, 12 * s, 3 * s, "#24363f44");
-  ellipse(ctx, p.x, p.y - 9 * s, (dog ? 12 : 9) * s, 7 * s, coat, "#463e3d", Math.max(.7, s));
-  for (const dx of [-7, 7]) rect(ctx, p.x + dx * s - 2 * s,
-    p.y - 6 * s, 4 * s, 6 * s, coat, s);
-  ellipse(ctx, p.x + 9 * s, p.y - (dog ? 13 : 16) * s,
-    (dog ? 6 : 5) * s, 5 * s, coat);
-  for (const dx of [-3, 3]) {
-    polygon(ctx, [{ x: p.x + (9 + dx - 2) * s, y: p.y - 18 * s },
-      { x: p.x + (9 + dx) * s, y: p.y - 24 * s },
-      { x: p.x + (9 + dx + 2) * s, y: p.y - 18 * s }], coat);
+  ctx.save(); ctx.translate(p.x, p.y); ctx.scale(direction, 1);
+  ctx.beginPath(); ctx.moveTo(-9 * s, -10 * s);
+  if (dog) ctx.quadraticCurveTo(-17 * s, (-8 + Math.sin(time * 5) * 1.5) * s, -17 * s, (-15 + Math.sin(time * 5) * 1.5) * s);
+  else ctx.quadraticCurveTo((-16 + Math.sin(time * 3)) * s, -10 * s, (-13 + Math.sin(time * 3)) * s, -23 * s);
+  ctx.strokeStyle = coat; ctx.lineWidth = 3 * s; ctx.lineCap = "round"; ctx.stroke();
+  for (const [dx, swing] of [[-7, stride], [6, -stride]]) {
+    ctx.beginPath(); ctx.moveTo(dx * s, -7 * s); ctx.lineTo((dx + swing) * s, -1 * s);
+    ctx.strokeStyle = coat; ctx.lineWidth = 4 * s; ctx.stroke();
   }
-  ellipse(ctx, p.x + 13 * s, p.y - 12 * s, 1.6 * s, 1.5 * s, "#283646");
+  ellipse(ctx, 0, -9 * s, (dog ? 12 : 9) * s, (dog ? 7 : 6) * s, coat, "#463e3d", Math.max(.7, s));
+  ellipse(ctx, 8 * s, -12 * s, 4 * s, 5 * s, coat);
+  ellipse(ctx, 12 * s, -(dog ? 15 : 16) * s, (dog ? 6 : 5) * s, 5 * s, coat);
+  if (dog) {
+    ellipse(ctx, 10 * s, -15 * s, 2.5 * s, 4 * s, "#805a45");
+    ellipse(ctx, 17 * s, -13 * s, 4 * s, 2.4 * s, coat);
+    ellipse(ctx, 20 * s, -13.5 * s, 1.2 * s, 1.1 * s, "#283646");
+  } else {
+    for (const dx of [-3, 3]) polygon(ctx, [{ x: (12 + dx - 2) * s, y: -19 * s },
+      { x: (12 + dx) * s, y: -24 * s }, { x: (12 + dx + 2) * s, y: -19 * s }], coat);
+    ellipse(ctx, 16.5 * s, -15 * s, 1 * s, 1 * s, "#283646");
+  }
+  ctx.restore();
   if (a.bracing) {
     worldLabel(ctx, c, a.x, a.y, 36, "…!", "#fff1cf", "#6e5847", 12, 25);
   }
@@ -977,7 +1059,7 @@ export function renderWorld(ctx, game, view = {}) {
   for (const p of game.party?.members || [])
     items.push({ y: p.y, draw: () => person(ctx, c, p, game, view) });
   for (const a of game.animals || [])
-    items.push({ y: a.y, draw: () => animal(ctx, c, a) });
+    items.push({ y: a.y, draw: () => animal(ctx, c, a, view) });
   if (game.routeBranch) items.push({ y: game.routeBranch.fork.y - 33,
     draw: () => routeSign(ctx, c, game) });
   items.sort((a, b) => a.y - b.y);

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRun } from "../src/run.js";
+import { appearanceFor } from "../src/appearance.js";
 import {
   pedestrianFacing, pedestrianSignalProjections, renderWorld, reunionWave,
   worldLabelCenterX,
@@ -187,4 +188,35 @@ test("both route names remain visible on a narrow screen near the fork", () => {
   assert.ok(short);
   assert.ok(wide.x > 8 && wide.x < 160);
   assert.ok(short.x > wide.x);
+});
+
+test("hair and outfit choices change the person drawing calls", () => {
+  function callsFor(style, outfit) {
+    const run = createRun(0, 17);
+    run.player.y = 500;
+    run.crowd = [{ id: 0, appearanceId: 0, x: run.player.x, y: 400,
+      active: true, ux: 0, uy: 1 }];
+    run.party.members = [];
+    run.meetingPartner = null;
+    run.animals = [];
+    const calls = [];
+    const ctx = drawingContext();
+    for (const name of ["ellipse", "roundRect", "lineTo", "quadraticCurveTo"]) {
+      ctx[name] = (...args) => calls.push([name, ...args]);
+    }
+    const look = appearanceFor({ id: 0 });
+    const saved = { style: look.style, outfit: look.outfit };
+    try {
+      Object.assign(look, { style, outfit });
+      renderWorld(ctx, run, { width: 390, height: 844, reducedMotion: true });
+    } finally {
+      Object.assign(look, saved);
+    }
+    return calls;
+  }
+  const baseline = callsFor("crop", "shirt");
+  for (const style of ["bob", "long"])
+    assert.notDeepEqual(callsFor(style, "shirt"), baseline, style);
+  for (const outfit of ["skirt", "coat"])
+    assert.notDeepEqual(callsFor("crop", outfit), baseline, outfit);
 });

@@ -88,11 +88,20 @@ const LOOKS = [
     outfit: "coat",
     width: 1.06,
   },
+  {
+    skin: "#eec4a0",
+    hair: "#d87949",
+    style: "long",
+    outfit: "cardigan",
+    width: 1,
+  },
 ];
+const CROWD_LOOK_COUNT = 12;
 export function appearanceFor(p, player = false) {
   const id = player
     ? 0
     : (p.appearanceId ??
       (p.friend ? p.id + 2 : (p.id ?? Math.round(p.x / 64))));
-  return LOOKS[((id % LOOKS.length) + LOOKS.length) % LOOKS.length];
+  if (!player && p.appearanceId === 12) return LOOKS[12];
+  return LOOKS[((id % CROWD_LOOK_COUNT) + CROWD_LOOK_COUNT) % CROWD_LOOK_COUNT];
 }

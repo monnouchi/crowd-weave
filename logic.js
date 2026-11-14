@@ -482,7 +482,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     scene,
     meetingPartner: {
       ...MEETING_PARTNER,
-      appearanceId: stage + 3,
+      appearanceId: 12,
       shirt: scene.shirt,
       targetKind: scene.targetKind,
       visualScale: scene.visualScale,

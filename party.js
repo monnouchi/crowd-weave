@@ -19,6 +19,7 @@ export function createParty(count, player) {
     ],
     members: FRIENDS.slice(0, count).map((friend, i) => ({
       ...friend,
+      appearanceId: 12,
       friend: true,
       r: 9,
       x: player.x,

@@ -50,3 +50,34 @@ test("destination side walls are physical while either edge of the entrance work
     }
   }
 });
+
+test("original looks and crowd assignments stay stable with the dedicated partner", () => {
+  const originals = [
+    ["#eec4a0", "#3c343c", "crop", "shirt", 1],
+    ["#c38d69", "#292e3c", "bob", "coat", .96],
+    ["#f5dbbc", "#876348", "long", "skirt", 1],
+    ["#ad7357", "#d0c9c4", "short", "cardigan", 1.06, true],
+    ["#e3ac86", "#58403a", "bun", "shirt", .96],
+    ["#906446", "#242f39", "curls", "jacket", 1.06],
+    ["#f3d0ab", "#b9b4a9", "bob", "coat", 1, true],
+    ["#c68b65", "#3b2f32", "long", "shirt", .96],
+    ["#e7bd95", "#af9e8b", "thinning", "cardigan", 1.06, true],
+    ["#bd8261", "#42333b", "short", "skirt", 1],
+    ["#f1d2b7", "#71543c", "curls", "jacket", .96],
+    ["#a87756", "#242e3d", "bun", "coat", 1.06],
+  ];
+  for (const id of [-25, -12, -1, ...Array.from({ length: 50 }, (_, i) => i)]) {
+    const look = appearanceFor({ id });
+    const expected = originals[((id % 12) + 12) % 12];
+    assert.deepEqual([look.skin, look.hair, look.style, look.outfit, look.width,
+      ...(look.older ? [look.older] : [])], expected);
+  }
+  const dedicated = appearanceFor({ appearanceId: 12 });
+  assert.equal(dedicated.style, "long");
+  assert.ok(!originals.some(([skin, hair]) => skin === dedicated.skin && hair === dedicated.hair));
+  for (let stage = 0; stage < 4; stage++) {
+    assert.equal(createGame(stage).meetingPartner.appearanceId, 12);
+    assert.deepEqual(appearanceFor(createGame(stage).meetingPartner), dedicated);
+    assert.deepEqual(appearanceFor(createGame(stage + 1).party.members.at(-1)), dedicated);
+  }
+});
