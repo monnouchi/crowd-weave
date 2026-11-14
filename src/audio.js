@@ -1,14 +1,13 @@
 // The soundtrack is synthesized at runtime. No recordings or external assets are used.
-// A small motif gathers harmony as the journey moves toward the venue.
-const STAGES = [
-  { root: 196, beat: 0.62, voice: "triangle", shade: 0.012 },
-  { root: 220, beat: 0.49, voice: "triangle", shade: 0.015 },
-  { root: 174.61, beat: 0.58, voice: "sine", shade: 0.011 },
-  { root: 220, beat: 0.46, voice: "triangle", shade: 0.021 },
-  { root: 261.63, beat: 0.4, voice: "triangle", shade: 0.018 },
+// Small motifs gather harmony as the journey moves toward the venue.
+export const STAGES = [
+  { root: 196, beat: 0.62, voice: "triangle", shade: 0.012, motif: [0, 3, 7, 10, 7, 3, 5, 2] },
+  { root: 220, beat: 0.49, voice: "triangle", shade: 0.015, motif: [0, 3, 7, 10, 12, 10, 7, 5] },
+  { root: 174.61, beat: 0.58, voice: "sine", shade: 0.011, motif: [0, 7, 10, 7, 3, 5, 7, 3] },
+  { root: 220, beat: 0.46, voice: "triangle", shade: 0.021, motif: [0, 3, 5, 7, 10, 7, 5, 3] },
+  { root: 261.63, beat: 0.4, voice: "triangle", shade: 0.018, motif: [0, 3, 7, 10, 12, 14, 12, 10] },
 ];
 
-const MOTIF = [0, 3, 7, 10, 7, 3, 5, 2];
 // Calibrated in Chrome with a time-domain analyser after the mix bus.
 const MASTER_LEVEL = 3.2;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -190,7 +189,7 @@ export class Soundscape {
     const index = this.beatIndex % 8;
     const config = STAGES[stage];
     const root = config.root;
-    const melody = MOTIF[index] + (stage === 4 ? 7 : 0);
+    const melody = config.motif[index] + (stage === 4 ? 7 : 0);
     const high = stage >= 3 ? 1 : 0;
     const clear = 1 + open * 0.16;
 
@@ -204,7 +203,7 @@ export class Soundscape {
       this.tone(semitone(root, melody + 12), at + 0.06, config.beat * 0.73,
         (0.016 + high * 0.003) * clear, config.voice, this.musicBus,
         { pan: index === 0 ? -0.17 : 0.17 });
-    } else if (stage >= 1) {
+    } else if (stage >= 1 && stage !== 3) {
       this.tone(semitone(root, melody + 12), at + config.beat * 0.17,
         config.beat * 0.53, 0.009 * clear, config.voice, this.musicBus);
     }
