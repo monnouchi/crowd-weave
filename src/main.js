@@ -195,7 +195,7 @@ function showReady() {
     extra: run.stage === 0 ? "すきまを読み、何度でも声をかけよう。" : meta.cue || "道を譲ってくれた人の間を抜けよう。",
     intro: meta.intro || "",
     action: "歩き出す", guide: run.stage === 0,
-    foot: run.stage === 0 ? "PC は ← → / A D、左右同時か Space 長押しで待つ。C で声、Esc で一時停止。" : "左右でよける · 左右同時か Space 長押しで待つ · 声で道をひらく",
+    foot: run.stage === 0 ? "PC：←→ か A D でよける／両押し か Space 長押しで待つ／C で「すみませーん」／Esc でひと休み" : "左右でよける · 左右同時か Space 長押しで待つ · 声で道をひらく",
   });
 }
 function resultTotals() {
@@ -224,10 +224,10 @@ function showFinished() {
   const next = STORY_STAGES?.[run.stage + 1];
   setOverlay({
     kicker: final ? "雑踏突破 / THE FRONT ROW" : `雑踏突破 / ${String(run.stage + 1).padStart(2,"0")} CLEAR`,
-    title: final ? "最前列、到着。" : "たどり着いた。",
-    body: final ? "人波の向こうに舞台が開けた。後ろから仲間の声も近づいてくる。" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
+    title: final ? "最前列に、ついた！" : "たどり着いた。",
+    body: final ? "人波を抜けきった先に、舞台が開けた。後ろからは仲間の声。みんな、間に合った！" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
     extra: final ? fixedSeed === null
-      ? "最初からもう一度、違うすきまを探せます。"
+      ? "また最初から、今度は違うすきまを抜けてみよう。"
       : "同じ配置で、別のすきまを探せます。"
       : next ? `次の友だちから：${next.message || next.title}` : "",
     action: final ? "もう一度歩く" : "次の区間へ", stats: true, replay: true,
@@ -245,7 +245,7 @@ function showGameOver() {
   setOverlay({
     kicker: "雑踏突破 / RETRY",
     title: "いったん、止まろう。",
-    body: "車や自転車が通る道では、青信号と人の流れを確かめよう。",
+    body: "車の通る道は、あわてず青信号を待とう。人の流れも一緒に見ると、渡りやすいよ。",
     extra: "この区間から、同じ配置でやり直せます。",
     action: "この区間をやり直す",
   });
@@ -266,7 +266,7 @@ function begin() {
   sound.event("start");
   previousPhase = run.phase;
   closeOverlay();
-  if (run.stage === 0 && run.worldTime === 0) cue("人波の拍を、見つけよう", 2.7);
+  if (run.stage === 0 && run.worldTime === 0) cue("流れの切れ目を、探そう", 2.7);
   else cue(story().cue || storyName(), 2.7);
 }
 function resume() {

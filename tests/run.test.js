@@ -20,11 +20,11 @@ const tick = (run, seconds, controls = {}) => {
 
 test("chapter introductions describe new encounters and crossing consequences", () => {
   const intros = STORY_STAGES.map((stage) => stage.intro);
-  assert.match(intros[0], /犬.*声.*譲りません/);
-  assert.match(intros[1], /青で渡ろう.*赤で入ると時間が加算.*車や自転車.*この区間からやり直し/);
+  assert.match(intros[0], /ワンちゃん.*声.*譲ってくれない/);
+  assert.match(intros[1], /青のうちに渡ろう.*赤で渡るとタイムが増え.*車や自転車.*この区間のはじめからやり直し/);
   assert.match(intros[2], /猫.*横切る人の流れ/);
-  assert.match(intros[3], /雨.*二つの横断歩道/);
-  assert.match(intros[4], /ロビーの受付.*最前列/);
+  assert.match(intros[3], /雨.*横断歩道は2つ.*傘/);
+  assert.match(intros[4], /受付.*最前列/);
 });
 
 test("five chapters have destination walkers, never timed flow gates", () => {

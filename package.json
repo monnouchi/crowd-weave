@@ -8,5 +8,5 @@
     "build:pages": "node scripts/build-pages.js"
   },
   "license": "MIT",
-  "description": "雑踏突破 — 人波の呼吸を読み、一声で道をひらいて友だちとライブへ向かう一人称ゲーム"
+  "description": "雑踏突破 — 人波のすきまを抜けて、「すみませーん」で道をひらいて、友だちとライブの最前列を目指す一人称ゲーム"
 }
