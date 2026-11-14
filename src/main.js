@@ -394,7 +394,7 @@ function frame(now) {
     const steer = held.left === held.right ? 0 : held.left ? -1 : 1;
     cameraYaw += ((reducedMotion.matches ? 0 : steer * .045) - cameraYaw) * Math.min(1, dt * 6);
     const callPressed = callControl.take();
-    updateRun(run, dt, { ...held, call: callPressed, callPulse: callPressed, hopEnabled: false });
+    updateRun(run, dt, { ...held, call: callPressed, callPulse: callPressed, hopEnabled: true });
     consumeEvents();
     sound.tick(run, dt);
     if (run.phase !== previousPhase) {

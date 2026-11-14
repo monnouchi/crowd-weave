@@ -324,7 +324,7 @@ export function updateRun(run, dt, controls = {}) {
     right: run.braking ? true : !!controls.right,
     call: !!controls.call,
     callPulse: !!controls.callPulse,
-    hopEnabled: false,
+    hopEnabled: true,
   });
   run.speed = Math.max(0, (before.y - run.player.y) / dt);
   if (run.callSerial !== before.callSerial) {
