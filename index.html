@@ -31,8 +31,7 @@
 
       <header class="hud" aria-label="進行状況">
         <div class="hud-line">
-          <span class="stage-number" id="stage-number">01 / 05</span>
-          <strong id="stage-name">夕暮れの路地</strong>
+          <span class="stage-chip"><span class="stage-number" id="stage-number">01 / 05</span><strong id="stage-name">夕暮れの路地</strong></span>
           <span class="time" id="time">0:00</span>
           <button id="sound" class="icon-button" type="button" aria-label="音を消す" aria-pressed="true" title="音のオン・オフ">♪</button>
           <button id="pause" class="icon-button" type="button" aria-label="一時停止" title="一時停止">Ⅱ</button>
@@ -66,7 +65,7 @@
             <input id="share-url" type="text" readonly aria-label="同じ配置の URL" hidden />
           </div>
           <div id="overlay-guide" class="overlay-guide"><div><b>← →</b><span>左右によける</span></div><div><b>ホップ</b><span>同じ方向を素早く2回押す<br />1回ずつ離して押そう</span></div><div><b>待つ</b><span>左右を同時に長押し<br />または Space を長押し</span></div><div><b>声</b><span>足元に輪がある人が<br />声に応える</span></div></div>
-          <button id="action" class="action" type="button">歩き出す <span aria-hidden="true">↗</span></button>
+          <button id="action" class="action" type="button"><span class="action-label">歩き出す </span><span class="wind" aria-hidden="true"><i></i><i></i><i></i></span></button>
           <button id="secondary" class="secondary-action" type="button" hidden>この区間をやり直す</button>
           <p id="overlay-foot" class="overlay-foot">PC は ← → / A D、左右同時か Space 長押しで待つ。C で声、Esc で一時停止。</p>
         </div>
