@@ -220,3 +220,69 @@ test("hair and outfit choices change the person drawing calls", () => {
   for (const outfit of ["skirt", "coat"])
     assert.notDeepEqual(callsFor("crop", outfit), baseline, outfit);
 });
+
+function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true, worldTime = 1 } = {}) {
+  const run = createRun(stage, 17);
+  run.phase = "playing";
+  run.player.x = 240;
+  run.player.y = playerY;
+  run.crowd = crowd;
+  run.party.members = [];
+  run.meetingPartner = null;
+  run.animals = [];
+  run.crossings = [];
+  run.worldTime = worldTime;
+  const calls = [];
+  const ctx = drawingContext();
+  for (const name of ["fill", "fillRect", "stroke", "ellipse", "fillText", "createRadialGradient"]) {
+    const original = ctx[name];
+    ctx[name] = (...args) => {
+      calls.push({ name, args, fill: ctx.fillStyle, stroke: ctx.strokeStyle });
+      return original(...args);
+    };
+  }
+  renderWorld(ctx, run, { width: 1280, height: 844, reducedMotion });
+  return calls;
+}
+
+test("side scenery rotates through new objects and retains existing scenery", () => {
+  const fills = (stage) => [900, 1800, 2800].flatMap((playerY) => recordedScene(stage, { playerY }))
+    .filter((c) => c.name === "fill" || c.name === "fillRect").map((c) => c.fill);
+  const residential = fills(0);
+  for (const color of ["#b94e50", "#d6e3dc", "#6c9b75", "#669875"])
+    assert.ok(residential.includes(color), `residential ${color}`);
+  const station = fills(1);
+  for (const color of ["#f2f1db", "#e3bb79", "#a17e69"])
+    assert.ok(station.includes(color), `station ${color}`);
+  const cafe = fills(2);
+  for (const color of ["#f2d2aa", "#64494b", "#ef9a9b", "#f9e5c7"])
+    assert.ok(cafe.includes(color), `cafe ${color}`);
+  const rainy = fills(3);
+  for (const color of ["#e5c9b7", "#d98e8b", "#426f76"])
+    assert.ok(rainy.includes(color), `rain ${color}`);
+});
+
+test("venue corridor draws speakers, framed posters, banner and paired light towers", () => {
+  const calls = recordedScene(4, { playerY: 1200 });
+  const filled = calls.filter((c) => c.name === "fill" || c.name === "fillRect");
+  for (const color of ["#20283a", "#303b50", "#edbb91", "#c57383", "#df956f", "#d78583", "#efbb87", "#87e1db20", "#e88dbc20"])
+    assert.ok(filled.some((c) => c.fill === color), color);
+  assert.ok(calls.filter((c) => c.name === "stroke" && c.stroke === "#8eaab2").length >= 2);
+});
+
+test("audience glow sticks have a tip and halo without radial gradients and freeze with reduced motion", () => {
+  const actor = { id: 0, x: 240, y: 900, active: true, glowStick: true, vx: 20, walk: 1 };
+  const render = (reducedMotion, walk) => recordedScene(4, { playerY: 1000,
+    crowd: [{ ...actor, walk }], reducedMotion });
+  const frozen = render(true, 1);
+  const glow = frozen.filter((c) => c.name === "fill" && ["#8ae9da33", "#8ae9da"].includes(c.fill));
+  assert.ok(glow.some((c) => c.fill === "#8ae9da33"));
+  assert.ok(glow.some((c) => c.fill === "#8ae9da"));
+  assert.equal(frozen.filter((c) => c.name === "createRadialGradient").length, 0);
+  const glowEllipses = (calls) => {
+    const index = calls.findIndex((c) => c.name === "fill" && c.fill === "#8ae9da33");
+    return calls.slice(index - 1, index + 3);
+  };
+  assert.deepEqual(glowEllipses(frozen), glowEllipses(render(true, 8)));
+  assert.notDeepEqual(glowEllipses(render(false, 1)), glowEllipses(render(false, 8)));
+});

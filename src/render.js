@@ -281,6 +281,11 @@ function sceneBlock(ctx, c, theme, side, y, length, index) {
       index % 2 ? "#80d2ce" : "#eeb38a");
     }
     worldLine(ctx, c, [inner, y + 7, 72], [inner, y1 - 8, 72], "#ffdaab63", 2);
+    const wallX = inner + (left ? 1 : -1);
+    worldFace(ctx, c, [[wallX, midY - 17, 25], [wallX, midY + 17, 25],
+      [wallX, midY + 17, 64], [wallX, midY - 17, 64]], "#edbb91", "#25283f", 2);
+    worldFace(ctx, c, [[wallX, midY - 14, 28], [wallX, midY + 14, 28],
+      [wallX, midY + 14, 61], [wallX, midY - 14, 61]], index % 2 ? "#c57383" : "#df956f");
   } else {
     for (const yy of [y + 25, y + length - 28]) {
       worldFace(ctx, c, [[inner, yy - 17, 34], [inner, yy + 17, 34],
@@ -293,9 +298,15 @@ function sceneBlock(ctx, c, theme, side, y, length, index) {
       worldLine(ctx, c, [inner, yy, 35], [inner, yy, 87], "#f7ebd7", 1);
     }
     if (c.stage === 2 || c.stage === 1) {
-      worldFace(ctx, c, [[inner, y + 9, 74], [inner + (left ? 26 : -26), y + 9, 73],
-        [inner + (left ? 26 : -26), y1 - 8, 73], [inner, y1 - 8, 74]],
+      worldFace(ctx, c, [[inner, y + 9, 74], [inner + (left ? 26 : -26), y + 9, c.stage === 2 ? 70 : 73],
+        [inner + (left ? 26 : -26), y1 - 8, c.stage === 2 ? 70 : 73], [inner, y1 - 8, 74]],
       c.stage === 2 ? "#af5e5d" : "#4a7b89");
+      if (c.stage === 2) for (let i = 0; i < 8; i += 2) {
+        const a = y + 9 + (length - 17) * i / 8;
+        const b = y + 9 + (length - 17) * (i + 1) / 8;
+        worldFace(ctx, c, [[inner, a, 74], [inner + (left ? 26 : -26), a, 70],
+          [inner + (left ? 26 : -26), b, 70], [inner, b, 74]], "#f2d2aa");
+      }
       for (let i = 0; i < 4; i++) {
         const yy = y + 15 + (length - 30) * i / 4;
         worldLine(ctx, c, [inner, yy, 75], [inner + (left ? 26 : -26), yy, 74],
@@ -316,6 +327,55 @@ function streetObject(ctx, c, theme, side, y, index) {
   const x = side < 0 ? 42 : 438;
   const base = screenPoint(c, x, y, 0);
   if (!base || base.depth > FAR || base.x < -180 || base.x > c.width + 180) return;
+  const slot = ((index % 9) + 9) % 9;
+  const variant = slot === 0 ? 0 : slot === 1 ? 1 : slot === 4 ? 2 : -1;
+  const s = base.scale, bx = base.x, by = base.y;
+  if (variant >= 0) {
+    if (c.stage === 0 && variant === 0) {
+      rect(ctx, bx - 9*s, by - 35*s, 18*s, 32*s, "#b94e50", 2*s);
+      rect(ctx, bx - 11*s, by - 38*s, 22*s, 4*s, "#d36c60", s);
+      rect(ctx, bx - 6*s, by - 30*s, 12*s, 2*s, "#542f3d");
+    } else if (c.stage === 0 && variant === 1) {
+      rect(ctx, bx - 11*s, by - 55*s, 22*s, 55*s, "#d6e3dc", 2*s);
+      rect(ctx, bx - 8*s, by - 50*s, 16*s, 32*s, "#f9ecc9");
+      for (let i = 0; i < 6; i++) ellipse(ctx, bx + (i % 3 - 1)*5*s,
+        by - (45 - Math.floor(i / 3)*10)*s, 1.5*s, 2*s, i % 2 ? "#cf806b" : "#76a9a4");
+    } else if ((c.stage === 0 && variant === 2) || (c.stage === 2 && variant === 2)) {
+      rect(ctx, bx - 14*s, by - 9*s, 28*s, 9*s, "#a47b65", 2*s);
+      ellipse(ctx, bx, by - 13*s, 15*s, 9*s, "#6c9b75");
+      if (c.stage === 2) for (let i = 0; i < 4; i++)
+        ellipse(ctx, bx + (i * 7 - 10)*s, by - (15 + i % 2 * 4)*s, 2*s, 2*s,
+          i % 2 ? "#ffd079" : "#ef9a9b");
+    } else if (c.stage === 1 && variant === 0) {
+      rect(ctx, bx - 2*s, by - 58*s, 4*s, 58*s, "#57777c");
+      rect(ctx, bx - 13*s, by - 58*s, 26*s, 18*s, "#f2f1db", 2*s);
+      rect(ctx, bx - 9*s, by - 48*s, 18*s, 3*s, "#75a7aa");
+    } else if ((c.stage === 1 && variant === 1) || (c.stage === 3 && variant === 1)) {
+      rect(ctx, bx - 2*s, by - 45*s, 4*s, 45*s, theme.ink);
+      rect(ctx, bx - 16*s, by - 53*s, 32*s, 34*s, theme.ink, 2*s);
+      rect(ctx, bx - 13*s, by - 50*s, 12*s, 27*s, c.stage === 3 ? "#d98e8b" : "#e3bb79");
+      rect(ctx, bx + 1*s, by - 50*s, 12*s, 27*s, c.stage === 3 ? "#83b8bc" : "#91babc");
+    } else if (c.stage === 1 && variant === 2) {
+      for (const dx of [-10, 10]) rect(ctx, bx + dx*s, by - 17*s, 3*s, 17*s, theme.ink);
+      rect(ctx, bx - 15*s, by - 28*s, 30*s, 5*s, "#a17e69", s);
+      rect(ctx, bx - 15*s, by - 19*s, 30*s, 5*s, "#a17e69", s);
+    } else if (c.stage === 2 && variant === 0) {
+      polygon(ctx, [{x: bx - 13*s, y: by}, {x: bx - 8*s, y: by - 37*s},
+        {x: bx + 8*s, y: by - 37*s}, {x: bx + 13*s, y: by}], "#64494b", "#ddbb92", Math.max(1, s));
+      rect(ctx, bx - 6*s, by - 30*s, 12*s, 2*s, "#f3ddbc");
+    } else if (c.stage === 3 && variant === 0) {
+      rect(ctx, bx - 2*s, by - 65*s, 3*s, 65*s, "#d5e3e1");
+      rect(ctx, bx + s, by - 64*s, 15*s, 43*s, Math.floor(index / 9) % 2 ? "#ba7382" : "#538f99");
+      rect(ctx, bx + 4*s, by - 60*s, 3*s, 35*s, "#e5c9b7");
+    } else if (c.stage === 4 && variant === 0) {
+      for (let i = 0; i < 2; i++) {
+        rect(ctx, bx - 13*s, by - (i + 1)*26*s, 26*s, 25*s, "#20283a", 2*s);
+        ellipse(ctx, bx, by - (i*26 + 13)*s, 8*s, 8*s, "#303b50", "#75909b", Math.max(.6, s));
+      }
+    }
+    if ((c.stage === 0) || (c.stage === 1) || (c.stage === 2 && variant !== 1) ||
+        (c.stage === 3 && variant !== 2) || (c.stage === 4 && variant === 0)) return;
+  }
   if (c.stage === 0 || c.stage === 3) {
     const crown = screenPoint(c, x, y, c.stage === 3 ? 92 : 79);
     if (!crown) return;
@@ -517,6 +577,20 @@ function destination(ctx, c, theme, game) {
     dark, stage === 4 ? "#ffe1ab" : "#fff3d9", 20, 21,
     stage === 4 ? 2300 : FAR);
   if (stage === 4) {
+    // A banner and a pair of small trusses stand on the approach to the arch.
+    for (const x of [145, 335]) worldLine(ctx, c, [x, 115, 0], [x, 115, 76], "#a3b9bf", 2);
+    worldFace(ctx, c, [[145, 115, 58], [335, 115, 58], [335, 115, 75], [145, 115, 75]], "#d78583");
+    worldFace(ctx, c, [[145, 115, 58], [335, 115, 58], [335, 115, 64], [145, 115, 64]], "#efbb87");
+    for (const x of [105, 375]) {
+      worldLine(ctx, c, [x, 110, 0], [x, 110, 68], "#8eaab2", 2);
+      for (const z of [40, 61]) {
+        const hue = z === 40 ? "#87e1db" : "#e88dbc";
+        worldFace(ctx, c, [[x - 3, 110, z], [x + 3, 110, z],
+          [240 + (x - 240)*.7, 150, 2], [240 + (x - 240)*.85, 150, 2]], hue + "20");
+        const light = screenPoint(c, x, 110, z);
+        if (light) ellipse(ctx, light.x, light.y, 4*light.scale, 4*light.scale, hue);
+      }
+    }
     for (let i = 0; i < 6; i++) {
       const x = 134 + i * 42;
       const color = i % 2 ? "#e88dbc" : "#87e1db";
@@ -878,8 +952,10 @@ function person(ctx, c, actor, game, view) {
   }
   if (actor.glowStick && c.stage === 4) {
     const color = ["#8ae9da", "#ffd58c", "#edabdf"][(actor.id || 0) % 3];
-    rect(ctx, px + 12 * s, bodyTop - 4 * s, 3.2 * s, 18 * s,
-      color, 1.6 * s);
+    const tipX = px + (13.6 + stride * .3) * s, tipY = bodyTop - 4 * s;
+    limb(px + 13.6 * s, bodyTop + 14 * s, tipX, tipY, 3.2 * s, color);
+    ellipse(ctx, tipX, tipY, 5 * s, 5 * s, color + "33");
+    ellipse(ctx, tipX, tipY, 2 * s, 2 * s, color);
   }
   if (actor.acknowledge) {
     ellipse(ctx, px, foot + .6 * s, 21 * s, Math.max(1.5, 5 * s),
