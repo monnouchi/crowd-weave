@@ -103,14 +103,16 @@ test("a red-entry warning belongs to the friend and replaces lower-priority chat
   assert.equal(g.waitSpeechArmed, true, "waiting can speak after the warning ends");
 });
 
-test("a friend-only contact never puts YOU's words in the wrong mouth; pause and new stages reset speech", () => {
+test("Item W: a friend overlap triggers no contact speech; pause and new stages reset speech", () => {
   const g = playing(1);
   const person = bystander(g);
   person.x = g.party.members[0].x;
   person.y = g.party.members[0].y;
   g.crowd = [person];
   step(g, 0.025, { left: true, right: true });
-  assert.equal(g.lastContactMember, 1);
+  // Item W removes friend-only contacts as well as their speech.
+  assert.equal(g.hits, 0);
+  assert.equal(g.memberHits[1], 0);
   assert.equal(activeSpeech(g), null);
   g.crowd = [];
   g.stun = 0.3;

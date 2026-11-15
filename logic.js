@@ -11,7 +11,7 @@ import {
 } from "./traffic.js";
 import { FRIENDS, PARTY_SPACING, createParty, moveParty, regroupReady } from "./party.js";
 import { FRIEND_LOOKS } from "./src/appearance.js";
-import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
+import { BODY_GAP, resolvePlayerMove } from "./bodies.js";
 import {
   makeCrowd,
   createAnimals,
@@ -20,7 +20,6 @@ import {
   moveCrowd,
   visiblePerson,
   reactToContact,
-  makeRoomForFollower,
   askCrowdToMove,
 } from "./crowd.js";
 export const W = 480,
@@ -789,13 +788,7 @@ export function step(g, dt, input) {
   moveParty(g.party, g.player, dt, {
     braking: !!(input.left && input.right),
     stunned: g.stun > 0,
-    resolveFollower: (member, next) => {
-      const result = followerProgress(member, next, member.r, people);
-      for (const id of result.contacts)
-        if (!blockedContacts.has(id) || blockedContacts.get(id) === 0)
-          blockedContacts.set(id, member.id);
-      return result.fraction;
-    },
+    // Item W: friends pass through crowds; no follower contact or yielding.
   });
   // A recovery is a relocation, not a swept movement through traffic.
   g.party.members.forEach((member, i) => {
@@ -806,12 +799,7 @@ export function step(g, dt, input) {
       previousTeam[i + 1] = { ...member };
     }
   });
-  for (const [id, memberId] of blockedContacts) {
-    if (!memberId) continue;
-    const person = people.find((p) => p.id === id),
-      friend = g.party.members.find((m) => m.id === memberId);
-    if (person && friend && !person.animal) makeRoomForFollower(person, friend);
-  }
+  // Item W retires the follower path to makeRoomForFollower; contacts are player-only.
   const crash = vehicleContact(g, previousTeam);
   if (crash) {
     g.phase = "gameover";
@@ -825,7 +813,7 @@ export function step(g, dt, input) {
     contactMember = null,
     nearest = Infinity;
   const touching = [];
-  const team = [{ ...g.player, id: 0 }, ...g.party.members];
+  const team = [{ ...g.player, id: 0 }];
   for (const p of people) {
     let overlaps = false;
     for (const member of team) {

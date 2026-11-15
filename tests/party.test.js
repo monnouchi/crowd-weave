@@ -118,28 +118,35 @@ function fixture() {
   g.crowd = [];
   return g;
 }
-test("a follower contact penalizes and identifies that member, not only the leader", () => {
-  const g = fixture(),
-    m = g.party.members[1];
+test("Item W: a follower passes through pedestrians without contact, reaction or lost progress", () => {
+  const g = fixture(), m = g.party.members[1];
+  m.s -= 40;
+  m.y += 40;
   const p = {
-    ...createGame().crowd[0],
-    id: 77,
-    x: m.x,
-    y: m.y,
-    state: "reading",
-    wait: 100,
-    vx: 0,
-    vy: 0,
+    ...createGame().crowd[0], id: 77, x: m.x, y: m.y,
+    state: "reading", wait: 100, vx: 0, vy: 0,
   };
   g.crowd = [p];
-  step(g, 0.05, { left: true, right: true });
-  assert.equal(g.hits, 1);
-  assert.equal(g.lastContactMember, 2);
-  assert.equal(g.memberHits[2], 1);
-  assert.ok(g.party.members[1].flash > 0);
-  assert.ok(p.reaction);
-  for (let i = 0; i < 60; i++) step(g, 0.05, { left: true, right: true });
-  assert.equal(g.hits, 1, "continuous contact is counted once");
+  g.animals = [];
+  g.combo.flow = 20;
+  const noCrowd = structuredClone(g);
+  noCrowd.crowd = [];
+  const noFollower = structuredClone(g);
+  noFollower.party.members = [];
+  const initialS = m.s;
+  for (let i = 0; i < 10; i++) {
+    step(g, 0.025, { left: true, right: true });
+    step(noCrowd, 0.025, { left: true, right: true });
+    step(noFollower, 0.025, { left: true, right: true });
+    assert.deepEqual(g.party.members[1], noCrowd.party.members[1]);
+    assert.deepEqual(g.crowd, noFollower.crowd);
+    assert.deepEqual(g.combo, noFollower.combo);
+    assert.equal(g.hits, 0);
+    assert.ok(g.memberHits.every((hits) => hits === 0));
+    assert.deepEqual(g.touchingIds, []);
+  }
+  assert.ok(m.s > initialS, "the overlapping friend continues along the trail");
+  assert.equal(p.reaction, null);
 });
 test("one pedestrian overlapping two party members is one contact event", () => {
   const g = fixture();
@@ -206,7 +213,6 @@ test("full four-friend simulation has a bounded update budget and no unbounded t
     `40 pedestrians + 4 followers / 3600 updates: ${ms.toFixed(1)} ms; max trail ${points} points on this Node runtime`,
   );
   assert.ok(ms < 5000);
-  // Solid spectators can delay a friend briefly while the leader keeps
-  // walking; the trail still sheds old turns once the spectator yields.
+  // Item W: friends pass through spectators while the trail sheds old turns.
   assert.ok(points < 256);
 });

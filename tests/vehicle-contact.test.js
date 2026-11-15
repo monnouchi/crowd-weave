@@ -46,7 +46,7 @@ test("swept car and bicycle collisions cannot tunnel through a stationary or mov
   );
 });
 
-test("every outdoor crossing ends the run immediately on a player or follower hit and freezes its score", () => {
+test("Item W: only player vehicle hits end the run at every outdoor crossing", () => {
   for (const stage of [1, 3])
     for (let road = 0; road < (stage === 3 ? 2 : 1); road++)
       for (const memberId of [0, 1]) {
@@ -66,7 +66,17 @@ test("every outdoor crossing ends the run immediately on a player or follower hi
           g.party.members[0].suitcase = true;
         }
         Object.assign(v, { x: 100, speed: 3000, entered: true, active: true });
+        const previousTarget = { ...(memberId ? g.party.members[0] : g.player) };
         step(g, 0.05, { left: true, right: true });
+        assert.notEqual(sweptVehicleContact(v, previousTarget,
+          memberId ? g.party.members[0] : g.player), null, "the vehicle actually crosses the target");
+        // Item W retires Item F: a vehicle passes through a friend without a crash.
+        if (memberId) {
+          assert.equal(g.phase, "playing");
+          assert.equal(g.crash, undefined);
+          assert.equal(g.hits, 0);
+          continue;
+        }
         assert.equal(g.phase, "gameover");
         assert.equal(g.crash.memberId, memberId);
         assert.equal(g.crash.crossingId, t.id || "road");

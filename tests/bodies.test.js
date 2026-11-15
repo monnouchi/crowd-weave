@@ -47,7 +47,7 @@ test("either direction recovers from a bump and goes around the rendered bodies"
   }
 });
 
-test("a follower stalled by a bystander regroups without piling up forever", () => {
+test("Item W: a bystander cannot stall or react to a follower on the way to arrival", () => {
   const g = createGame(2);
   g.crowd = [];
   g.phase = "playing";
@@ -77,9 +77,11 @@ test("a follower stalled by a bystander regroups without piling up forever", () 
     maxTrail = Math.max(maxTrail, g.party.trail.length);
   }
   assert.equal(g.phase, "finished");
-  assert.equal(g.hits, 1);
-  assert.equal(g.lastContactMember, 1);
-  assert.ok(bystander.x > 300, "the bystander gives the delayed friend room");
+  // Item W retires follower contacts and the crowd making room for them.
+  assert.equal(g.hits, 0);
+  assert.equal(g.memberHits[1], 0);
+  assert.equal(bystander.x, 240);
+  assert.equal(bystander.reaction, null);
   const finalFollowers = g.party.members.map((member) => [member.x, member.y]);
   step(g, 0.05, {});
   assert.deepEqual(g.party.members.map((member) => [member.x, member.y]), finalFollowers,

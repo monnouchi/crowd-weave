@@ -15,6 +15,15 @@ const copyParty = (p) => ({
   trail: p.trail.map((t) => ({ ...t })),
   members: p.members.map((m) => ({ ...m })),
 });
+// This full-column check is a corridor-durability margin, not a follower-
+// collision model: Item W removed follower collisions from the game. Keeping
+// the column clear at every snapshot is the sufficient condition under which
+// planned routes provably replay to completion in the real game. A head-only
+// instantaneous clearance was measured to admit routes the physical player
+// cannot finish: resolvePlayerMove can block the player as a gap closes during
+// traversal, and a tick lost to blocking cannot be recovered by the replay
+// driver's fixed schedule. The column check keeps the corridor open for the
+// seconds the party needs to pass.
 function safeTeam(head, party, people) {
   return ![{ ...head, r: 12 }, ...party.members].some((m) =>
     people.some(
@@ -55,7 +64,8 @@ function gatherSafely(head, party, crowd, model) {
   }
   return null;
 }
-// Time-expanded search replays all followers against the actual seeded pedestrians.
+// Time-expanded search checks the player's corridor against the actual seeded
+// pedestrians, using the full party column as a corridor-durability margin.
 // No crowd removal, position edits, or collision suppression is used to find routes.
 export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0,
   simulationStep = 0.025) {

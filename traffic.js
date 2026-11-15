@@ -169,7 +169,7 @@ function updateCrossing(g, t, dt) {
   v.wasActive = v.active;
   if (v.active) {
     // Traffic yields before entering whenever anyone is in the road. A reserved
-    // party never loses its crossing even if a pedestrian contact delays the tail.
+    // party keeps its conservative reservation until the tail clears.
     if (v.entered || (!t.nominalGreen && !t.reserved && !occupied)) {
       v.x += v.direction * v.speed * dt;
       if (
@@ -344,17 +344,15 @@ export function vehicleContact(g, previousTeam) {
   for (const t of g.crossings || []) {
     const v = t.vehicle;
     if (!v.active && !v.wasActive) continue;
-    const team = [g.player, ...g.party.members];
-    for (let i = 0; i < team.length; i++) {
-      const time = sweptVehicleContact(v, previousTeam[i], team[i]);
-      if (time !== null && (!first || time < first.time))
-        first = {
-          crossingId: t.id || "road",
-          vehicleKind: v.kind,
-          memberId: team[i].id || 0,
-          time,
-        };
-    }
+    // Item W retires Item F's follower vehicle danger: only the player can crash.
+    const time = sweptVehicleContact(v, previousTeam[0], g.player);
+    if (time !== null && (!first || time < first.time))
+      first = {
+        crossingId: t.id || "road",
+        vehicleKind: v.kind,
+        memberId: 0,
+        time,
+      };
   }
   return first;
 }
