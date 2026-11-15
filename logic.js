@@ -25,6 +25,13 @@ export const W = 480,
   START = { x: 240, y: 1165 },
   GOAL = { x: 175, y: 20, w: 130, h: 65 };
 export const FRONT_BARRIER_Y = 20;
+export const GOAL_MIN_PLAYER_Y = 32;
+// Player-centre limits used by the approach clamp and its world furniture.
+export const GOAL_APPROACH = Object.freeze({ left: 174, right: 306, y: 107 });
+export const WORLD_EDGE = Object.freeze({ left: 30, right: W - 30 });
+export const HALL_LIMITS = Object.freeze({ left: 48, right: 432, end: 650,
+  doorLeft: 142, doorRight: 338, margin: 12,
+  doors: Object.freeze([Object.freeze([790, 825]), Object.freeze([685, 720])]) });
 export const CONCERT_ENTRY_Y = 700;
 const segOY = (g) => g.segOriginY || 0;
 export function insideConcert(game) {
@@ -646,33 +653,30 @@ export function step(g, dt, input) {
   }
   const attemptedEdge = dt > 0 && lateralIntent < 0 && g.player.x <= 30
     ? -1 : dt > 0 && lateralIntent > 0 && g.player.x >= W - 30 ? 1 : 0;
-  g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
+  g.player.x = Math.max(WORLD_EDGE.left, Math.min(WORLD_EDGE.right, g.player.x));
   g.player.y = Math.max(
-    segOY(g) + (g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32),
+    segOY(g) + (g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : GOAL_MIN_PLAYER_Y),
     Math.min(g.worldHeight - 25, g.player.y),
   );
   // Shops, hedges and the hall wall leave the destination's central entrance.
   if (
     g.stage !== 4 &&
-    (g.player.x < 174 || g.player.x > 306) &&
-    g.player.y < segOY(g) + 107
+    (g.player.x < GOAL_APPROACH.left || g.player.x > GOAL_APPROACH.right) &&
+    g.player.y < segOY(g) + GOAL_APPROACH.y
   )
-    g.player.y = segOY(g) + 107;
+    g.player.y = segOY(g) + GOAL_APPROACH.y;
   if (g.stage === 4) {
-    if (g.player.y < segOY(g) + 650) g.player.x = Math.max(48, Math.min(432, g.player.x));
-    for (const [localTop, localBottom] of [
-      [790, 825],
-      [685, 720],
-    ]) {
+    if (g.player.y < segOY(g) + HALL_LIMITS.end) g.player.x = Math.max(HALL_LIMITS.left, Math.min(HALL_LIMITS.right, g.player.x));
+    for (const [localTop, localBottom] of HALL_LIMITS.doors) {
       const top = segOY(g) + localTop, bottom = segOY(g) + localBottom;
       if (
-        previousPlayer.y >= bottom + 12 &&
-        g.player.y < bottom + 12 &&
-        (g.player.x < 142 || g.player.x > 338)
+        previousPlayer.y >= bottom + HALL_LIMITS.margin &&
+        g.player.y < bottom + HALL_LIMITS.margin &&
+        (g.player.x < HALL_LIMITS.doorLeft || g.player.x > HALL_LIMITS.doorRight)
       )
-        g.player.y = bottom + 12;
-      if (g.player.y < bottom + 12 && g.player.y > top - 12)
-        g.player.x = Math.max(142, Math.min(338, g.player.x));
+        g.player.y = bottom + HALL_LIMITS.margin;
+      if (g.player.y < bottom + HALL_LIMITS.margin && g.player.y > top - HALL_LIMITS.margin)
+        g.player.x = Math.max(HALL_LIMITS.doorLeft, Math.min(HALL_LIMITS.doorRight, g.player.x));
     }
     if (!g.ticketChecked && g.player.y < segOY(g) + 790) g.ticketChecked = true;
   }
@@ -690,9 +694,9 @@ export function step(g, dt, input) {
     }
   }
   constrainTraffic(g, previousPlayer, input);
-  g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
+  g.player.x = Math.max(WORLD_EDGE.left, Math.min(WORLD_EDGE.right, g.player.x));
   g.player.y = Math.max(
-    segOY(g) + (g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32),
+    segOY(g) + (g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : GOAL_MIN_PLAYER_Y),
     Math.min(g.worldHeight - 25, g.player.y),
   );
   if (g.hop && hopRequested) {

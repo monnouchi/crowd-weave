@@ -3,7 +3,8 @@ import { appearanceFor } from "./appearance.js";
 import { drawRadar } from "./radar-view.js";
 import { previewTurn } from "../crowd.js";
 import { RECOVERY_FADE_SECONDS } from "../party.js";
-import { activeCallRipple, flowTier, HOP_DISTANCE } from "../logic.js";
+import { activeCallRipple, flowTier, HOP_DISTANCE, GOAL_APPROACH, WORLD_EDGE,
+  HALL_LIMITS, FRONT_BARRIER_Y, GOAL_MIN_PLAYER_Y, STAGES } from "../logic.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
 // z exists only here so every visible object obeys the same camera and depth.
@@ -686,6 +687,49 @@ function worldLabel(ctx, c, x, y, z, text, fill, ink,
   rect(ctx, labelX - w / 2, p.y - h / 2, w, h, fill, Math.min(7, h * .2));
   ctx.fillStyle = ink; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(text, labelX, p.y + fontSize * .01);
+}
+
+// These coordinates describe player-centre limits, not a second collider.
+export function approachBarrierSpans(stage, origin = 0, playerRadius = 12) {
+  const spans = [];
+  const add = (x1, y1, x2, y2, kind) => spans.push({ x1, y1: y1 + origin,
+    x2, y2: y2 + origin, kind });
+  if (stage < 4) {
+    add(WORLD_EDGE.left, GOAL_APPROACH.y, GOAL_APPROACH.left, GOAL_APPROACH.y, "goal");
+    add(GOAL_APPROACH.right, GOAL_APPROACH.y, WORLD_EDGE.right, GOAL_APPROACH.y, "goal");
+    for (const x of [GOAL_APPROACH.left, GOAL_APPROACH.right])
+      add(x, GOAL_MIN_PLAYER_Y, x, GOAL_APPROACH.y, "goal-side");
+  } else {
+    for (const [top, bottom] of HALL_LIMITS.doors) {
+      const near = bottom + HALL_LIMITS.margin, far = top - HALL_LIMITS.margin;
+      add(WORLD_EDGE.left, near, HALL_LIMITS.doorLeft, near, "door");
+      add(HALL_LIMITS.doorRight, near, WORLD_EDGE.right, near, "door");
+      for (const x of [HALL_LIMITS.doorLeft, HALL_LIMITS.doorRight])
+        add(x, far, x, near, "door");
+    }
+    for (const x of [HALL_LIMITS.left, HALL_LIMITS.right])
+      add(x, FRONT_BARRIER_Y + playerRadius, x, HALL_LIMITS.end, "edge");
+    add(HALL_LIMITS.left, FRONT_BARRIER_Y, HALL_LIMITS.right, FRONT_BARRIER_Y, "front");
+  }
+  for (const x of [WORLD_EDGE.left, WORLD_EDGE.right])
+    add(x, stage === 4 ? HALL_LIMITS.end : GOAL_MIN_PLAYER_Y, x, STAGES[stage].startY + 55, "edge");
+  return spans;
+}
+
+function barrier(ctx, c, span, stage) {
+  const colors = ["#647954", "#66868b", "#9d6a54", "#7896a1", "#9a9fae"];
+  const color = colors[stage], highlight = stage === 2 ? "#e3b88c" : "#d2d6c4";
+  const { x1, y1, x2, y2, kind } = span;
+  const height = kind === "front" ? 12 : stage === 0 ? 26 : 31;
+  if (stage === 0 && kind === "goal")
+    worldFace(ctx, c, [[x1, y1, 3], [x2, y2, 3], [x2, y2, 20], [x1, y1, 20]], "#72865e");
+  for (const z of [height * .45, height])
+    worldLine(ctx, c, [x1, y1, z], [x2, y2, z], z === height ? highlight : color, 2.4);
+  const count = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 25));
+  for (let i = 0; i <= count; i++) {
+    const t = i / count, x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+    worldLine(ctx, c, [x, y, 0], [x, y, height + 2], color, 2.5);
+  }
 }
 
 function destination(ctx, c, theme, game, groundPass = false) {
@@ -1444,6 +1488,19 @@ export function renderWorld(ctx, game, view = {}) {
   }
   if (c.stage === 4)
     items.push({ y: (game.segOriginY || 0) - 24, draw: () => concertStage(ctx, c, game, view) });
+  for (const span of approachBarrierSpans(c.stage, game.segOriginY || 0, game.player.r)) {
+    // Break long rails into short pieces so people sort naturally against them.
+    const count = Math.max(1, Math.ceil(Math.abs(span.y2 - span.y1) / 55));
+    for (let i = 0; i < count; i++) {
+      const a = i / count, b = (i + 1) / count;
+      const piece = { ...span, x1: span.x1 + (span.x2 - span.x1) * a,
+        y1: span.y1 + (span.y2 - span.y1) * a,
+        x2: span.x1 + (span.x2 - span.x1) * b,
+        y2: span.y1 + (span.y2 - span.y1) * b };
+      items.push({ y: (piece.y1 + piece.y2) / 2,
+        draw: () => barrier(ctx, c, piece, c.stage) });
+    }
+  }
   items.push({ y: (game.segOriginY || 0) + 84, draw: () => destination(ctx, c, theme, game) });
   const addPerson = (p) => {
     shadows.push(() => person(ctx, c, p, game, view, true));
