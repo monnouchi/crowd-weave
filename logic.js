@@ -100,7 +100,10 @@ export const STAGES = [
 ];
 const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
-export const CALL_RIPPLE_DURATION = 0.65;
+export const CALL_RIPPLE_SWEEP = 0.3;
+export const CALL_RIPPLE_LINGER = 0.4;
+export const CALL_RIPPLE_FADE = 0.25;
+export const CALL_RIPPLE_DURATION = CALL_RIPPLE_SWEEP + CALL_RIPPLE_LINGER + CALL_RIPPLE_FADE;
 export const HOP_TAP_WINDOW = 0.34;
 export const HOP_DISTANCE = 36;
 export const HOP_SPEED = 240;
@@ -114,7 +117,8 @@ export function activeCallRipple(g) {
   const age = g.worldTime - g.callRipple.started;
   return age >= 0 && age < CALL_RIPPLE_DURATION
     ? { x: g.callRipple.x, y: g.callRipple.y,
-        progress: age / CALL_RIPPLE_DURATION, mode: g.callRipple.mode }
+        progress: age / CALL_RIPPLE_DURATION, age, mode: g.callRipple.mode,
+        responders: g.callRipple.responders }
     : null;
 }
 function say(g, kind, speakerId, text, duration) {
@@ -207,9 +211,13 @@ function updateCallGesture(g, input) {
   // The ripple acknowledges the completed input. A quieter color distinguishes
   // a recognized gesture whose crowd-moving effect is currently unavailable.
   g.callRipple = { x: g.player.x, y: g.player.y, started: g.worldTime,
-    mode: unavailable ? "unavailable" : "recognized" };
+    mode: unavailable ? "unavailable" : "recognized", responders: [] };
   if (unavailable) return;
+  const acknowledgments = new Map(g.crowd.map((p) => [p, p.acknowledge]));
   const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage);
+  g.callRipple.responders = g.crowd
+    .filter((p) => p.acknowledge && p.acknowledge !== acknowledgments.get(p))
+    .map((p) => ({ x: p.x, y: p.y }));
   g.callResponseCount = moved;
   if (moved) {
     say(g, "call", 0, "すみませーん！", 1.35);

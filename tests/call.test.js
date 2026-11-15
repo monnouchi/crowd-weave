@@ -5,7 +5,8 @@ import {
   cancelCallGesture, createGame, step,
 } from '../logic.js';
 import { OneShotControl } from '../input.js';
-import { courtesyCallWindow, courtesyUnavailableReason } from '../crowd.js';
+import { CALL_AREA, courtesyCallWindow, courtesyUnavailableReason } from '../crowd.js';
+import { callAreaFrame, renderWorld } from '../src/render.js';
 import { createRun, beginRun, updateRun } from '../src/run.js';
 
 const idle = { left: false, right: false };
@@ -61,13 +62,14 @@ test('one call press opens a person-only gap and confirms with a ripple', () => 
   assert.equal(g.callSerial, 1);
   assert.equal(g.callResponseCount, 2);
   assert.deepEqual(activeCallRipple(g), {
-    x: from.x, y: from.y, progress: 0, mode: 'recognized',
+    x: from.x, y: from.y, progress: 0, age: 0, mode: 'recognized',
+    responders: g.crowd.map(({ x, y }) => ({ x, y })),
   });
   assert.ok(g.crowd.every((p) => p.courtesy));
   assert.ok(g.crowd.every((p) => p.acknowledge));
   const before = g.crowd.map((p) => p.x);
   for (let i = 0; i < 24; i++) step(g, 0.025, idle);
-  assert.ok(activeCallRipple(g)?.progress > 0.8);
+  assert.ok(activeCallRipple(g)?.progress > 0.6);
   assert.ok(g.crowd[0].x < before[0] - 20);
   assert.ok(g.crowd[1].x > before[1] + 20);
   for (let i = 0; i < 35; i++) step(g, 0.025, idle);
@@ -215,4 +217,56 @@ test('pause, restart and canceled input leave no stale call', () => {
   assert.equal(createGame(0, 17).callHeld, false);
   assert.equal(createGame(1, 17).callReadyAt, 0);
   assert.equal(createGame(1, 17).callRipple, null);
+});
+
+
+test('call outline uses shared bounds, lingers, and respects reduced motion', () => {
+  const ripple = { x: 240, y: 600, age: .3, responders: [] };
+  const full = callAreaFrame(ripple);
+  assert.deepEqual([full.left, full.right, full.near, full.far],
+    [240 - CALL_AREA.halfWidth, 240 + CALL_AREA.halfWidth, 600 - CALL_AREA.near, 600 - CALL_AREA.far]);
+  const custom = callAreaFrame(ripple, false, { halfWidth: 22, near: 5, far: 80 });
+  assert.deepEqual([custom.left, custom.right, custom.near, custom.far], [218, 262, 595, 520]);
+  assert.equal(callAreaFrame({ ...ripple, age: .6 }).far, full.far);
+  assert.equal(callAreaFrame({ ...ripple, age: .6 }).alpha, 1);
+  assert.equal(callAreaFrame({ ...ripple, age: 0 }, true).far, full.far);
+});
+
+test('call highlights only captured responders when the sweep reaches them', () => {
+  const g = crowded();
+  g.crowd.push({ ...g.crowd[0], id: 950, x: 85 });
+  const positions = g.crowd.map(({ x, y }) => ({ x, y }));
+  pressCall(g);
+  const ripple = activeCallRipple(g);
+  assert.deepEqual(ripple.responders, positions.slice(0, 2));
+  assert.equal(callAreaFrame(ripple).responders.length, 0);
+  assert.deepEqual(callAreaFrame({ ...ripple, age: .1 }).responders, positions.slice(0, 2));
+  assert.deepEqual(callAreaFrame(ripple, true).responders, positions.slice(0, 2));
+  assert.equal(callAreaFrame({ ...ripple, age: .6 }).responders.length, 0);
+});
+
+test('renderer strokes the static reduced-motion area and captured responder marks', () => {
+  const g = crowded();
+  pressCall(g);
+  const strokes = [];
+  let path = [];
+  const ctx = new Proxy({ globalAlpha: 1 }, {
+    get(target, name) {
+      if (name in target) return target[name];
+      if (name === 'createLinearGradient' || name === 'createRadialGradient')
+        return () => ({ addColorStop() {} });
+      if (name === 'measureText') return () => ({ width: 20 });
+      if (name === 'beginPath') return () => { path = []; };
+      if (['moveTo', 'lineTo', 'ellipse', 'closePath'].includes(name))
+        return (...args) => path.push([name, ...args]);
+      if (name === 'stroke') return () => strokes.push({ color: target.strokeStyle, path: [...path] });
+      return () => {};
+    },
+  });
+  renderWorld(ctx, g, { width: 390, height: 700, reducedMotion: true });
+  const highlights = strokes.filter((stroke) => stroke.color === '#fff3a6');
+  assert.equal(highlights.length, 3);
+  assert.deepEqual(highlights[0].path.map(([name]) => name),
+    ['moveTo', 'lineTo', 'lineTo', 'lineTo', 'closePath']);
+  assert.ok(highlights.slice(1).every(({ path }) => path[0][0] === 'ellipse'));
 });

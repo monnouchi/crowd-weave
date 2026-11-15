@@ -720,13 +720,15 @@ function courtesyChoice(p, crowd, player, reserved) {
   return choices[0]?.targetX;
 }
 
+export const CALL_AREA = Object.freeze({ halfWidth: 68, near: 8, far: 105 });
+
 // Keep the button's availability in sync with the actual courtesy action.
 // A person already stepping aside can acknowledge another call without being
 // pushed progressively toward a wall.
 function courtesyPeopleAhead(crowd, player, crossings, stage) {
   return crowd.filter((p) =>
-    p.active && !p.animal && p.y <= player.y - 8 &&
-    p.y >= player.y - 105 && Math.abs(p.x - player.x) < 68 &&
+    p.active && !p.animal && p.y <= player.y - CALL_AREA.near &&
+    p.y >= player.y - CALL_AREA.far && Math.abs(p.x - player.x) < CALL_AREA.halfWidth &&
     !crossings.some((t) => p.y >= t.top - 45 && p.y <= t.bottom + 45) &&
     !(stage === 4 && p.y >= (p.originY || 0) + 640 &&
       p.y <= (p.originY || 0) + 885));

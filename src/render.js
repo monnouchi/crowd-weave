@@ -1,10 +1,11 @@
 import { boundaryDip } from "./transitions.js";
 import { appearanceFor } from "./appearance.js";
 import { drawRadar } from "./radar-view.js";
-import { previewTurn } from "../crowd.js";
+import { CALL_AREA, previewTurn } from "../crowd.js";
 import { RECOVERY_FADE_SECONDS } from "../party.js";
 import { activeCallRipple, flowTier, HOP_DISTANCE, GOAL_APPROACH, WORLD_EDGE,
-  HALL_LIMITS, FRONT_BARRIER_Y, GOAL_MIN_PLAYER_Y, STAGES } from "../logic.js";
+  HALL_LIMITS, FRONT_BARRIER_Y, GOAL_MIN_PLAYER_Y, STAGES,
+  CALL_RIPPLE_SWEEP, CALL_RIPPLE_LINGER, CALL_RIPPLE_FADE } from "../logic.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
 // z exists only here so every visible object obeys the same camera and depth.
@@ -1483,6 +1484,47 @@ function speedLines(ctx, c, game, view) {
   }
 }
 
+// The footprint is fixed at the call position, even as the player moves away.
+export function callAreaFrame(ripple, reducedMotion = false, area = CALL_AREA) {
+  const age = ripple.age;
+  const extent = reducedMotion ? 1 : clamp(age / CALL_RIPPLE_SWEEP, 0, 1);
+  const far = ripple.y - (area.near + (area.far - area.near) * extent);
+  const alpha = reducedMotion ? 1 : clamp((CALL_RIPPLE_SWEEP + CALL_RIPPLE_LINGER + CALL_RIPPLE_FADE - age) / CALL_RIPPLE_FADE, 0, 1);
+  const responders = (ripple.responders || []).filter((p) => {
+    const arrival = reducedMotion ? 0 : CALL_RIPPLE_SWEEP * clamp((ripple.y - p.y - area.near) / (area.far - area.near), 0, 1);
+    return age >= arrival && age < arrival + .25;
+  });
+  return { left: ripple.x - area.halfWidth, right: ripple.x + area.halfWidth,
+    near: ripple.y - area.near, far, alpha, responders };
+}
+
+function drawCallArea(ctx, c, game, view) {
+  const ripple = activeCallRipple(game);
+  if (!ripple) return;
+  const frame = callAreaFrame(ripple, view.reducedMotion);
+  const points = [[frame.left, frame.near], [frame.left, frame.far],
+    [frame.right, frame.far], [frame.right, frame.near]].map(([x, y]) => screenPoint(c, x, y));
+  ctx.save();
+  ctx.globalAlpha *= frame.alpha;
+  if (points.every(Boolean)) {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (const p of points.slice(1)) ctx.lineTo(p.x, p.y);
+    ctx.closePath();
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#182238"; ctx.lineWidth = 8; ctx.stroke();
+    ctx.strokeStyle = "#fff3a6"; ctx.lineWidth = 4; ctx.stroke();
+  }
+  for (const responder of frame.responders) {
+    const p = screenPoint(c, responder.x, responder.y);
+    if (!p) continue;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, Math.max(5, 13 * p.scale), Math.max(2, 5 * p.scale), 0, 0, TAU);
+    ctx.strokeStyle = "#182238"; ctx.lineWidth = 5; ctx.stroke();
+    ctx.strokeStyle = "#fff3a6"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** Render a third-person view of the current run. The caller owns sizing. */
 export function renderWorld(ctx, game, view = {}) {
   if (!ctx || !game?.player) return;
@@ -1505,6 +1547,7 @@ export function renderWorld(ctx, game, view = {}) {
   overhead(ctx, c, game, 4, hallAlpha);
   for (const t of game.crossings || []) crossingGround(ctx, c, t);
   destination(ctx, c, theme, game, true);
+  drawCallArea(ctx, c, game, view);
   const items = [];
   const shadows = [];
   const stride = c.stage === 0 ? 235 : c.stage === 4 ? 185 : 210;
