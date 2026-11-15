@@ -133,6 +133,22 @@ function ellipse(ctx, x, y, rx, ry, fill, stroke = null, lw = 1) {
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
 }
 
+// Screen-space lengths scale with the projected owner. The sun is ahead and
+// to the right, so outdoor shadows fall toward the viewer and slightly left.
+const SHADOWS = [
+  { alpha: "70", length: 6, sideways: 1.2 },
+  { alpha: "70", length: 6, sideways: 1.2 },
+  { alpha: "28", length: 2.4, sideways: .25 },
+  { alpha: "20", length: 2, sideways: .4 },
+  { alpha: "40", length: 3, sideways: .3 },
+];
+
+function blobShadow(ctx, c, x, y, scale, width) {
+  const { alpha, length, sideways } = SHADOWS[c.stage];
+  ellipse(ctx, x - sideways * scale, y + length * .55 * scale,
+    width * scale, length * scale, `#24343c${alpha}`);
+}
+
 function rect(ctx, x, y, w, h, fill, r = 0) {
   ctx.fillStyle = fill;
   if (r > 0 && ctx.roundRect) {
@@ -355,6 +371,10 @@ function streetObject(ctx, c, theme, side, y, index, variant) {
   const base = screenPoint(c, x, y, 0);
   if (!base || base.depth > FAR || base.x < -180 || base.x > c.width + 180) return;
   const s = base.scale, bx = base.x, by = base.y;
+  const tableBase = c.stage === 2 && (variant < 0 || variant === 1)
+    ? screenPoint(c, side < 0 ? 19 : 461, y, 0) : null;
+  const shadowBase = tableBase || base;
+  blobShadow(ctx, c, shadowBase.x, shadowBase.y, shadowBase.scale, 15);
   if (variant >= 0) {
     if (c.stage === 0 && variant === 0) {
       rect(ctx, bx - 9*s, by - 35*s, 18*s, 32*s, "#b94e50", 2*s);
@@ -465,7 +485,7 @@ function crossing(ctx, c, t, theme) {
     const p = screenPoint(c, v.x, v.y, 0);
     if (p && p.depth > NEAR && p.depth < FAR) {
       const s = p.scale, w = (v.width || 45) * s, h = (v.kind === "bicycle" ? 22 : 25) * s;
-      ellipse(ctx, p.x, p.y, w * .58, Math.max(2, 5 * s), "#253f4d55");
+      blobShadow(ctx, c, p.x, p.y, s, (v.width || 45) * .58);
       if (v.kind === "bicycle") {
         for (const dx of [-w * .32, w * .32]) ellipse(ctx, p.x + dx, p.y - 6 * s,
           7 * s, 7 * s, "#263b4b", "#d0e3df", Math.max(1, s));
@@ -834,7 +854,7 @@ function person(ctx, c, actor, game, view) {
   const bow = actor.acknowledge
     ? actor.courtesy?.phase === "prepare" ? 1.8 : 1.2 : 0;
   const outlined = friend ? "#fff0bd" : "#30444baa";
-  ellipse(ctx, px, foot + 1.5 * s, 13 * s, Math.max(1, 3.1 * s), "#26363e43");
+  blobShadow(ctx, c, px, foot, s, 13);
   if (game.callReady && game.callTargets?.includes(actor.id))
     ellipse(ctx, px, foot + .7 * s, Math.min(42, 18 * s),
       Math.min(12, Math.max(2, 4.6 * s)), "#85f0c32a", "#a5fbe0", 2);
@@ -1085,7 +1105,7 @@ function animal(ctx, c, a, view) {
     span > 0 ? (Math.abs(Math.cos(phase)) < .001 ? (a.x >= (a.minX + a.maxX) / 2 ? -1 : 1) : Math.sign(Math.cos(phase))) : 1;
   const time = view.reducedMotion ? 0 : (a.time || 0);
   const stride = !view.reducedMotion && !a.bracing && Math.abs(a.vx || 0) > .1 ? Math.sin(time * 12) * 3 : 0;
-  ellipse(ctx, p.x, p.y + s, 12 * s, 3 * s, "#24363f44");
+  blobShadow(ctx, c, p.x, p.y, s, 12);
   ctx.save(); ctx.translate(p.x, p.y); ctx.scale(direction, 1);
   ctx.beginPath(); ctx.moveTo(-9 * s, -10 * s);
   if (dog) ctx.quadraticCurveTo(-17 * s, (-8 + Math.sin(time * 5) * 1.5) * s, -17 * s, (-15 + Math.sin(time * 5) * 1.5) * s);

@@ -400,6 +400,34 @@ function filledEllipses(calls, color) {
     calls[i + 1]?.name === "fill" && calls[i + 1].fill === color);
 }
 
+test("pedestrian shadows follow projected feet and reflect stage lighting", () => {
+  const shadow = (stage, y = 1700) => {
+    const actor = { id: 0, x: 240, y, active: true, ux: 0, uy: 1 };
+    const calls = recordedScene(stage, { playerY: 1800, crowd: [actor] });
+    const alpha = ["70", "70", "28", "20", "40"][stage];
+    const scale = Math.min(1280 * 1.12, 844 * .91) / Math.hypot(1800 - y, 76);
+    const foot = 844 * .43 + 57 * scale;
+    const matches = filledEllipses(calls, `#24343c${alpha}`).filter((call) =>
+      Math.abs(call.args[2] - 13 * scale) < 1e-6);
+    assert.equal(matches.length, 1);
+    const fill = calls[calls.indexOf(matches[0]) + 1].fill;
+    return { ellipse: matches[0].args, foot, alpha: parseInt(fill.slice(-2), 16) };
+  };
+  const sun = shadow(0), rain = shadow(3), indoor = shadow(2);
+  assert.ok(sun.alpha > rain.alpha);
+  assert.ok(sun.ellipse[3] > rain.ellipse[3]);
+  assert.ok(sun.ellipse[3] > indoor.ellipse[3]);
+  for (const stage of [0, 1]) {
+    const result = shadow(stage);
+    assert.ok(result.ellipse[1] > result.foot);
+    assert.ok(result.ellipse[0] < 640);
+    assert.ok(result.ellipse[1] - result.ellipse[3] < result.foot);
+    const closer = shadow(stage, 1730);
+    assert.ok(closer.ellipse[3] > result.ellipse[3]);
+    assert.ok(closer.ellipse[1] - closer.foot > result.ellipse[1] - result.foot);
+  }
+});
+
 test("back-facing heads have no eyes", () => {
   for (const id of [2, 3])
     assert.equal(filledEllipses(personCalls(id, -1), "#33434b").length, 0);
