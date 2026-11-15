@@ -202,21 +202,27 @@ test("world speech bubbles remain readable at the edge without losing their acto
   }
 });
 
-test("the fork renders both road markings without branch labels", () => {
+test("the fork has no route guides, while crosswalk stripes remain", () => {
   const run = createRun(1, 17);
   run.phase = "playing";
   run.player.x = 240;
-  run.player.y = run.routeBranch.fork.y + 81;
-  const labels = [];
-  const strokes = [];
-  const ctx = drawingContext();
-  ctx.fillText = (value) => labels.push(value);
-  ctx.stroke = () => strokes.push(ctx.strokeStyle);
-  renderWorld(ctx, run, { width: 320, height: 568 });
-  // The owner removed the teaching labels while keeping both roads visible.
-  assert.ok(!labels.some((label) => /ひろい道|近道/.test(label)));
-  assert.ok(strokes.includes("#e5a95eaa"), "short branch marking is drawn");
-  assert.ok(strokes.includes("#86d9d0cc"), "wide branch marking is drawn");
+  for (const position of [run.routeBranch.fork.y + 81,
+    ...run.crossings.map((road) => (road.top + road.bottom) / 2)]) {
+    run.player.y = position;
+    const labels = [], strokes = [], fills = [];
+    const ctx = drawingContext();
+    ctx.fillText = (value) => labels.push(value);
+    ctx.stroke = () => strokes.push(ctx.strokeStyle);
+    ctx.fill = () => fills.push(ctx.fillStyle);
+    renderWorld(ctx, run, { width: 320, height: 568 });
+    // The player reads the route without teaching labels or colored guide ribbons.
+    assert.ok(!labels.some((label) => /ひろい道|近道/.test(label)));
+    assert.ok(!strokes.includes("#e5a95eaa"), "short branch guide is absent");
+    assert.ok(!strokes.includes("#86d9d0cc"), "wide branch guide is absent");
+    if (run.crossings.some((road) => position === (road.top + road.bottom) / 2))
+      assert.ok(fills.some((fill) => fill === "#e5f5e8" || fill === "#e2e5de"),
+        "crosswalk stripes remain visible");
+  }
 });
 
 test("a crossing telegraph turns the head while the body keeps its heading", () => {

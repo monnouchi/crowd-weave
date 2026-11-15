@@ -474,7 +474,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   const pair = crowd.find((person) => person.anchor);
   const mergeY = Math.max(pair.y - 45,
     ...crossings.map((crossing) => crossing.bottom + 20));
-  // The station offers a marked central shortcut and a wider detour that
+  // The station offers a central shortcut and a wider detour that
   // naturally leaves more room for the friend following the player's trail.
   const routeBranch = stage === 1 ? {
     fork: { x: 240, y: pair.y + 190 },

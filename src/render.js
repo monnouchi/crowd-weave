@@ -349,20 +349,6 @@ function overhead(ctx, c, game, stage, alpha) {
   ctx.restore();
 }
 
-function routeMarks(ctx, c, game) {
-  const branch = game.routeBranch;
-  if (!branch || c.stage !== 1) return;
-  function ribbon(points, color) {
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1], b = points[i];
-      if (a.y < c.py - FAR && b.y < c.py - FAR) continue;
-      worldLine(ctx, c, [a.x, a.y, .55], [b.x, b.y, .55], color, 3.5);
-    }
-  }
-  ribbon(branch.short || [], "#e5a95eaa");
-  ribbon(branch.wide || [], "#86d9d0cc");
-}
-
 function sceneBlock(ctx, c, theme, side, y, length, index) {
   if (y > c.py + 18 || y + length < c.py - FAR) return;
   const left = side < 0;
@@ -1428,7 +1414,6 @@ export function renderWorld(ctx, game, view = {}) {
     : (c.stage === 4 ? 1 : 0);
   overhead(ctx, c, game, 4, hallAlpha);
   for (const t of game.crossings || []) crossingGround(ctx, c, t);
-  routeMarks(ctx, c, game);
   destination(ctx, c, theme, game, true);
   const items = [];
   const shadows = [];
