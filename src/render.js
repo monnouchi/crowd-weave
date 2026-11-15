@@ -956,9 +956,9 @@ function person(ctx, c, actor, game, view) {
   ctx.save();
   ctx.globalAlpha *= edgeOpacity;
   const look = appearanceFor(actor);
-  const clothes = actor.appearanceId === 12 ? "#cda65e" : actor.shirt || (c.stage === 4
+  const clothes = look.torso || (actor.appearanceId === 12 ? "#cda65e" : actor.shirt || (c.stage === 4
     ? ["#9b5974", "#617b9b", "#b2806e", "#788c84", "#ae9b75"][(actor.color ?? actor.id ?? 0) % 5]
-    : ["#c57960", "#739081", "#b79668", "#7a8799", "#9c6d7e"][(actor.color ?? actor.id ?? 0) % 5]);
+    : ["#c57960", "#739081", "#b79668", "#7a8799", "#9c6d7e"][(actor.color ?? actor.id ?? 0) % 5]));
   const friend = actor.friend || actor.partner;
   const facing = pedestrianFacing(actor);
   const face = facing.front;
@@ -1066,6 +1066,10 @@ function person(ctx, c, actor, game, view) {
     polygon(ctx, [{ x: px - torsoWidth * .25 * s, y: bodyTop + s }, { x: px, y: bodyTop + 6 * s },
       { x: px + torsoWidth * .25 * s, y: bodyTop + s }], "#e9dfc2");
   }
+  if (look.goldAccent === "scarf") {
+    rect(ctx, px - torsoHalf * s, bodyTop + 2 * s, torsoWidth * s, 3 * s, "#ffd66e", s);
+    rect(ctx, px + 3 * s, bodyTop + 3 * s, 3 * s, 10 * s, "#ffd66e", s);
+  }
   if (profile) {
     rect(ctx, px - profile * 1.3 * s - .65 * s, bodyTop + 5 * s,
       1.3 * s, 13 * s, "#f9e7c45c", .6 * s);
@@ -1112,7 +1116,7 @@ function person(ctx, c, actor, game, view) {
       { x: hx + w / 2 * s, y: hy + 3 * s },
       { x: hx + (w / 2 + 1) * s, y: hy + (3 + h) * s },
       { x: hx - (w / 2 + 1) * s, y: hy + (3 + h) * s }],
-    tote ? "#c77d56" : "#ead9b7");
+    look.goldAccent === "tote" ? "#ffd66e" : tote ? "#c77d56" : "#ead9b7");
   }
   if (specialFriend) {
     const hx = px - (hand + waveOffset) * s, hy = bodyTop + (wave ? -7 : 19) * s;
@@ -1150,6 +1154,14 @@ function person(ctx, c, actor, game, view) {
       return { x: starX + Math.cos(angle) * radius, y: starY + Math.sin(angle) * radius };
     });
     polygon(ctx, points, "#ffd66e");
+  }
+  if (look.goldAccent === "badge")
+    ellipse(ctx, headX, headY - 9 * s, 2.5 * s, 2.5 * s, "#ffd66e");
+  if (look.goldAccent === "ribbon") {
+    polygon(ctx, [{ x: headX - 11 * s, y: headY - 10 * s },
+      { x: headX - 6 * s, y: headY - 8 * s }, { x: headX - 11 * s, y: headY - 5 * s }], "#ffd66e");
+    polygon(ctx, [{ x: headX - 1 * s, y: headY - 10 * s },
+      { x: headX - 6 * s, y: headY - 8 * s }, { x: headX - 1 * s, y: headY - 5 * s }], "#ffd66e");
   }
   if (headProfile && s > .6) {
     ellipse(ctx, headX + headProfile * 5.3 * s, headY + .35 * s,

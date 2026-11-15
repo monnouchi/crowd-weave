@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appearanceFor } from "../src/appearance.js";
-import { createGame, step } from "../logic.js";
+import { appearanceFor, FRIEND_LOOKS } from "../src/appearance.js";
+import { createGame, joiningFriend, step } from "../logic.js";
+import { advanceRun, beginRun, createRun, updateRun } from "../src/run.js";
 
 test("new crowd keeps stable varied looks as friends join", () => {
   const looks = Array.from({ length: 40 }, (_, id) => appearanceFor({ id, x: 200 }));
@@ -75,13 +76,33 @@ test("original looks and crowd assignments stay stable with the dedicated partne
   const dedicated = appearanceFor({ appearanceId: 12 });
   assert.equal(dedicated.style, "long");
   assert.ok(!originals.some(([skin, hair]) => skin === dedicated.skin && hair === dedicated.hair));
-  for (let stage = 0; stage < 4; stage++) {
-    assert.equal(createGame(stage).meetingPartner.appearanceId, 12);
-    assert.deepEqual(appearanceFor(createGame(stage).meetingPartner), dedicated);
-    assert.deepEqual(appearanceFor(createGame(stage + 1).party.members.at(-1)), dedicated);
-  }
+  assert.equal(createGame(0).meetingPartner.appearanceId, 12);
 });
 
+test("each stage friend has a distinct gold marker and retains their look on joining", () => {
+  assert.equal(new Set(FRIEND_LOOKS).size, 5);
+  const looks = FRIEND_LOOKS.map((appearanceId) => appearanceFor({ appearanceId }));
+  assert.equal(looks[0].star, true);
+  assert.deepEqual(looks.slice(1).map((look) => look.goldAccent), ["scarf", "tote", "badge", "ribbon"]);
+  for (let stage = 0; stage < 5; stage++) {
+    const run = createRun(stage);
+    const waiting = run.meetingPartner.appearanceId;
+    assert.equal(waiting, FRIEND_LOOKS[stage]);
+    beginRun(run);
+    run.crowd = [];
+    run.crossings = [];
+    run.traffic = null;
+    run.player.x = 240;
+    run.player.y = 89;
+    for (let frame = 0; frame < 700 && run.phase === "playing"; frame++)
+      updateRun(run, .025, {});
+    assert.equal(run.phase, "finished");
+    if (stage < 4) {
+      assert.equal(joiningFriend(run, true).appearanceId, waiting);
+      assert.equal(advanceRun(run).party.members.at(-1).appearanceId, waiting);
+    }
+  }
+});
 
 test("all looks have the specified silhouette and accessory assignments", () => {
   const expected = [

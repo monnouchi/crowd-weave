@@ -7,6 +7,7 @@ import {
   vehicleContact,
 } from "./traffic.js";
 import { FRIENDS, PARTY_SPACING, createParty, moveParty, regroupReady } from "./party.js";
+import { FRIEND_LOOKS } from "./src/appearance.js";
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
@@ -503,7 +504,7 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     scene,
     meetingPartner: {
       ...MEETING_PARTNER,
-      appearanceId: 12,
+      appearanceId: FRIEND_LOOKS[stage],
       shirt: scene.shirt,
       targetKind: scene.targetKind,
       visualScale: scene.visualScale,
@@ -556,7 +557,7 @@ function crossCourseBoundary(g) {
   const partner = g.meetingPartner;
   partner.state = "met";
   g.party.members.push({
-    ...FRIENDS[k], appearanceId: 12, friend: true, r: 9,
+    ...FRIENDS[k], appearanceId: partner.appearanceId, friend: true, r: 9,
     x: partner.x, y: partner.y, s: g.party.distance - (k + 1) * PARTY_SPACING,
     ux: 0, uy: -1, walk: 0, state: "following", docked: false,
     docking: false, flash: 0,

@@ -1,3 +1,5 @@
+import { FRIEND_LOOKS } from "./src/appearance.js";
+
 // Followers replay the player's measured polyline; progress is monotonic.
 export const FRIENDS = [
   { id: 1, name: "友だち1", shirt: "#d5ab53" },
@@ -19,7 +21,7 @@ export function createParty(count, player) {
     ],
     members: FRIENDS.slice(0, count).map((friend, i) => ({
       ...friend,
-      appearanceId: 12,
+      appearanceId: FRIEND_LOOKS[i],
       friend: true,
       r: 9,
       x: player.x,

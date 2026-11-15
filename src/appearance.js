@@ -135,13 +135,34 @@ const LOOKS = [
     accessory: "toteBag",
     star: true,
   },
+  {
+    skin: "#bd8261", hair: "#392d45", style: "bun", outfit: "coat",
+    width: .96, archetype: "slim", headMass: "bun", accessory: "shoppingBag",
+    torso: "#a96055", goldAccent: "scarf",
+  },
+  {
+    skin: "#f1d2b7", hair: "#634331", style: "curls", outfit: "shirt",
+    width: 1.06, archetype: "broad", headMass: "hood", accessory: "toteBag",
+    torso: "#9b6685", goldAccent: "tote",
+  },
+  {
+    skin: "#c68b65", hair: "#253341", style: "short", outfit: "coat",
+    width: 1, archetype: "regular", headMass: "cap", accessory: "backpack",
+    torso: "#bd765b", goldAccent: "badge",
+  },
+  {
+    skin: "#e3ac86", hair: "#a45b42", style: "bob", outfit: "skirt",
+    width: .96, archetype: "slim", headMass: "long", accessory: "shoppingBag",
+    torso: "#ab7180", goldAccent: "ribbon",
+  },
 ];
+export const FRIEND_LOOKS = Object.freeze([12, 13, 14, 15, 16]);
 const CROWD_LOOK_COUNT = 12;
 export function appearanceFor(p, player = false) {
   const id = player
     ? 0
     : (p.appearanceId ??
       (p.friend ? p.id + 2 : (p.id ?? Math.round(p.x / 64))));
-  if (!player && p.appearanceId === 12) return LOOKS[12];
+  if (!player && FRIEND_LOOKS.includes(p.appearanceId)) return LOOKS[p.appearanceId];
   return LOOKS[((id % CROWD_LOOK_COUNT) + CROWD_LOOK_COUNT) % CROWD_LOOK_COUNT];
 }

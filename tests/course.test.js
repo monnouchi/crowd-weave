@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { STAGES, courseOffsets, createCourseRun, createRun, beginRun, updateRun, retryRun } from "../src/run.js";
+import { FRIEND_LOOKS } from "../src/appearance.js";
 
 const round4 = (n) => Math.round(n * 10000) / 10000;
 function crowdHash(crowd, dy = 0) {
@@ -91,18 +92,23 @@ function cross(run, k) {
 
 test("course boundaries record splits and carry the party and combo", () => {
   const run = createCourseRun();
+  assert.deepEqual(run.course.segments.map((segment) => segment.partner.appearanceId), FRIEND_LOOKS);
   beginRun(run);
   for (let k = 0; k < 4; k++) {
+    const waiting = run.meetingPartner.appearanceId;
     cross(run, k);
     assert.equal(run.stage, k + 1);
     assert.equal(run.records.length, k + 1);
     assert.equal(run.records[k].stage, k);
     assert.equal(run.party.members.length, k + 1);
+    assert.equal(run.party.members.at(-1).appearanceId, waiting);
+    assert.deepEqual(run.party.members.map((member) => member.appearanceId), FRIEND_LOOKS.slice(0, k + 1));
     assert.ok(run.events.some((event) => event.kind === "split"));
     assert.equal(run.combo.flow, 5);
     if (k) assert.ok(run.course.splits[k].total >= run.course.splits[k - 1].total);
   }
   cross(run, 4);
+  assert.deepEqual(run.party.members.map((member) => member.appearanceId), FRIEND_LOOKS.slice(0, 4));
   assert.equal(run.phase, "finished");
   assert.equal(run.records.length, 5);
   assert.ok(run.events.some((event) => event.kind === "finale"));
