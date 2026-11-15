@@ -217,14 +217,15 @@ function showFinished() {
   const totals = final ? resultTotals() : { elapsed: run.elapsed, hits: run.hits, score: run.combo.score, maxFlow: run.combo.maxFlow };
   if (final) recordLocalBest(browserStorage(), {
     seed: run.runSeed, stage: run.stage,
-    elapsed: run.elapsed, hits: run.hits,
+    elapsed: run.elapsed, hits: run.hits, score: run.combo.score, maxFlow: run.combo.maxFlow,
   });
   const result = recordLocalBest(browserStorage(), {
     seed: run.runSeed, stage: final ? 5 : run.stage,
-    elapsed: totals.elapsed, hits: totals.hits,
+    elapsed: totals.elapsed, hits: totals.hits, score: totals.score, maxFlow: totals.maxFlow,
   });
   const course = recordCourseResults(browserStorage(), {
     stage: run.stage, elapsed: run.elapsed, hits: run.hits,
+    score: run.combo.score, maxFlow: run.combo.maxFlow,
     total: totals, totalEligible: final && run.startStage === 0,
   });
   const streak = final
@@ -256,7 +257,10 @@ function showFinished() {
     const streakText = streak > 1 ? `人波を無接触で ${streak} 区間連続突破`
       : streak === 1 ? "人波を無接触で 1 区間突破" : "";
     const courseText = course ? `${course.improved ? "通しベスト更新！" : "通しベスト"} ${clock(course.best.elapsed)} ／ 接触${course.best.hits}` : "";
-    $("result-record").textContent = [bestText, courseText, streakText].filter(Boolean).join("\n");
+    const scoreBest = course?.scoreImproved ? course.best.score
+      : course?.stageResult?.scoreImproved ? course.stageResult.best.score : null;
+    const scoreText = scoreBest !== null ? `スコアベスト更新！ ${scoreBest}` : "";
+    $("result-record").textContent = [bestText, courseText, streakText, scoreText].filter(Boolean).join("\n");
   };
   if (!final || reducedMotion.matches) return reveal();
 

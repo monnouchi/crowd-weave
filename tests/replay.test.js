@@ -20,7 +20,7 @@ test("course bests combine seeds without changing seed bests", () => {
     recordLocalBest(local, { seed, stage: 2, elapsed, hits: 1 });
     recordCourseResults(local, { stage: 2, elapsed, hits: 1 });
   }
-  assert.deepEqual(readCourseBest(local, 2), { stage: 2, elapsed: 18, hits: 1 });
+  assert.deepEqual(readCourseBest(local, 2), { stage: 2, elapsed: 18, hits: 1, score: 0, maxFlow: 0 });
   assert.equal(readLocalBest(local, 17, 2).elapsed, 20);
   assert.equal(JSON.parse(local.getItem(COURSE_BEST_STORAGE_KEY)).records.length, 1);
   assert.equal(recordCourseBest(local, { stage: 2, elapsed: 18, hits: 0 }).improved, true);
@@ -39,7 +39,7 @@ test("only a full journey records a course total, while every clear records its 
     total: { elapsed: 60, hits: 2 }, totalEligible: true });
   assert.equal(line.kind, "total");
   assert.equal(readCourseBest(local, 4).elapsed, 13);
-  assert.deepEqual(readCourseBest(local, 5), { stage: 5, elapsed: 60, hits: 2 });
+  assert.deepEqual(readCourseBest(local, 5), { stage: 5, elapsed: 60, hits: 2, score: 0, maxFlow: 0 });
   assert.equal(recordCourseResults(null, { stage: 0, elapsed: 1, hits: 0 }), null);
   const blocked = { getItem() { throw Error(); }, setItem() { throw Error(); } };
   assert.equal(recordCourseResults(blocked, { stage: 0, elapsed: 1, hits: 0 }), null);
@@ -49,15 +49,15 @@ test("a faster replay for the same seed and stage becomes the local best", () =>
   const local = storage();
   assert.deepEqual(recordLocalBest(local,
     { seed: 17, stage: 1, elapsed: 20, hits: 1 }), {
-    best: { seed: 17, stage: 1, elapsed: 20, hits: 1 },
-    improved: true, stored: true,
+    best: { seed: 17, stage: 1, elapsed: 20, hits: 1, score: 0, maxFlow: 0 },
+    improved: true, scoreImproved: false, stored: true,
   });
   assert.equal(recordLocalBest(local,
     { seed: 17, stage: 1, elapsed: 21, hits: 0 }).improved, false);
   assert.equal(recordLocalBest(local,
     { seed: 17, stage: 1, elapsed: 20, hits: 0 }).improved, true);
   assert.deepEqual(readLocalBest(local, 17, 1),
-    { seed: 17, stage: 1, elapsed: 20, hits: 0 });
+    { seed: 17, stage: 1, elapsed: 20, hits: 0, score: 0, maxFlow: 0 });
   assert.equal(readLocalBest(local, 18, 1), null);
   assert.equal(readLocalBest(local, 17, 2), null);
   assert.equal(recordLocalBest(local,
@@ -72,7 +72,7 @@ test("storage errors and corrupt contents do not stop a result", () => {
   };
   const result = { seed: 0, stage: 0, elapsed: 12.3456, hits: 0 };
   assert.deepEqual(recordLocalBest(blocked, result), {
-    best: { ...result, elapsed: 12.346 }, improved: true, stored: false,
+    best: { ...result, elapsed: 12.346, score: 0, maxFlow: 0 }, improved: true, scoreImproved: false, stored: false,
   });
   assert.equal(readLocalBest(blocked, 0, 0), null);
   const local = storage();
@@ -89,7 +89,7 @@ test("local best history is versioned, bounded, and contains only game data", ()
   assert.equal(saved.version, 1);
   assert.equal(saved.records.length, MAX_LOCAL_BESTS);
   assert.deepEqual(Object.keys(saved.records[0]).sort(),
-    ["elapsed", "hits", "seed", "stage"]);
+    ["elapsed", "hits", "maxFlow", "score", "seed", "stage"]);
   assert.equal(readLocalBest(local, 0, 0), null);
   assert.equal(readLocalBest(local, MAX_LOCAL_BESTS + 4, 0)?.hits, 0);
 });
@@ -170,4 +170,46 @@ test("bounded variation changes destinations, pace, dwell, entry timing and venu
       ),
     ).size > 1,
   );
+});
+
+
+test("score and flow bests are independent of time for seed and course records", () => {
+  const local = storage();
+  for (const [record, read, base] of [
+    [recordLocalBest, () => readLocalBest(local, 7, 1), { seed: 7, stage: 1 }],
+    [recordCourseBest, () => readCourseBest(local, 1), { stage: 1 }],
+  ]) {
+    assert.equal(record(local, { ...base, elapsed: 10, hits: 1, score: 100, maxFlow: 3 }).scoreImproved, true);
+    assert.equal(read().score, 100); assert.equal(read().maxFlow, 3);
+    const slower = record(local, { ...base, elapsed: 12, hits: 0, score: 200, maxFlow: 5 });
+    assert.equal(slower.improved, false); assert.equal(slower.scoreImproved, true);
+    assert.equal(read().elapsed, 10); assert.equal(read().score, 200); assert.equal(read().maxFlow, 5);
+    const faster = record(local, { ...base, elapsed: 9, hits: 0, score: 50, maxFlow: 2 });
+    assert.equal(faster.scoreImproved, false); assert.equal(read().score, 200); assert.equal(read().maxFlow, 5);
+  }
+});
+
+test("legacy records normalize missing or invalid metrics and update", () => {
+  const local = storage();
+  local.setItem(BEST_STORAGE_KEY, JSON.stringify({ version: 1, records: [{ seed: 7, stage: 1, elapsed: 10, hits: 0 }] }));
+  local.setItem(COURSE_BEST_STORAGE_KEY, JSON.stringify({ version: 1, records: [{ stage: 1, elapsed: 10, hits: 0, score: -1, maxFlow: "bad" }] }));
+  assert.equal(readLocalBest(local, 7, 1).score, 0); assert.equal(readLocalBest(local, 7, 1).maxFlow, 0);
+  assert.equal(readCourseBest(local, 1).score, 0); assert.equal(readCourseBest(local, 1).maxFlow, 0);
+  recordLocalBest(local, { seed: 7, stage: 1, elapsed: 11, hits: 0, score: 8, maxFlow: 2 });
+  recordCourseBest(local, { stage: 1, elapsed: 11, hits: 0, score: 9, maxFlow: 3 });
+  assert.equal(readLocalBest(local, 7, 1).score, 8); assert.equal(readCourseBest(local, 1).maxFlow, 3);
+});
+
+test("course results expose total and stage score improvement flags", () => {
+  const local = storage();
+  const result = (score, totalScore) => recordCourseResults(local, { stage: 4, elapsed: 10, hits: 0, score, maxFlow: 2,
+    total: { elapsed: 50, hits: 0, score: totalScore, maxFlow: 4 }, totalEligible: true });
+  let r = result(100, 500);
+  assert.equal(r.scoreImproved, true); assert.equal(r.stageResult.scoreImproved, true);
+  r = result(150, 400);
+  assert.equal(r.scoreImproved, false); assert.equal(r.stageResult.scoreImproved, true);
+  assert.equal(r.stageResult.best.score, 150);
+  r = result(140, 600);
+  assert.equal(r.scoreImproved, true); assert.equal(r.stageResult.scoreImproved, false);
+  assert.equal(r.best.score, 600);
 });

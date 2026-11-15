@@ -1099,7 +1099,9 @@ export function extendJourney(crowd, stage, seed, config) {
   for (let i = 0; i < crowd.length - config.baseCrowd; i++) {
     const p = crowd[config.baseCrowd + i];
     const slot = i % perBand;
-    const x = perBand === 4 ? [85, 190, 300, 405][slot]
+    // The 78-unit central opening puts both edges within near-miss range
+    // from its middle; retain the original final crossing on stage 0.
+    const x = perBand === 4 ? [85, stage === 0 && i >= perBand ? 190 : 201, 279, 405][slot]
       : [65, 135, 205, 275, 345, 415][slot];
     const y = bands[Math.floor(i / perBand)] + (slot % 2 ? 34 : -34)
       + (rand() - 0.5) * 12;
