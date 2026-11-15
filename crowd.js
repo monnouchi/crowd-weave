@@ -890,8 +890,22 @@ function updateNegotiation(crowd, dt, ctx) {
     }
   }
 }
+// Station entries are admitted during a two-second window every six seconds.
+// The shared phase comes from the crowd's seeded initial walk value; individual
+// pace phases use their own seeded initial values. Neither depends on players.
+export const FLOW_PULSE_PERIOD = 6;
+export const FLOW_PULSE_LULL = 4;
+const FLOW_SHEAR_PERIOD = 12;
+
 export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
     playerCtx = null) {
+  const stationPhase = crowd[0]?.environment === "station"
+    ? (crowd[0].flowPulsePhase ??= crowd[0].walk / 30 * FLOW_PULSE_PERIOD)
+    : 0;
+  for (const p of crowd) if (p.environment === "station") {
+    p.flowTime = (p.flowTime ?? 0) + dt;
+    p.flowShearPhase ??= p.walk / 30 * Math.PI * 2;
+  }
   updateNegotiation(crowd, dt, playerCtx);
   const crossings = traffic;
   // V2-5 crossing etiquette: nobody stops, dashes or dawdles inside a
@@ -919,6 +933,9 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
     let vx = ux * effectivePace,
       vy = uy * effectivePace,
       paceFactor = 1;
+    if (p.environment === "station" && p.flow === "along")
+      paceFactor *= 0.975 + 0.125 * Math.sin(
+        p.flowTime * 2 * Math.PI / FLOW_SHEAR_PERIOD + p.flowShearPhase);
     for (const q of crowd) {
       if (q === p || !q.active) continue;
       const rx = p.x - q.x,
@@ -1143,6 +1160,9 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
       p.wait -= dt;
       if (
         p.wait <= 0 &&
+        (p.environment !== "station" || p.flow !== "opposing" ||
+          (p.flowTime + stationPhase) % FLOW_PULSE_PERIOD <
+            FLOW_PULSE_PERIOD - FLOW_PULSE_LULL) &&
         crowd.every(
           (q) =>
             q === p ||
@@ -1321,6 +1341,11 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
         p.state = "entry";
         p.cycle++;
         p.wait = 0.8 + ((p.id * 17 + p.cycle * 13) % 23) / 10;
+        if (p.environment === "station" && p.flow === "opposing") {
+          const phase = (p.flowTime + p.wait + stationPhase) % FLOW_PULSE_PERIOD;
+          if (phase >= FLOW_PULSE_PERIOD - FLOW_PULSE_LULL)
+            p.wait += FLOW_PULSE_PERIOD - phase;
+        }
       }
     }
   });
