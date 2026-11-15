@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EnterLatch, primaryCommand } from "../input.js";
+import { EnterLatch, gameplayKey, primaryCommand } from "../input.js";
+test("gameplay keys classify calls separately from movement", () => {
+  for (const key of ["arrowup", "w", "c"]) assert.equal(gameplayKey(key), "call");
+  for (const key of ["arrowleft", "a"]) assert.equal(gameplayKey(key), "left");
+  for (const key of ["arrowright", "d"]) assert.equal(gameplayKey(key), "right");
+  assert.equal(gameplayKey(" "), null);
+});
 test("primary command maps ready, paused and all five results; play has no action", () => {
   assert.equal(primaryCommand("ready", 0), "start");
   assert.equal(primaryCommand("paused", 2), "resume");

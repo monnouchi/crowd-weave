@@ -1,5 +1,5 @@
 import { flowTier } from "../logic.js";
-import { TwoButtons, bindPointerControls } from "../input.js";
+import { TwoButtons, bindPointerControls, gameplayKey } from "../input.js";
 import { createRun, beginRun, updateRun, advanceRun, retryRun, restartRun, pauseRun, resumeRun, STORY_STAGES } from "./run.js";
 import { renderWorld } from "./render.js";
 import { Soundscape } from "./audio.js";
@@ -199,7 +199,7 @@ function showReady() {
     extra: run.stage === 0 ? "すきまを読み、何度でも声をかけよう。" : meta.cue || "道を譲ってくれた人の間を抜けよう。",
     intro: meta.intro || "",
     action: "歩き出す", guide: run.stage === 0,
-    foot: run.stage === 0 ? "PC：←→ か A D でよける／両押し か Space 長押しで待つ／C で「すみませーん」／Esc でひと休み" : "左右でよける · 左右同時か Space 長押しで待つ · 声で道をひらく",
+    foot: run.stage === 0 ? "PC：←→ か A D でよける／両押し か Space 長押しで待つ／C／↑／W で「すみませーん」／Esc でひと休み" : "左右でよける · 左右同時か Space 長押しで待つ · 声で道をひらく",
   });
   $("stage-select").hidden = !(run.stage === 0 && run.startStage === 0 && run.phase === "ready");
 }
@@ -390,21 +390,21 @@ updateSoundButton();
 addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
   const key = event.key.toLowerCase();
-  if (["arrowleft", "arrowright", " ", "enter", "escape"].includes(key)) event.preventDefault();
+  if (["arrowleft", "arrowright", "arrowup", " ", "enter", "escape"].includes(key)) event.preventDefault();
   if (key === "enter" && !event.repeat && run.phase !== "playing") return action();
   if (key === "escape" && !event.repeat) return run.phase === "paused" ? resume() : pauseGame();
   if (key === "m" && !event.repeat) { sound.unlock(); sound.toggleMuted(); return updateSoundButton(); }
   if (run.phase !== "playing") return;
-  if (key === "arrowleft" || key === "a") controls.press(`key:${key}`, "left");
-  else if (key === "arrowright" || key === "d") controls.press(`key:${key}`, "right");
+  const control = gameplayKey(key);
+  if (control === "left" || control === "right") controls.press(`key:${key}`, control);
   else if (key === " ") { controls.press("key:space-left", "left"); controls.press("key:space-right", "right"); }
-  else if (key === "c") callControl.press();
+  else if (control === "call") callControl.press();
 });
 addEventListener("keyup", (event) => {
   const key = event.key.toLowerCase();
   controls.release(`key:${key}`);
   if (key === " ") { controls.release("key:space-left"); controls.release("key:space-right"); }
-  if (key === "c") callControl.release();
+  if (gameplayKey(key) === "call") callControl.release();
 });
 addEventListener("blur", () => pauseGame(true));
 document.addEventListener("visibilitychange", () => { if (document.hidden) pauseGame(true); });

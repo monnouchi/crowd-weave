@@ -1,3 +1,11 @@
+// Classify normalized keys used for movement and calling.
+export function gameplayKey(key) {
+  if (key === "arrowleft" || key === "a") return "left";
+  if (key === "arrowright" || key === "d") return "right";
+  if (key === "c" || key === "arrowup" || key === "w") return "call";
+  return null;
+}
+
 // Platform-neutral two-button state. Multiple pointers on one side are independent.
 export class TwoButtons {
   constructor() {
