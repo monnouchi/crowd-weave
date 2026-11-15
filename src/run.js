@@ -279,6 +279,11 @@ function updateCallAvailability(run) {
 }
 
 function syncTotals(run) {
+  if (run.course) {
+    run.totalElapsed = run.elapsed;
+    run.totalHits = run.hits;
+    return;
+  }
   const recorded = run.records.some((record) => record.stage === run.stage);
   run.totalElapsed = run.records.reduce((sum, record) =>
     sum + record.elapsed, 0) + (recorded ? 0 : run.elapsed);
@@ -307,6 +312,106 @@ export function createRun(stage = 0, seed = 1402485690, records = [], startStage
   updateCallAvailability(run);
   syncTotals(run);
   return run;
+}
+
+export function courseOffsets() {
+  const offsets = [0];
+  for (let k = 1; k < STAGES.length; k++)
+    offsets.push(offsets[k - 1] + 124 - STAGES[k].startY);
+  return offsets;
+}
+
+function translateSegment(seg, dy, index) {
+  seg.startY += dy;
+  const translated = new Set();
+  const translatePoint = (point) => {
+    if (point && !translated.has(point)) {
+      point.y += dy;
+      translated.add(point);
+    }
+  };
+  for (const person of seg.crowd) {
+    translatePoint(person);
+    translatePoint(person.entry);
+    for (const point of person.route || []) translatePoint(point);
+    translatePoint(person.spot);
+    person.id += index * 10000;
+    if (typeof person.group === "number") person.group += index * 1000;
+    person.seg = index;
+  }
+  for (const crossing of seg.crossings) {
+    crossing.top += dy;
+    crossing.bottom += dy;
+    if (crossing.vehicle) crossing.vehicle.y += dy;
+  }
+  for (const animal of seg.animals) animal.y += dy;
+  seg.meetingPartner.y += dy;
+  if (seg.cleanPass) seg.cleanPass.y += dy;
+  if (seg.routeBranch) {
+    for (const point of [seg.routeBranch.fork, seg.routeBranch.merge,
+      ...seg.routeBranch.short, ...seg.routeBranch.wide]) point.y += dy;
+  }
+}
+
+export function createCourseRun(seed = 1402485690) {
+  const offsets = courseOffsets(), segments = [], games = [], sections = [];
+  for (let k = 0; k < STAGES.length; k++) {
+    const seg = createGame(k, (seed + k * 97) >>> 0);
+    seg.story = STORY_STAGES[k];
+    const localSections = naturalizeCrowd(seg);
+    translateSegment(seg, offsets[k], k);
+    for (const section of localSections) {
+      section.y += offsets[k];
+      section.id += k * 100;
+      sections.push(section);
+    }
+    games.push(seg);
+    segments.push({ offset: offsets[k], partner: seg.meetingPartner,
+      cleanPass: seg.cleanPass, routeBranch: seg.routeBranch });
+  }
+  const run = games[0];
+  for (const seg of games.slice(1)) {
+    run.crowd.push(...seg.crowd);
+    run.crossings.push(...seg.crossings);
+    run.animals.push(...seg.animals);
+  }
+  for (const person of run.crowd) person.awarePlayer = run.player;
+  Object.assign(run, {
+    worldHeight: STAGES[0].startY + 55, memberHits: Array(5).fill(0),
+    segOriginY: 0, negotiationEnabled: true,
+    course: { offsets, segments, index: 0, crossedSerial: 0, splits: [],
+      snapshots: [], lastSplit: { elapsed: 0, hits: 0, score: 0 },
+      segMaxFlow: 0, segBestStreak: 0, finaleRecorded: false },
+    runSeed: seed >>> 0, startStage: 0, records: [], events: [],
+    story: STORY_STAGES[0], braking: false, speed: 0, pressure: 0,
+    cleanStreak: 0, bestStreak: 0, callWindow: null, _crowdSections: sections,
+  });
+  updateFlow(run);
+  updateCallAvailability(run);
+  syncTotals(run);
+  return run;
+}
+
+function recordCourseSegment(run, k) {
+  const course = run.course, last = course.lastSplit;
+  const record = { stage: k, elapsed: run.elapsed - last.elapsed,
+    hits: run.hits - last.hits, bestStreak: course.segBestStreak,
+    score: run.combo.score - last.score, maxFlow: course.segMaxFlow };
+  run.records.push(record);
+  course.splits.push({ stage: k, elapsed: record.elapsed, total: run.elapsed });
+  course.lastSplit = { elapsed: run.elapsed, hits: run.hits, score: run.combo.score };
+  course.segMaxFlow = run.combo.flow;
+  course.segBestStreak = run.cleanStreak;
+  return record;
+}
+
+function takeCourseSnapshot(run) {
+  const course = run.course, k = course.index;
+  const prior = course.snapshots.slice(0, k);
+  course.snapshots = prior;
+  const snap = structuredClone(run);
+  snap.course.snapshots = [...prior, snap];
+  course.snapshots = [...prior, snap];
 }
 
 export function beginRun(run) {
@@ -346,8 +451,11 @@ export function updateRun(run, dt, controls = {}) {
     reunion: run.reunionSerial,
     violation: run.violationEvent?.id,
     nearMiss: run.combo.nearMissSerial,
+    courseSerial: run.course ? run.course.crossedSerial : 0,
   };
   run.braking = !!controls.brake || !!(controls.left && controls.right);
+  if (run.course && run.course.index === 0 && !run.course.snapshots[0])
+    takeCourseSnapshot(run);
   step(run, dt, {
     left: run.braking ? true : !!controls.left,
     right: run.braking ? true : !!controls.right,
@@ -396,11 +504,27 @@ export function updateRun(run, dt, controls = {}) {
       }
     }
   }
+  if (run.course) {
+    run.course.segMaxFlow = Math.max(run.course.segMaxFlow, run.combo.flow);
+    run.course.segBestStreak = Math.max(run.course.segBestStreak, run.bestStreak);
+    if (run.course.crossedSerial !== before.courseSerial) {
+      const done = run.course.index - 1;
+      const record = recordCourseSegment(run, done);
+      run.events.push({ kind: "split", stage: done, split: record.elapsed, total: run.elapsed });
+      run.story = STORY_STAGES[run.course.index];
+      takeCourseSnapshot(run);
+    }
+  }
   updateFlow(run);
   updatePressure(run);
   updateCallAvailability(run);
   if (run.phase === "finished") {
-    if (!run.records.some((record) => record.stage === run.stage))
+    if (run.course) {
+      if (!run.course.finaleRecorded) {
+        run.course.finaleRecorded = true;
+        recordCourseSegment(run, 4);
+      }
+    } else if (!run.records.some((record) => record.stage === run.stage))
       run.records.push({ stage: run.stage, elapsed: run.elapsed,
         hits: run.hits, bestStreak: run.bestStreak,
         score: run.combo.score, maxFlow: run.combo.maxFlow });
@@ -417,6 +541,13 @@ export function advanceRun(run) {
 }
 
 export function retryRun(run) {
+  if (run?.course) {
+    const snap = run.course.snapshots[run.course.index];
+    if (!snap) return createCourseRun(run.runSeed);
+    const retry = structuredClone(snap);
+    Object.assign(retry, { phase: "ready", events: [], speed: 0, braking: false });
+    return retry;
+  }
   return createRun(run.stage, run.runSeed, run.records.filter(
     (record) => record.stage < run.stage,
   ), run.startStage);

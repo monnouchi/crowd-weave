@@ -6,7 +6,7 @@ import {
   trafficSpecs,
   vehicleContact,
 } from "./traffic.js";
-import { PARTY_SPACING, createParty, moveParty, regroupReady } from "./party.js";
+import { FRIENDS, PARTY_SPACING, createParty, moveParty, regroupReady } from "./party.js";
 import { BODY_GAP, resolvePlayerMove, followerProgress } from "./bodies.js";
 import {
   makeCrowd,
@@ -25,15 +25,16 @@ export const W = 480,
   GOAL = { x: 175, y: 20, w: 130, h: 65 };
 export const FRONT_BARRIER_Y = 20;
 export const CONCERT_ENTRY_Y = 700;
+const segOY = (g) => g.segOriginY || 0;
 export function insideConcert(game) {
-  return game.stage !== 4 || game.player.y < CONCERT_ENTRY_Y;
+  return game.stage !== 4 || game.player.y < segOY(game) + CONCERT_ENTRY_Y;
 }
 export function goalFor(stage) {
   return stage === 4 ? { x: 95, y: 20, w: 290, h: 65 } : GOAL;
 }
 export function goalPrompt(game) {
   if (game.arriving) return "到着！";
-  if (game.player.y <= 145 && !game.arriving) {
+  if (game.player.y <= segOY(game) + 145 && !game.arriving) {
     const goal = goalFor(game.stage);
     if (game.player.x < goal.x) return "→ 右へ進もう";
     if (game.player.x > goal.x + goal.w) return "← 左へ進もう";
@@ -550,6 +551,27 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     animals: createAnimals(stage, crowd),
   };
 }
+function crossCourseBoundary(g) {
+  const k = g.course.index;
+  const partner = g.meetingPartner;
+  partner.state = "met";
+  g.party.members.push({
+    ...FRIENDS[k], appearanceId: 12, friend: true, r: 9,
+    x: partner.x, y: partner.y, s: g.party.distance - (k + 1) * PARTY_SPACING,
+    ux: 0, uy: -1, walk: 0, state: "following", docked: false,
+    docking: false, flash: 0,
+  });
+  g.course.index = k + 1;
+  g.stage = k + 1;
+  g.scene = SCENES[k + 1];
+  const segment = g.course.segments[k + 1];
+  g.meetingPartner = segment.partner;
+  g.cleanPass = segment.cleanPass;
+  g.routeBranch = segment.routeBranch;
+  g.segOriginY = segment.offset;
+  g.course.crossedSerial++;
+}
+
 export function step(g, dt, input) {
   if (g.phase !== "playing") return;
   dt = Math.max(0, Math.min(dt, 0.05));
@@ -625,22 +647,23 @@ export function step(g, dt, input) {
     ? -1 : dt > 0 && lateralIntent > 0 && g.player.x >= W - 30 ? 1 : 0;
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
   g.player.y = Math.max(
-    g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
+    segOY(g) + (g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32),
     Math.min(g.worldHeight - 25, g.player.y),
   );
   // Shops, hedges and the hall wall leave the destination's central entrance.
   if (
     g.stage !== 4 &&
     (g.player.x < 174 || g.player.x > 306) &&
-    g.player.y < 107
+    g.player.y < segOY(g) + 107
   )
-    g.player.y = 107;
+    g.player.y = segOY(g) + 107;
   if (g.stage === 4) {
-    if (g.player.y < 650) g.player.x = Math.max(48, Math.min(432, g.player.x));
-    for (const [top, bottom] of [
+    if (g.player.y < segOY(g) + 650) g.player.x = Math.max(48, Math.min(432, g.player.x));
+    for (const [localTop, localBottom] of [
       [790, 825],
       [685, 720],
     ]) {
+      const top = segOY(g) + localTop, bottom = segOY(g) + localBottom;
       if (
         previousPlayer.y >= bottom + 12 &&
         g.player.y < bottom + 12 &&
@@ -650,7 +673,7 @@ export function step(g, dt, input) {
       if (g.player.y < bottom + 12 && g.player.y > top - 12)
         g.player.x = Math.max(142, Math.min(338, g.player.x));
     }
-    if (!g.ticketChecked && g.player.y < 790) g.ticketChecked = true;
+    if (!g.ticketChecked && g.player.y < segOY(g) + 790) g.ticketChecked = true;
   }
   if (!g.arriving) {
     const result = resolvePlayerMove(
@@ -668,7 +691,7 @@ export function step(g, dt, input) {
   constrainTraffic(g, previousPlayer, input);
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
   g.player.y = Math.max(
-    g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32,
+    segOY(g) + (g.stage === 4 ? FRONT_BARRIER_Y + g.player.r : 32),
     Math.min(g.worldHeight - 25, g.player.y),
   );
   if (g.hop && hopRequested) {
@@ -691,10 +714,17 @@ export function step(g, dt, input) {
     !g.arriving &&
     g.player.x >= goal.x &&
     g.player.x <= goal.x + goal.w &&
-    g.player.y <= goal.y + goal.h + 0.000001
+    g.player.y <= goal.y + segOY(g) + goal.h + 0.000001
   ) {
-    g.arriving = true;
-    g.arrivalTarget = arrivalPoint(g.stage, g.player);
+    if (g.course && g.course.index < 4) {
+      crossCourseBoundary(g);
+      previousTeam.push({ ...g.party.members.at(-1) });
+    }
+    else {
+      g.arriving = true;
+      g.arrivalTarget = arrivalPoint(g.stage, g.player);
+      g.arrivalTarget.y += segOY(g);
+    }
   }
   moveParty(g.party, g.player, dt, {
     braking: !!(input.left && input.right),
