@@ -1,3 +1,5 @@
+import { flowTier } from "../logic.js";
+
 // The soundtrack is synthesized at runtime. No recordings or external assets are used.
 // Small motifs gather harmony as the journey moves toward the venue.
 export const STAGES = [
@@ -12,6 +14,29 @@ export const STAGES = [
 const MASTER_LEVEL = 3.2;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const semitone = (root, step) => root * 2 ** (step / 12);
+
+export function ambienceFor(stage, pressure = 0, open = 0) {
+  const index = clamp(Math.floor(Number(stage) || 0), 0, STAGES.length - 1);
+  pressure = clamp(Number(pressure) || 0, 0, 1);
+  open = clamp(Number(open) || 0, 0, 1);
+  return {
+    crowdGain: STAGES[index].shade * (0.75 + pressure * 0.75) * (1 - open * 0.48),
+    crowdFrequency: index === 4 ? 320 + pressure * 100 : 390 + pressure * 480,
+    rainGain: index === 3 ? 0.012 : 0,
+    rainFrequency: 1650,
+  };
+}
+
+export function drumHits(stage, beatIndex, subBeat) {
+  if (stage !== 4 || (subBeat !== 0 && subBeat !== 1)) return [];
+  const hits = ["hat"];
+  const index = ((beatIndex % 8) + 8) % 8;
+  if (subBeat === 0 && (index === 0 || index === 4)) hits.push("kick");
+  if (subBeat === 0 && (index === 2 || index === 6)) hits.push("snare");
+  return hits;
+}
+
+export const flowLayerActive = (tier) => tier >= 3;
 
 function storedMute() {
   try {
@@ -38,6 +63,9 @@ export class Soundscape {
     this.airBus = null;
     this.airFilter = null;
     this.airSource = null;
+    this.rainBus = null;
+    this.rainFilter = null;
+    this.rainSource = null;
     this.noiseBuffer = null;
     this.voices = new Set();
     this.muted = storedMute();
@@ -47,6 +75,8 @@ export class Soundscape {
     this.nextBeat = 0;
     this.lastAtmosphere = -Infinity;
     this.lastEvent = new Map();
+    this.pressure = 0;
+    this.open = 0;
   }
 
   // Call this synchronously from the Start button or another real user gesture.
@@ -88,15 +118,25 @@ export class Soundscape {
     this.musicBus.connect(this.master);
 
     this.airBus = c.createGain();
-    this.airBus.gain.value = STAGES[this.stage].shade;
+    const ambience = ambienceFor(this.stage, this.pressure, this.open);
+    this.airBus.gain.value = ambience.crowdGain;
     this.airFilter = c.createBiquadFilter();
     this.airFilter.type = "bandpass";
-    this.airFilter.frequency.value = 360;
+    this.airFilter.frequency.value = ambience.crowdFrequency;
     this.airFilter.Q.value = 0.55;
     this.airFilter.connect(this.airBus);
     this.airBus.connect(this.master);
 
-    // One deterministic, looping noise source suggests a living crowd and rain.
+    this.rainBus = c.createGain();
+    this.rainBus.gain.value = ambience.rainGain;
+    this.rainFilter = c.createBiquadFilter();
+    this.rainFilter.type = "bandpass";
+    this.rainFilter.frequency.value = ambience.rainFrequency;
+    this.rainFilter.Q.value = 0.55;
+    this.rainFilter.connect(this.rainBus);
+    this.rainBus.connect(this.master);
+
+    // Separate loops share the deterministic noise buffer.
     this.noiseBuffer = c.createBuffer(1, c.sampleRate, c.sampleRate);
     const samples = this.noiseBuffer.getChannelData(0);
     let seed = 0x5a1701;
@@ -109,6 +149,11 @@ export class Soundscape {
     this.airSource.loop = true;
     this.airSource.connect(this.airFilter);
     this.airSource.start();
+    this.rainSource = c.createBufferSource();
+    this.rainSource.buffer = this.noiseBuffer;
+    this.rainSource.loop = true;
+    this.rainSource.connect(this.rainFilter);
+    this.rainSource.start();
   }
 
   setMuted(muted) {
@@ -146,7 +191,21 @@ export class Soundscape {
     if (index === this.stage) return;
     this.stage = index;
     this.beatIndex = 0;
-    if (this.context) this.nextBeat = this.context.currentTime + 0.12;
+    if (this.context) {
+      this.nextBeat = this.context.currentTime + 0.12;
+      this.updateAtmosphere();
+    }
+  }
+
+  updateAtmosphere() {
+    if (!this.airBus || !this.rainBus || this.context.state === "closed") return;
+    const now = this.context.currentTime;
+    const ambience = ambienceFor(this.stage, this.pressure, this.open);
+    this.airBus.gain.setTargetAtTime(ambience.crowdGain, now, 0.19);
+    this.airFilter.frequency.setTargetAtTime(ambience.crowdFrequency, now, 0.24);
+    this.rainBus.gain.setTargetAtTime(ambience.rainGain, now, 0.08);
+    this.rainFilter.frequency.setTargetAtTime(ambience.rainFrequency, now, 0.24);
+    this.lastAtmosphere = now;
   }
 
   // Called once per animation frame. Scheduling only looks a fraction of a second ahead.
@@ -158,33 +217,24 @@ export class Soundscape {
       this.setStage(run.stage);
     const pressure = clamp(Number(run?.pressure) || 0, 0, 1);
     const open = clamp(Number(run?.flow?.open) || 0, 0, 1);
+    this.pressure = pressure;
+    this.open = open;
     const moving = !run?.braking && (run?.speed == null || run.speed > 8);
     if (c.currentTime - this.lastAtmosphere > 0.15) {
-      const config = STAGES[this.stage];
-      this.airBus.gain.setTargetAtTime(
-        config.shade * (0.75 + pressure * 0.75) * (1 - open * 0.48),
-        c.currentTime,
-        0.19,
-      );
-      this.airFilter.frequency.setTargetAtTime(
-        this.stage === 3 ? 1650 : this.stage === 4 ? 680 : 390 + pressure * 480,
-        c.currentTime,
-        0.24,
-      );
-      this.lastAtmosphere = c.currentTime;
+      this.updateAtmosphere();
     }
     const beat = STAGES[this.stage].beat;
     if (this.nextBeat < c.currentTime - beat)
       this.nextBeat = c.currentTime + 0.035;
     let scheduled = 0;
     while (this.nextBeat < c.currentTime + 0.13 && scheduled++ < 2) {
-      this.scoreBeat(this.nextBeat, pressure, open, moving);
+      this.scoreBeat(this.nextBeat, pressure, open, moving, flowTier(run?.combo?.flow || 0));
       this.nextBeat += beat;
       this.beatIndex++;
     }
   }
 
-  scoreBeat(at, pressure, open, moving) {
+  scoreBeat(at, pressure, open, moving, tier = 0) {
     const stage = this.stage;
     const index = this.beatIndex % 8;
     const config = STAGES[stage];
@@ -218,6 +268,24 @@ export class Soundscape {
         this.tone(semitone(root, interval + 12), at, config.beat * 1.9,
           0.006, "sine", this.musicBus);
     }
+    if (stage === 4) {
+      this.tone(semitone(root, index < 4 ? 0 : 5) / 4, at,
+        config.beat * 0.8, 0.009, "triangle", this.musicBus);
+      for (const subBeat of [0, 1]) {
+        const time = at + subBeat * config.beat / 2;
+        for (const hit of drumHits(stage, index, subBeat)) {
+          if (hit === "kick")
+            this.tone(120, time, 0.12, 0.014, "sine", this.musicBus, { endFrequency: 42 });
+          else if (hit === "snare") {
+            this.breath(time, 0.11, 0.009, 2300, this.musicBus);
+            this.tone(185, time, 0.09, 0.007, "triangle", this.musicBus);
+          } else this.breath(time, 0.035, 0.004, 7000, this.musicBus);
+        }
+      }
+    }
+    if (flowLayerActive(tier) && index % 2 === 0)
+      this.tone(semitone(root, melody + 19), at + config.beat * 0.36,
+        config.beat * 0.38, 0.005, "triangle", this.musicBus);
   }
 
   tone(frequency, at, duration, volume, type = "sine", destination = null,
@@ -255,7 +323,7 @@ export class Soundscape {
     oscillator.stop(end + 0.015);
   }
 
-  breath(at, duration, volume, center = 680) {
+  breath(at, duration, volume, center = 680, destination = null) {
     const c = this.context;
     if (!c || !this.noiseBuffer || this.muted || this.paused) return;
     const source = c.createBufferSource();
@@ -271,7 +339,7 @@ export class Soundscape {
     gain.gain.exponentialRampToValueAtTime(0.00001, start + duration);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(this.master);
+    gain.connect(destination || this.master);
     this.voices.add(source);
     source.onended = () => {
       this.voices.delete(source);
@@ -398,6 +466,7 @@ export class Soundscape {
   destroy() {
     this.stopVoices();
     try { this.airSource?.stop(); } catch { /* May already have ended. */ }
+    try { this.rainSource?.stop(); } catch { /* May already have ended. */ }
     this.context?.close().catch(() => {});
     this.context = null;
   }
