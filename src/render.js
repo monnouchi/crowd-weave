@@ -241,16 +241,8 @@ function sky(ctx, c, theme, game, view) {
     ctx.save();
     ctx.globalAlpha = interiorAlpha;
     rect(ctx, 0, 0, c.width, c.horizon, "#e8d6bb");
-    rect(ctx, 0, 0, c.width, c.horizon * .30, "#b99582");
     for (const x of [.08, .92])
       rect(ctx, c.width * x - 12, c.horizon * .24, 24, c.horizon * .76, "#caa994");
-    for (const x of [.25, .75]) {
-      rect(ctx, c.width * x - 2, 0, 4, c.horizon * .24, "#795f5a");
-      rect(ctx, c.width * x - 48, c.horizon * .20, 96, 29, "#745e5c", 3);
-      rect(ctx, c.width * x - 38, c.horizon * .235, 76, 3, "#f6e6c4");
-    }
-    for (const x of [.12, .42, .72])
-      rect(ctx, c.width * x, c.horizon * .08, c.width * .16, 5, "#fff4d6", 2);
     ctx.restore();
   }
 }
@@ -292,26 +284,64 @@ function ground(ctx, c, theme, game) {
   }
 }
 
-function hallCeiling(ctx, c) {
-  if (c.stage !== 4) return;
-  const farY = Math.max(-120, c.py - FAR);
+// Each row is defined relative to its segment, independently of the camera.
+export function overheadRow(seed, stage, row, origin = 0) {
+  const stride = stage === 4 ? 155 : 175;
+  const key = (Number(seed) || 0) * .001 + stage * 313;
+  const parity = ((row % 2) + 2) % 2;
+  const kind = parity * 2 + Math.floor(hash(key + row * 19.17) * 2);
+  return { y: origin + row * stride + (hash(key + row * 31.73 + 7) - .5) * stride * .3,
+    kind: kind === 3 ? -1 : kind };
+}
+
+export function overheadProjection(game, view, x, y, z) {
+  return screenPoint(camera(game, view), x, y, z);
+}
+
+function overhead(ctx, c, game, stage, alpha) {
+  if (alpha <= .001) return;
+  const origin = game.course?.offsets?.[stage] ?? (game.segOriginY || 0);
+  const farY = Math.max(origin - 120, c.py - FAR);
   const nearY = c.py + 30;
-  worldFace(ctx, c, [[35, farY, 117], [445, farY, 117],
-    [445, nearY, 117], [35, nearY, 117]], "#24283f");
-  for (const x of [35, 122, 240, 358, 445])
-    worldLine(ctx, c, [x, farY, 115], [x, nearY, 115],
-      x === 240 ? "#d29c9169" : "#8ea4b64c", 1.4);
-  for (let y = Math.floor(c.py / 125) * 125; y > farY; y -= 125) {
-    if (y > c.py - 8) continue;
-    worldLine(ctx, c, [35, y, 115], [445, y, 115], "#8290a281", 1.4);
-    for (const x of [115, 240, 365]) {
-      const p = screenPoint(c, x, y, 112);
-      if (p && p.x > -20 && p.x < c.width + 20 && p.y > -20) {
-        ellipse(ctx, p.x, p.y, Math.max(1.2, p.scale * 3.6),
-          Math.max(1, p.scale * 2.1), x === 240 ? "#f7dcb2" : "#9adbd5");
+  const stride = stage === 4 ? 155 : 175;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (stage === 4) {
+    worldFace(ctx, c, [[35, farY, 230], [445, farY, 230],
+      [445, nearY, 230], [35, nearY, 230]], "#24283f");
+    for (const x of [35, 122, 240, 358, 445])
+      worldLine(ctx, c, [x, farY, 228], [x, nearY, 228],
+        x === 240 ? "#d29c9169" : "#8ea4b64c", 1.4);
+  }
+  const first = Math.floor((farY - origin) / stride) - 1;
+  const last = Math.ceil((nearY - origin) / stride) + 1;
+  for (let row = first; row <= last; row++) {
+    const { y, kind } = overheadRow(game.seed, stage, row, origin);
+    if (kind < 0 || y < farY || y > nearY) continue;
+    if (stage === 2) {
+      worldFace(ctx, c, [[35, y - 7, 235], [445, y - 7, 235],
+        [445, y + 7, 235], [35, y + 7, 235]], "#b99582");
+      if (kind !== 1) for (const x of [135, 345]) {
+        worldLine(ctx, c, [x, y, 235], [x, y, 213], "#795f5a", 2);
+        worldFace(ctx, c, [[x - 36, y, 193], [x + 36, y, 193],
+          [x + 36, y, 213], [x - 36, y, 213]], "#745e5c");
+        worldFace(ctx, c, [[x - 29, y + .1, 198], [x + 29, y + .1, 198],
+          [x + 29, y + .1, 200], [x - 29, y + .1, 200]], "#f6e6c4");
+      }
+      if (kind !== 0) for (const x of [80, 200, 320])
+        worldFace(ctx, c, [[x, y - 20, 234], [x + 65, y - 20, 234],
+          [x + 65, y - 14, 234], [x, y - 14, 234]], "#fff4d6");
+    } else {
+      worldLine(ctx, c, [35, y, 228], [445, y, 228], "#8290a281", 1.4);
+      for (const x of (kind === 1 ? [115, 365] : [115, 240, 365])) {
+        const p = screenPoint(c, x, y, 224);
+        if (p && p.x > -20 && p.x < c.width + 20 && p.y > -20 && p.y < c.height)
+          ellipse(ctx, p.x, p.y, Math.max(1.2, p.scale * 3.6),
+            Math.max(1, p.scale * 2.1), x === 240 ? "#f7dcb2" : "#9adbd5");
       }
     }
   }
+  ctx.restore();
 }
 
 function routeMarks(ctx, c, game) {
@@ -1387,7 +1417,11 @@ export function renderWorld(ctx, game, view = {}) {
   // objects and actors. Screen-space overlays retain their existing order.
   sky(ctx, c, theme, game, view);
   ground(ctx, c, theme, game);
-  hallCeiling(ctx, c);
+  overhead(ctx, c, game, 2, c.interiorAlpha);
+  const hallAlpha = blend
+    ? (blend.from === 4 ? 1 : 0) * (1 - blend.t) + (blend.to === 4 ? 1 : 0) * blend.t
+    : (c.stage === 4 ? 1 : 0);
+  overhead(ctx, c, game, 4, hallAlpha);
   for (const t of game.crossings || []) crossingGround(ctx, c, t);
   routeMarks(ctx, c, game);
   destination(ctx, c, theme, game, true);

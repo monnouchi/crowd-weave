@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createCourseRun, createRun, STAGES } from "../src/run.js";
-import { courseThemeBlend, lerpTheme, renderWorld, THEMES } from "../src/render.js";
+import { courseThemeBlend, lerpTheme, overheadRow, overheadProjection, renderWorld, THEMES } from "../src/render.js";
 
 function drawingContext() {
   const fills = [];
@@ -77,4 +77,58 @@ test("course interior ceiling is drawn inside the cafe only", () => {
   };
   assert.ok(colors(2).includes("#e8d6bb"));
   assert.ok(!colors(0).includes("#e8d6bb"));
+});
+
+
+test("overhead rows stay in segment coordinates and project as the player advances", () => {
+  const run = createCourseRun(17);
+  for (const stage of [2, 4]) {
+    const origin = run.course.offsets[stage];
+    const rows = Array.from({ length: 40 }, (_, row) => overheadRow(17, stage, row, origin));
+    assert.ok(rows.some(row => row.kind < 0));
+    assert.ok(new Set(rows.map(row => row.y % (stage === 4 ? 155 : 175))).size > 10);
+    for (let i = 1; i < rows.length; i++)
+      assert.ok(rows[i].kind < 0 || rows[i - 1].kind < 0 || rows[i].kind !== rows[i - 1].kind);
+    const row = rows[0];
+    assert.deepEqual(row, overheadRow(17, stage, 0, origin));
+    assert.equal(overheadRow(17, stage, 0, origin + 500).y, row.y + 500);
+    place(run, stage, row.y + 600);
+    const first = overheadProjection(run, { width: 390, height: 844 }, 240, row.y, 228);
+    run.player.y -= 100;
+    const second = overheadProjection(run, { width: 390, height: 844 }, 240, row.y, 228);
+    assert.ok(first && second);
+    assert.ok(second.y < first.y);
+    assert.ok(Math.abs((second.y - 844 * .43) / (first.y - 844 * .43) - first.depth / second.depth) < 1e-10);
+    assert.deepEqual(row, overheadRow(17, stage, 0, origin));
+  }
+});
+
+test("overhead drawing uses the projected world row and boundary alpha", () => {
+  const run = createCourseRun(17);
+  for (const stage of [2, 4]) {
+    place(run, stage - 1, run.course.offsets[stage - 1] + 84);
+    const ctx = drawingContext();
+    const paths = [];
+    let path = [];
+    ctx.beginPath = () => { path = []; };
+    ctx.moveTo = (x, y) => path.push({ x, y });
+    ctx.lineTo = (x, y) => path.push({ x, y });
+    ctx.fill = () => paths.push({ points: [...path], style: ctx.fillStyle, alpha: ctx.globalAlpha });
+    ctx.stroke = () => paths.push({ points: [...path], style: ctx.strokeStyle, alpha: ctx.globalAlpha });
+    renderWorld(ctx, run, { width: 390, height: 844 });
+    const style = stage === 2 ? "#b99582" : "#8290a281";
+    const calls = paths.filter(call => call.style === style);
+    assert.ok(calls.length > 0);
+    assert.ok(calls.every(call => call.alpha === .5));
+    const origin = run.course.offsets[stage];
+    const stride = stage === 2 ? 175 : 155;
+    const matches = calls.some(call => Array.from({ length: 30 }, (_, i) => i - 10).some(row => {
+      const item = overheadRow(run.seed, stage, row, origin);
+      if (item.kind < 0) return false;
+      const expected = overheadProjection(run, { width: 390, height: 844 }, 35,
+        item.y - (stage === 2 ? 7 : 0), stage === 2 ? 235 : 228);
+      return expected && call.points.some(point => Math.abs(point.x - expected.x) < 1e-8 && Math.abs(point.y - expected.y) < 1e-8);
+    }));
+    assert.ok(matches, `stage ${stage} drew a projected row`);
+  }
 });
