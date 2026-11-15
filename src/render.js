@@ -196,6 +196,37 @@ function sky(ctx, c, theme, game, view) {
   g.addColorStop(0, theme.sky[0]); g.addColorStop(1, theme.sky[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, c.height);
   const interiorAlpha = c.interiorAlpha ?? (c.stage === 2 ? 1 : 0);
+  // Outdoor dressing and the cafe interior crossfade against each other at
+  // the segment edges (V2-6); at the extremes exactly one is drawn, at full
+  // strength, exactly as before.
+  if (interiorAlpha < .999) {
+    ctx.save();
+    ctx.globalAlpha = 1 - interiorAlpha;
+    if (c.stage === 4) {
+      // Lighting points into the hall, not into the player's eyes.
+      polygon(ctx, [{ x: c.width * .04, y: 0 }, { x: c.width * .51, y: c.horizon + 230 },
+        { x: c.width * .25, y: 0 }], "#e5a6c70b");
+      polygon(ctx, [{ x: c.width * .96, y: 0 }, { x: c.width * .49, y: c.horizon + 230 },
+        { x: c.width * .75, y: 0 }], "#82d9e419");
+    } else {
+      const sunX = c.width * (c.stage === 3 ? .79 : .69);
+      const sunY = c.horizon * .48;
+      ellipse(ctx, sunX, sunY, c.stage === 3 ? 19 : 26, c.stage === 3 ? 19 : 26,
+        c.stage === 3 ? "#dae5dd35" : "#fff1d4b8");
+      // Distant roofline gives scale without filling the playable gaps.
+      ctx.fillStyle = theme.haze;
+      for (let i = 0; i < 12; i++) {
+        const x = (i - 1) * c.width / 10;
+        const w = c.width / 9.1;
+        const h = 14 + hash(i + c.stage * 19) * (c.stage === 3 ? 62 : 35);
+        ctx.fillRect(x, c.horizon - h, w, h + 3);
+      }
+      const haze = ctx.createLinearGradient(0, c.horizon - 26, 0, c.horizon + 80);
+      haze.addColorStop(0, "#ffffff00"); haze.addColorStop(1, theme.haze + "99");
+      ctx.fillStyle = haze; ctx.fillRect(0, c.horizon - 26, c.width, 106);
+    }
+    ctx.restore();
+  }
   if (interiorAlpha > .001) {
     ctx.save();
     ctx.globalAlpha = interiorAlpha;
@@ -211,31 +242,7 @@ function sky(ctx, c, theme, game, view) {
     for (const x of [.12, .42, .72])
       rect(ctx, c.width * x, c.horizon * .08, c.width * .16, 5, "#fff4d6", 2);
     ctx.restore();
-    return;
   }
-  if (c.stage === 4) {
-    // Lighting points into the hall, not into the player's eyes.
-    polygon(ctx, [{ x: c.width * .04, y: 0 }, { x: c.width * .51, y: c.horizon + 230 },
-      { x: c.width * .25, y: 0 }], "#e5a6c70b");
-    polygon(ctx, [{ x: c.width * .96, y: 0 }, { x: c.width * .49, y: c.horizon + 230 },
-      { x: c.width * .75, y: 0 }], "#82d9e419");
-    return;
-  }
-  const sunX = c.width * (c.stage === 3 ? .79 : .69);
-  const sunY = c.horizon * .48;
-  ellipse(ctx, sunX, sunY, c.stage === 3 ? 19 : 26, c.stage === 3 ? 19 : 26,
-    c.stage === 3 ? "#dae5dd35" : "#fff1d4b8");
-  // Distant roofline gives scale without filling the playable gaps.
-  ctx.fillStyle = theme.haze;
-  for (let i = 0; i < 12; i++) {
-    const x = (i - 1) * c.width / 10;
-    const w = c.width / 9.1;
-    const h = 14 + hash(i + c.stage * 19) * (c.stage === 3 ? 62 : 35);
-    ctx.fillRect(x, c.horizon - h, w, h + 3);
-  }
-  const haze = ctx.createLinearGradient(0, c.horizon - 26, 0, c.horizon + 80);
-  haze.addColorStop(0, "#ffffff00"); haze.addColorStop(1, theme.haze + "99");
-  ctx.fillStyle = haze; ctx.fillRect(0, c.horizon - 26, c.width, 106);
 }
 
 function ground(ctx, c, theme, game) {
