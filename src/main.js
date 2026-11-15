@@ -502,7 +502,10 @@ function frame(now) {
   $("flash").classList.toggle("danger", now < dangerUntil);
   updateHud();
   const scene = finaleReveal ? { ...run, worldTime: run.worldTime + (now - finaleStarted) / 1000 } : run;
-  renderWorld(ctx, scene, { ...viewport, yaw: cameraYaw, danger: now < dangerUntil, contactPulse: now < contactUntil ? 1 : 0 });
+  const renderHeld = controls.read();
+  renderWorld(ctx, scene, { ...viewport, yaw: cameraYaw,
+    steer: renderHeld.left === renderHeld.right ? 0 : renderHeld.left ? -1 : 1,
+    braking: renderHeld.left && renderHeld.right, danger: now < dangerUntil, contactPulse: now < contactUntil ? 1 : 0 });
   requestAnimationFrame(frame);
 }
 showReady();

@@ -1,7 +1,7 @@
 import { appearanceFor } from "./appearance.js";
 import { drawRadar } from "./radar-view.js";
 import { previewTurn } from "../crowd.js";
-import { flowTier } from "../logic.js";
+import { activeCallRipple, flowTier, HOP_DISTANCE } from "../logic.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
 // z exists only here so every visible object obeys the same camera and depth.
@@ -72,6 +72,24 @@ function screenActor(c, x, y) {
   const scale = c.focal / drawnDepth;
   return { x: c.cx + p.side * scale, y: c.horizon + p.high * scale,
     scale, depth: p.depth };
+}
+
+export function protagonistProjection(game, view = {}) {
+  return screenActor(camera(game, view), game.player.x, game.player.y);
+}
+
+export function protagonistPose(game, view = {}) {
+  if (game.stun > 0) return "stumble";
+  if (game.hop != null) return "hop";
+  if (activeCallRipple(game)) return "call";
+  if ((game.phase === "playing" || game.arriving) && (view.braking ?? game.braking)) return "brake";
+  if (game.phase === "playing" || game.arriving) return "walk";
+  return "idle";
+}
+
+export function protagonistLean(game, view = {}) {
+  const pose = protagonistPose(game, view);
+  return ["walk", "hop", "call"].includes(pose) ? clamp(Number(view.steer) || 0, -1, 1) * .13 : 0;
 }
 
 function polygon(ctx, points, fill, stroke = null, lineWidth = 1) {
@@ -826,6 +844,54 @@ export function pedestrianFacing(actor) {
     headLean: clamp((headX - ux) * 1.8, -1.6, 1.6), headGaze: headX };
 }
 
+function protagonist(ctx, c, game, view) {
+  const p = screenActor(c, game.player.x, game.player.y);
+  if (!p || p.depth > FAR) return;
+  const s = Math.min(18, p.scale);
+  const pose = protagonistPose(game, view);
+  const stride = pose === "walk" && !view.reducedMotion
+    ? Math.sin((game.worldTime || 0) * 4.2) * 3.2 : 0;
+  const lift = pose === "hop"
+    ? Math.sin(Math.PI * clamp(1 - game.hop.remaining / HOP_DISTANCE, 0, 1)) * 12 * s : 0;
+  const wobble = pose === "stumble" && !view.reducedMotion
+    ? Math.sin(game.stun * 24) * .07 : 0;
+  const lean = protagonistLean(game, view) + (pose === "brake" ? -.05 : 0) +
+    (pose === "stumble" ? .10 : 0) + wobble;
+  blobShadow(ctx, c, p.x, p.y, s, 12);
+  ctx.save();
+  ctx.translate(p.x, p.y - lift);
+  ctx.rotate(lean);
+  // Foreshorten the upright figure slightly as it pitches forward to walk.
+  if (pose === "walk") ctx.scale(1, .98);
+  function limb(x1, y1, x2, y2, width, color) {
+    ctx.beginPath(); ctx.moveTo(x1 * s, y1 * s); ctx.lineTo(x2 * s, y2 * s);
+    ctx.lineCap = "round"; ctx.lineWidth = width * s; ctx.strokeStyle = color; ctx.stroke();
+  }
+  const tuck = pose === "hop" ? 5 : 0;
+  const stance = pose === "brake" ? 2.5 : 5;
+  for (const side of [-1, 1]) {
+    const x = side * stance + stride;
+    limb(side * 3, -18, x, -2 - tuck, 4, "#344954");
+    ellipse(ctx, x * s, (-1.2 - tuck) * s, 4.5 * s, 2.4 * s, "#293843");
+  }
+  rect(ctx, -10 * s, -43 * s, 20 * s, 25 * s, "#30444b", 5 * s);
+  rect(ctx, -9 * s, -42 * s, 18 * s, 23 * s, "#25565e", 4 * s);
+  // A single orange stripe and the diagonal shoulder bag identify the player.
+  rect(ctx, -9 * s, -35 * s, 18 * s, 2.5 * s, "#ef7d4e", s);
+  limb(-7, -41, 10, -18, 1.5, "#665344");
+  rect(ctx, 8 * s, -22 * s, 7 * s, 9 * s, "#806650", 1.5 * s);
+  const raised = pose === "call";
+  const out = pose === "stumble" ? 4 : 0;
+  for (const side of [-1, 1]) {
+    const x = side * (13 + out), y = side < 0 && raised ? -50 : -24 - out;
+    limb(side * 9, -38, x, y, 3.4, "#25565e");
+    ellipse(ctx, x * s, y * s, 2.4 * s, 3 * s, "#d5aa8c");
+  }
+  // A full hair mass covers the back of the head.
+  ellipse(ctx, 0, -54 * s, 10 * s, 11 * s, "#352b29", "#27383d", Math.max(1, s));
+  ctx.restore();
+}
+
 function person(ctx, c, actor, game, view) {
   if (actor.active === false || !Number.isFinite(actor.x) || !Number.isFinite(actor.y)) return;
   const p = screenActor(c, actor.x, actor.y);
@@ -1163,31 +1229,7 @@ export function reunionWave(game, view = {}) {
 }
 
 function foreground(ctx, c, game, view) {
-  // Sleeves at the bottom are the only visible part of the player. They remain
-  // steady while walking, reducing motion sickness and leaving the route clear.
-  const base = c.height + 4;
   const w = c.width;
-  const sleeve = c.stage === 4 ? "#55677e" : "#337c92";
-  polygon(ctx, [{ x: -14, y: base - 82 }, { x: w * .11, y: base - 45 },
-    { x: w * .18, y: base }, { x: -14, y: base }], sleeve);
-  polygon(ctx, [{ x: w + 14, y: base - 82 }, { x: w * .89, y: base - 45 },
-    { x: w * .82, y: base }, { x: w + 14, y: base }], sleeve);
-  const wave = reunionWave(game, view);
-  if (wave && wave.lift > .02) {
-    // A small player hand can be seen when a companion catches up. It stays
-    // on the edge of the frame, leaving the road and traffic lamp clear.
-    polygon(ctx, [{ x: -9, y: base - 78 }, { x: 11, y: base - 69 },
-      { x: wave.x + 7, y: wave.y + 14 },
-      { x: wave.x - 8, y: wave.y + 15 }], sleeve, "#245769", 1.8);
-    ctx.beginPath();
-    ctx.moveTo(wave.x - 8, wave.y + 14);
-    ctx.lineTo(wave.x + 7, wave.y + 14);
-    ctx.strokeStyle = "#214e60"; ctx.lineWidth = 2; ctx.stroke();
-    ellipse(ctx, wave.x, wave.y + 3, 8.8, 11.8, "#e5b796", "#966f62", 1.35);
-    for (const offset of [-4, 0, 4])
-      ellipse(ctx, wave.x + offset, wave.y - 7, 2.4, 5.5,
-        "#e5b796", "#966f62", .8);
-  }
   const pressure = clamp(Number(view.danger) || game.pressure || 0, 0, 1);
   if (pressure > .24) {
     const glow = ctx.createRadialGradient(w / 2, c.height * .65,
@@ -1240,7 +1282,7 @@ function speedLines(ctx, c, game, view) {
   }
 }
 
-/** Render a stable eye-level view of the current run. The caller owns sizing. */
+/** Render a third-person view of the current run. The caller owns sizing. */
 export function renderWorld(ctx, game, view = {}) {
   if (!ctx || !game?.player) return;
   const c = camera(game, view);
@@ -1277,6 +1319,7 @@ export function renderWorld(ctx, game, view = {}) {
     items.push({ y: p.y, draw: () => person(ctx, c, p, game, view) });
   for (const p of game.party?.members || [])
     items.push({ y: p.y, draw: () => person(ctx, c, p, game, view) });
+  items.push({ y: game.player.y, draw: () => protagonist(ctx, c, game, view) });
   for (const a of game.animals || [])
     items.push({ y: a.y, draw: () => animal(ctx, c, a, view) });
   items.sort((a, b) => a.y - b.y);
