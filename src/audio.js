@@ -10,6 +10,13 @@ export const STAGES = [
   { root: 261.63, beat: 0.4, voice: "triangle", shade: 0.018, motif: [0, 3, 7, 10, 12, 14, 12, 10] },
 ];
 
+export const KIT = {
+  kick: { frequency: 120, endFrequency: 42, duration: 0.12, gain: 0.010 },
+  snare: { filter: "bandpass", frequency: 1800, q: 0.85, attack: 0.003, decay: 0.075, gain: 0.006,
+    body: { frequency: 185, duration: 0.09, gain: 0.005, type: "triangle" } },
+  hat: { filter: "highpass", frequency: 7000, q: 0.7, attack: 0.002, decay: 0.025, gain: 0.0025 },
+};
+
 // Calibrated in Chrome with a time-domain analyser after the mix bus.
 const MASTER_LEVEL = 3.2;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -275,17 +282,49 @@ export class Soundscape {
         const time = at + subBeat * config.beat / 2;
         for (const hit of drumHits(stage, index, subBeat)) {
           if (hit === "kick")
-            this.tone(120, time, 0.12, 0.014, "sine", this.musicBus, { endFrequency: 42 });
+            this.tone(KIT.kick.frequency, time, KIT.kick.duration, KIT.kick.gain,
+              "sine", this.musicBus, { endFrequency: KIT.kick.endFrequency });
           else if (hit === "snare") {
-            this.breath(time, 0.11, 0.009, 2300, this.musicBus);
-            this.tone(185, time, 0.09, 0.007, "triangle", this.musicBus);
-          } else this.breath(time, 0.035, 0.004, 7000, this.musicBus);
+            this.drumNoise(time, KIT.snare);
+            const body = KIT.snare.body;
+            this.tone(body.frequency, time, body.duration, body.gain, body.type, this.musicBus);
+          } else this.drumNoise(time, KIT.hat);
         }
       }
     }
     if (flowLayerActive(tier) && index % 2 === 0)
       this.tone(semitone(root, melody + 19), at + config.beat * 0.36,
         config.beat * 0.38, 0.005, "triangle", this.musicBus);
+  }
+
+  drumNoise(at, config) {
+    const c = this.context;
+    if (!c || c.state === "closed" || !this.noiseBuffer || this.muted || this.paused) return;
+    const source = c.createBufferSource();
+    const filter = c.createBiquadFilter();
+    const gain = c.createGain();
+    const start = Math.max(c.currentTime, at);
+    const end = start + config.attack + config.decay;
+    source.buffer = this.noiseBuffer;
+    filter.type = config.filter;
+    filter.frequency.value = config.frequency;
+    filter.Q.value = config.q;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(config.gain, start + config.attack);
+    gain.gain.exponentialRampToValueAtTime(0.00001, end - 0.003);
+    gain.gain.linearRampToValueAtTime(0, end);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicBus);
+    this.voices.add(source);
+    source.onended = () => {
+      this.voices.delete(source);
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
+    source.start(start);
+    source.stop(end);
   }
 
   tone(frequency, at, duration, volume, type = "sine", destination = null,

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { STAGES, Soundscape, ambienceFor, drumHits, flowLayerActive } from "../src/audio.js";
+import { KIT, STAGES, Soundscape, ambienceFor, drumHits, flowLayerActive } from "../src/audio.js";
 
 test("stages have distinct eight-note motifs and unchanged roots and beats", () => {
   assert.equal(STAGES.length, 5);
@@ -36,6 +36,47 @@ test("venue drums play an eight-beat pattern", () => {
     assert.equal(drumHits(4, beat, 0).includes("kick"), beat === 0 || beat === 4);
     assert.equal(drumHits(4, beat, 0).includes("snare"), beat === 2 || beat === 6);
     assert.deepEqual(drumHits(4, beat, 1), ["hat"]);
+  }
+});
+
+test("kit voices use quiet, short filtered noise and a tonal snare body", () => {
+  assert.deepEqual(KIT.kick, { frequency: 120, endFrequency: 42, duration: 0.12, gain: 0.010 });
+  assert.deepEqual(KIT.snare, {
+    filter: "bandpass", frequency: 1800, q: 0.85, attack: 0.003, decay: 0.075, gain: 0.006,
+    body: { frequency: 185, duration: 0.09, gain: 0.005, type: "triangle" },
+  });
+  assert.deepEqual(KIT.hat, {
+    filter: "highpass", frequency: 7000, q: 0.7, attack: 0.002, decay: 0.025, gain: 0.0025,
+  });
+});
+
+test("drum noise schedules zero-ended envelopes and stops at silence", () => {
+  for (const config of [KIT.hat, KIT.snare]) {
+    const events = [];
+    const node = () => ({ connect() {}, disconnect() {} });
+    const source = { ...node(), start: (time) => events.push(["start", time]),
+      stop: (time) => events.push(["stop", time]) };
+    const filter = { ...node(), frequency: {}, Q: {} };
+    const gain = { ...node(), gain: {
+      setValueAtTime: (value, time) => events.push(["set", value, time]),
+      linearRampToValueAtTime: (value, time) => events.push(["linear", value, time]),
+      exponentialRampToValueAtTime: (value, time) => events.push(["exponential", value, time]),
+    } };
+    const sound = new Soundscape();
+    sound.muted = false;
+    sound.context = { state: "running", currentTime: 1, createBufferSource: () => source,
+      createBiquadFilter: () => filter, createGain: () => gain };
+    sound.noiseBuffer = {};
+    sound.musicBus = {};
+    sound.drumNoise(2, config);
+    const end = 2 + config.attack + config.decay;
+    assert.equal(filter.type, config.filter);
+    assert.equal(filter.frequency.value, config.frequency);
+    assert.equal(filter.Q.value, config.q);
+    assert.deepEqual(events, [["set", 0, 2], ["linear", config.gain, 2 + config.attack],
+      ["exponential", 0.00001, end - 0.003], ["linear", 0, end], ["start", 2], ["stop", end]]);
+    source.onended();
+    assert.equal(sound.voices.size, 0);
   }
 });
 
