@@ -5,11 +5,14 @@ import { courseThemeBlend, lerpTheme, overheadRow, overheadProjection, renderWor
 
 function drawingContext() {
   const fills = [];
+  const stack = [];
   const gradient = () => ({ addColorStop() {} });
   const values = { globalAlpha: 1, canvas: { width: 1280, height: 844 }, fills };
   return new Proxy(values, {
     get(target, name) {
       if (name in target) return target[name];
+      if (name === "save") return () => stack.push(target.globalAlpha);
+      if (name === "restore") return () => { target.globalAlpha = stack.pop(); };
       if (name === "createLinearGradient" || name === "createRadialGradient") return gradient;
       if (name === "measureText") return (text) => ({ width: String(text).length * 12 });
       if (name === "fill" || name === "fillRect") return () => fills.push({ style: target.fillStyle, alpha: target.globalAlpha });
@@ -18,6 +21,29 @@ function drawingContext() {
     set(target, name, value) { target[name] = value; return true; },
   });
 }
+
+test("shopfronts crossfade from outdoor awnings to indoor concourse bays", () => {
+  const run = createCourseRun(17);
+  const fillsAt = (index, y) => {
+    place(run, index, y);
+    const ctx = drawingContext();
+    renderWorld(ctx, run, { width: 1280, height: 844 });
+    return ctx.fills;
+  };
+  const outdoor = fillsAt(1, run.course.offsets[1] + STAGES[1].startY / 2);
+  assert.ok(outdoor.some(fill => fill.style === "#4a7b89" && fill.alpha === 1));
+  assert.ok(!outdoor.some(fill => fill.style === "#477e7c"));
+  const indoor = fillsAt(2, run.course.offsets[2] + STAGES[2].startY / 2);
+  assert.ok(indoor.some(fill => fill.style === "#477e7c" && fill.alpha === 1));
+  assert.ok(indoor.some(fill => fill.style === "#915f60" && fill.alpha === 1));
+  assert.ok(!indoor.some(fill => ["#af5e5d", "#f2d2aa"].includes(fill.style)));
+  for (const index of [1, 2]) {
+    const midpoint = fillsAt(index, run.course.offsets[index] + 84);
+    assert.ok(midpoint.some(fill => fill.style === "#477e7c" && fill.alpha === .5));
+    const awning = index === 1 ? "#4a7b89" : "#af5e5d";
+    assert.ok(midpoint.some(fill => fill.style === awning && fill.alpha === .5));
+  }
+});
 
 function place(run, index, y) {
   run.course.index = index;

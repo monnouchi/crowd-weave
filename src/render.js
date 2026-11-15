@@ -350,7 +350,7 @@ function overhead(ctx, c, game, stage, alpha) {
   ctx.restore();
 }
 
-function sceneBlock(ctx, c, theme, side, y, length, index) {
+function outdoorSceneBlock(ctx, c, theme, side, y, length, index) {
   if (y > c.py + 18 || y + length < c.py - FAR) return;
   const left = side < 0;
   const x0 = left ? -130 : 445;
@@ -430,6 +430,52 @@ function sceneBlock(ctx, c, theme, side, y, length, index) {
         [inner + (left ? 13 : -13), yy, 53], "#dae7e9", 1);
     }
   }
+}
+
+function indoorSceneBlock(ctx, c, side, y, length, index) {
+  if (y > c.py + 18 || y + length < c.py - FAR) return;
+  const left = side < 0;
+  const inner = left ? 35 : 445;
+  const x0 = left ? -130 : 445, x1 = left ? 35 : 610;
+  const y1 = y + length;
+  const h = 117 + (index % 3) * 13;
+  const face = (a, b, low, high, fill, stroke = null) =>
+    worldFace(ctx, c, [[inner, a, low], [inner, b, low],
+      [inner, b, high], [inner, a, high]], fill, stroke, 1.2);
+  worldFace(ctx, c, [[x0, y1, 0], [x1, y1, 0], [x1, y1, h], [x0, y1, h]], "#e8d6bb");
+  face(y, y1, 0, h, "#caa994");
+  // Recessed glazing and mullions sit flush with the concourse wall.
+  face(y + 10, y1 - 10, 5, 78, "#477e7c", "#f2ddc1");
+  face(y + 13, y1 - 13, 8, 75, "#90b9b1");
+  for (const yy of [y + length * .34, y + length * .67])
+    worldLine(ctx, c, [inner, yy, 7], [inner, yy, 77], "#e8d6bb", 1.5);
+  // A flat sign band, end pillars and a shutter panel give the bays variety.
+  face(y + 7, y1 - 7, 82, 99, "#915f60");
+  face(y + 14, y1 - 14, 88, 92, "#ffd079");
+  for (const yy of [y, y1 - 7]) face(yy, yy + 7, 0, h, "#e8d6bb");
+  if (index % 2) {
+    face(y + 13, y + length * .34, 8, 75, "#d6b7a0");
+    for (let z = 16; z < 75; z += 10)
+      worldLine(ctx, c, [inner, y + 13, z], [inner, y + length * .34, z], "#b99582", 1);
+  }
+}
+
+function sceneBlock(ctx, c, theme, side, y, length, index) {
+  const alpha = c.interiorAlpha;
+  if (alpha <= .001) {
+    outdoorSceneBlock(ctx, c, theme, side, y, length, index);
+    return;
+  }
+  if (alpha < .999) {
+    ctx.save();
+    ctx.globalAlpha = 1 - alpha;
+    outdoorSceneBlock(ctx, c, theme, side, y, length, index);
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  indoorSceneBlock(ctx, c, side, y, length, index);
+  ctx.restore();
 }
 
 // Alternating disjoint groups guarantee neighbouring occupied rows differ.

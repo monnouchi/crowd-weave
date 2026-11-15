@@ -305,6 +305,13 @@ test("side scenery is seeded, varied and irregular without repeated neighbours",
   }
 });
 
+test("interior side scenery retains its seeded placement sequence", () => {
+  const rows = Array.from({ length: 8 }, (_, row) => sideScenery(17, 2, -1, row, 210));
+  assert.deepEqual(rows.map(row => row.kind), [-1, 1, -1, 1, 3, 1, 3, 0]);
+  assert.deepEqual(rows.map(row => Number(row.offset.toFixed(6))),
+    [-27.892784, 20.429986, 28.441617, -23.093969, 28.984428, -29.195504, 30.835277, 2.885648]);
+});
+
 test("drawn scenery kinds repeat for the same seed and vary for another", () => {
   const colors = ["#b94e50", "#d6e3dc", "#6c9b75", "#669875"];
   const kinds = seed => [900, 1800, 2800].flatMap(playerY => recordedScene(0, { seed, playerY }))
