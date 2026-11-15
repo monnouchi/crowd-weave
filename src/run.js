@@ -325,6 +325,7 @@ export function updateRun(run, dt, controls = {}) {
     callSerial: run.callSerial,
     reunion: run.reunionSerial,
     violation: run.violationEvent?.id,
+    nearMiss: run.combo.nearMissSerial,
   };
   run.braking = !!controls.brake || !!(controls.left && controls.right);
   step(run, dt, {
@@ -345,6 +346,8 @@ export function updateRun(run, dt, controls = {}) {
     run.cleanStreak = 0;
     run.events.push({ kind: "contact" });
   }
+  for (let i = before.nearMiss; i < run.combo.nearMissSerial; i++)
+    run.events.push({ kind: "nearMiss" });
   if (run.reunionSerial > before.reunion)
     run.events.push({ kind: "reunion" });
   if (run.violationEvent?.id !== before.violation && run.violationEvent)
@@ -379,7 +382,8 @@ export function updateRun(run, dt, controls = {}) {
   if (run.phase === "finished") {
     if (!run.records.some((record) => record.stage === run.stage))
       run.records.push({ stage: run.stage, elapsed: run.elapsed,
-        hits: run.hits, bestStreak: run.bestStreak });
+        hits: run.hits, bestStreak: run.bestStreak,
+        score: run.combo.score, maxFlow: run.combo.maxFlow });
     run.events.push({ kind: run.stage === 4 ? "finale" : "stageClear" });
   }
   syncTotals(run);

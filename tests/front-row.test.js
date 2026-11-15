@@ -9,7 +9,7 @@ import {
 } from "../logic.js";
 import { moveCrowd, visiblePerson } from "../crowd.js";
 import { createParty } from "../party.js";
-import { planRoute, routeInput } from "../validation/plan-route.js";
+import { planRoute, replayPlannedRoute } from "../validation/plan-route.js";
 
 test("front row spans the hall, with all arrival positions on the audience side of the barrier", () => {
   for (const x of [95, 210, 240, 270, 280, 385]) {
@@ -67,8 +67,7 @@ test("arrival spectators continue moving without changing the result, and backgr
     route = planRoute(4, g.seed, 45);
   assert.ok(route);
   g.phase = "playing";
-  for (const action of route.path)
-    for (let n = 0; n < 4; n++) step(g, 0.025, routeInput(action));
+  replayPlannedRoute(g, route);
   assert.equal(g.phase, "finished");
   const result = {
     elapsed: g.elapsed,

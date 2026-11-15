@@ -1,3 +1,4 @@
+import { flowTier } from "../logic.js";
 import { TwoButtons, bindPointerControls } from "../input.js";
 import { createRun, beginRun, updateRun, advanceRun, retryRun, restartRun, pauseRun, resumeRun, STORY_STAGES } from "./run.js";
 import { renderWorld } from "./render.js";
@@ -205,11 +206,13 @@ function resultTotals() {
   return {
     elapsed: Number.isFinite(run.totalElapsed) ? run.totalElapsed : records.reduce((n, record) => n + (record.elapsed || 0), 0),
     hits: Number.isFinite(run.totalHits) ? run.totalHits : records.reduce((n, record) => n + (record.hits || 0), 0),
+    score: records.reduce((n, record) => n + (record.score || 0), 0),
+    maxFlow: Math.max(0, ...records.map((record) => record.maxFlow || 0)),
   };
 }
 function showFinished() {
   const final = run.stage === 4;
-  const totals = final ? resultTotals() : { elapsed: run.elapsed, hits: run.hits };
+  const totals = final ? resultTotals() : { elapsed: run.elapsed, hits: run.hits, score: run.combo.score, maxFlow: run.combo.maxFlow };
   if (final) recordLocalBest(browserStorage(), {
     seed: run.runSeed, stage: run.stage,
     elapsed: run.elapsed, hits: run.hits,
@@ -229,6 +232,8 @@ function showFinished() {
   $("result-time-label").textContent = final && run.startStage > 0
     ? `タイム（${run.records.length}区間分）` : "タイム";
   $("result-hits").textContent = String(totals.hits);
+  $("result-score").textContent = String(totals.score);
+  $("result-max-flow").textContent = String(totals.maxFlow);
   const next = STORY_STAGES?.[run.stage + 1];
   setOverlay({
     kicker: final ? "雑踏突破 / THE FRONT ROW" : `雑踏突破 / ${String(run.stage + 1).padStart(2,"0")} CLEAR`,
@@ -378,6 +383,10 @@ function updateHud() {
   $("stage-name").textContent = storyName();
   $("time").textContent = clock(run.elapsed);
   $("hits").textContent = `接触 ${run.hits}`;
+  const comboText = `FLOW ${run.combo.flow}`;
+  if ($("combo-flow").textContent !== comboText) $("combo-flow").textContent = comboText;
+  const comboClass = `combo-meter tier-${flowTier(run.combo.flow)}`;
+  if ($("combo-meter").className !== comboClass) $("combo-meter").className = comboClass;
   const completion = limit(Math.round((1 - (run.player.y - 80) / Math.max(1, run.startY - 80)) * 100), 0, 100);
   $("progress-fill").style.width = `${completion}%`;
   $("progress").setAttribute("aria-valuenow", String(completion));
@@ -424,6 +433,7 @@ function consumeEvents() {
       cue(reasons[event?.reason] || "近くの人に声をかけよう", 1.1);
     }
     else if (kind === "contact") { cue("おっと、ゆっくり", .85); contactUntil = performance.now() + 250; }
+    else if (kind === "nearMiss") cue("際どい！", .85);
     else if (kind === "closePass") cue(Number(event.streak) >= 2 ? "続けて、すきまを抜けた！" : "すきまを抜けた", .85);
     else if (kind === "reunion") cue("追いついた！", 1.1);
     else if (kind === "danger") dangerUntil = performance.now() + 550;

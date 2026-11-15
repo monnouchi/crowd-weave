@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createGame, seedForRun, step } from "../logic.js";
 import { BODY_GAP } from "../bodies.js";
 import { createParty } from "../party.js";
-import { planRoute, routeInput } from "../validation/plan-route.js";
+import { planRoute, replayPlannedRoute, replayPlannedRouteAtBasePace } from "../validation/plan-route.js";
 
 test("a visible pair blocks idle progress without repeated time penalties", () => {
   const g = createGame(0, seedForRun(17, 0));
@@ -117,11 +117,9 @@ test("dense audience still clears after contact and every friend can finish", ()
   const g = createGame(4, seedForRun(2, 4));
   g.phase = "playing";
   let maxTrail = 0;
-  for (const action of route.path)
-    for (let frame = 0; frame < 4; frame++) {
-      step(g, 0.025, routeInput(action));
+  replayPlannedRoute(g, route, 0.025, () => {
       maxTrail = Math.max(maxTrail, g.party.trail.length);
-    }
+  });
   for (let frame = 0; frame < 1200 && g.phase === "playing"; frame++) {
     step(g, 0.025, {});
     maxTrail = Math.max(maxTrail, g.party.trail.length);
@@ -138,9 +136,7 @@ test("all stages still have a contact-free route at the capped low frame rate", 
     assert.ok(route, `stage ${stage + 1}`);
     const g = createGame(stage);
     g.phase = "playing";
-    for (const action of route.path)
-      for (let frame = 0; frame < 2; frame++)
-        step(g, 0.05, routeInput(action));
+    replayPlannedRouteAtBasePace(g, route, 0.05);
     for (let frame = 0; frame < 40 && g.phase === "playing"; frame++)
       step(g, 0.05, { left: true, right: true });
     assert.equal(g.phase, "finished", `stage ${stage + 1}`);

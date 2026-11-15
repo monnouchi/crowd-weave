@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createGame, step, GOAL } from "../logic.js";
 import { createParty } from "../party.js";
 import { trafficViolations, crossingTime, updateTraffic } from "../traffic.js";
-import { planRoute, routeInput } from "../validation/plan-route.js";
+import { planRoute, replayPlannedRoute, replayPlannedRouteAtBasePace } from "../validation/plan-route.js";
 const run = (g, seconds, input = {}) => {
   for (let n = 0; n < Math.round(seconds / 0.025); n++) step(g, 0.025, input);
 };
@@ -182,8 +182,7 @@ test("longer cafe has six moving crossing waves and a passable meeting group eve
     assert.ok(route, `route ${seed}`);
     const clean = createGame(2, seed);
     clean.phase = "playing";
-    for (const action of route.path)
-      for (let frame = 0; frame < 2; frame++) step(clean, 0.05, routeInput(action));
+    replayPlannedRouteAtBasePace(clean, route, 0.05);
     for (let frame = 0; frame < 40 && clean.phase === "playing"; frame++)
       step(clean, 0.05, { left: true, right: true });
     assert.equal(clean.phase, "finished");
@@ -205,8 +204,7 @@ test("all revised busy scenes retain all-member zero-contact routes across diffe
       assert.ok(result, `${stage}/${seed}`);
       const g = createGame(stage, seed);
       g.phase = "playing";
-      for (const action of result.path)
-        for (let k = 0; k < 4; k++) step(g, 0.025, routeInput(action));
+      replayPlannedRouteAtBasePace(g, result);
       assert.equal(g.phase, "finished");
       assert.equal(g.hits, 0);
       assert.equal(trafficViolations(g), 0);
@@ -225,9 +223,7 @@ test("both outdoor roads keep cars and bicycles apart from the complete moving p
     const route = planRoute(3, seed, 50);
     assert.ok(route);
     const kinds = new Set();
-    for (const action of route.path)
-      for (let k = 0; k < 4; k++) {
-        step(g, 0.025, routeInput(action));
+    replayPlannedRoute(g, route, 0.025, () => {
         for (const t of g.crossings) {
           const v = t.vehicle;
           kinds.add(v.kind);
@@ -248,7 +244,7 @@ test("both outdoor roads keep cars and bicycles apart from the complete moving p
             );
           }
         }
-      }
+    });
     assert.equal(g.phase, "finished");
     assert.ok(kinds.has("car") && kinds.has("bicycle"));
   }

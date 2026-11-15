@@ -350,6 +350,8 @@ export class Soundscape {
       this.tone(174.61, now, 0.22, 0.029, "triangle", null,
         { endFrequency: 123.47 });
       this.breath(now, 0.14, 0.025, 280);
+    } else if (kind === "nearMiss") {
+      this.tone(1568, now, 0.07, 0.009, "sine");
     } else if (kind === "closePass") {
       this.tone(659.25, now, 0.095, 0.009, "sine");
       this.tone(880, now + 0.07, 0.14, 0.009, "sine");

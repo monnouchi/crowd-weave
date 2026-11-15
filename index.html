@@ -37,6 +37,7 @@
           <button id="pause" class="icon-button" type="button" aria-label="一時停止" title="一時停止">Ⅱ</button>
         </div>
         <div id="progress" class="progress" role="progressbar" aria-label="目的地までの進行度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-fill"></span></div>
+        <div id="combo-meter" class="combo-meter tier-0"><span id="combo-flow">FLOW 0</span><span class="combo-bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></div>
         <div class="hud-detail"><span id="flow" aria-live="off">人波を見よう</span><span id="waiting" class="waiting" hidden>待っている</span><span id="hits">接触 0</span></div>
       </header>
 
@@ -59,7 +60,7 @@
           <p id="overlay-body" class="overlay-lead">開演まで、あと少し。<br />友だちとライブの最前列へ。</p>
           <p id="overlay-extra" class="overlay-extra">すきまを読み、何度でも声をかけよう。</p>
           <p id="overlay-intro" class="overlay-intro" hidden></p>
-          <div id="overlay-stats" class="overlay-stats" hidden><div><small id="result-time-label">タイム</small><strong id="result-time">0:00</strong></div><div><small>接触</small><strong id="result-hits">0</strong></div></div>
+          <div id="overlay-stats" class="overlay-stats" hidden><div><small id="result-time-label">タイム</small><strong id="result-time">0:00</strong></div><div><small>接触</small><strong id="result-hits">0</strong></div><div><small>スコア</small><strong id="result-score">0</strong></div><div><small>最大FLOW</small><strong id="result-max-flow">0</strong></div></div>
           <div id="replay-meta" class="replay-meta" hidden>
             <p id="result-record"></p>
             <button id="share-seed" type="button">同じ配置の URL をコピー</button>

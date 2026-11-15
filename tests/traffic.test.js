@@ -9,7 +9,7 @@ import {
   trafficViolations,
   trafficBlocks,
 } from "../traffic.js";
-import { planRoute, routeInput } from "../validation/plan-route.js";
+import { planRoute, replayPlannedRoute, replayPlannedRouteAtBasePace } from "../validation/plan-route.js";
 function fixture(stage = 3) {
   const g = createGame(stage);
   g.phase = "playing";
@@ -258,9 +258,7 @@ test("outdoor alternate seeds allow all-member zero-contact zero-violation arriv
       assert.ok(route, `stage${stage} seed${seed}`);
       const g = createGame(stage, seed);
       g.phase = "playing";
-      for (const a of route.path)
-        for (let k = 0; k < 4; k++) {
-          step(g, 0.025, routeInput(a));
+      replayPlannedRouteAtBasePace(g, route, 0.025, () => {
           const v = g.traffic.vehicle;
           if (v.active && v.entered)
             for (const p of [
@@ -272,7 +270,7 @@ test("outdoor alternate seeds allow all-member zero-contact zero-violation arriv
                 !overlap(v, p),
                 "moving party and all pedestrians remain safe",
               );
-        }
+      });
       assert.equal(g.phase, "finished");
       assert.equal(g.hits, 0);
       assert.equal(trafficViolations(g), 0);
@@ -394,8 +392,7 @@ test("bounded signal waiting and all-member clean routes remain achievable acros
       );
       const route = planRoute(stage, seed, 50);
       assert.ok(route);
-      for (const a of route.path)
-        for (let k = 0; k < 4; k++) step(clean, 0.025, routeInput(a));
+      replayPlannedRouteAtBasePace(clean, route);
       const direct = createGame(stage, seed);
       direct.phase = "playing";
       for (let n = 0; n < 4000 && direct.phase === "playing"; n++)

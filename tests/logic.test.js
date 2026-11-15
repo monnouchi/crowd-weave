@@ -7,7 +7,7 @@ import {
   visiblePerson,
   reactToContact,
 } from "../crowd.js";
-import { planRoute, routeInput } from "../validation/plan-route.js";
+import { planRoute, replayPlannedRoute, replayPlannedRouteAtBasePace } from "../validation/plan-route.js";
 import { performance } from "node:perf_hooks";
 import { TwoButtons } from "../input.js";
 import { createParty } from "../party.js";
@@ -210,8 +210,7 @@ test("all stages have a verified clean route, including the full-party signal wi
     const result = planRoute(stage, undefined, 50);
     assert.ok(result, `stage ${stage + 1} route`);
     const g = playing(stage);
-    for (const action of result.path)
-      for (let k = 0; k < 4; k++) step(g, 0.025, routeInput(action));
+    replayPlannedRouteAtBasePace(g, result);
     assert.equal(g.phase, "finished");
     assert.equal(g.hits, 0, `stage ${stage + 1} contact`);
     const careless = playing(stage);
@@ -240,8 +239,7 @@ test("alternate-seed busy stations retain fair routes", () => {
     assert.ok(result);
     const g = createGame(4, seed);
     g.phase = "playing";
-    for (const action of result.path)
-      for (let k = 0; k < 4; k++) step(g, 0.025, routeInput(action));
+    replayPlannedRouteAtBasePace(g, result);
     assert.equal(g.phase, "finished");
     assert.equal(g.hits, 0);
   }

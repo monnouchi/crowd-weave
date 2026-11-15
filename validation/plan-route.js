@@ -5,6 +5,8 @@ import {
   goalFor,
   arrivalPoint,
   setArrivalSlots,
+  FLOW_TIERS,
+  flowTier,
 } from "../logic.js";
 import { moveCrowd, visiblePerson } from "../crowd.js";
 import { moveParty, partyArrived } from "../party.js";
@@ -209,4 +211,55 @@ export function routeInput(action) {
     left: action === "L" || action === "B",
     right: action === "R" || action === "B",
   };
+}
+
+// Track each 0.1-second segment with zero depth epsilon and a 1-unit lateral
+// deadband; the optional observer preserves per-substep checks in route tests.
+export function replayPlannedRoute(g, route, substep = 0.025, afterStep) {
+  // Closed-loop replay: track the planned trajectory instead of replaying
+  // inputs open-loop. Under v2 the pace varies with FLOW (tier x kick), so
+  // the driver predicts the forward advance of each substep and brakes
+  // whenever moving would overshoot the planned depth by more than 0.5.
+  // Depth discipline wins over lateral correction: steering may create a
+  // lead of at most 4 units, and only to fix a lateral error over 4.
+  let x = 240, y = g.startY;
+  const substeps = Math.round(0.1 / substep), dt = 0.1 / substeps;
+  for (const action of route.path) {
+    const endX = Math.max(30, Math.min(450, x + (action === "L" ? -10 : action === "R" ? 10 : 0)));
+    const endY = y - (action === "B" ? 0 : 7.5);
+    for (let k = 0; k < substeps; k++) {
+      const fraction = (k + 1) / substeps;
+      const targetX = x + (endX - x) * fraction;
+      const targetY = y + (endY - y) * fraction;
+      const kick = g.worldTime < g.combo.kickUntil ? 1.25 : 1;
+      const advance = 75 * FLOW_TIERS[flowTier(g.combo.flow)].multiplier * kick * dt;
+      const errorX = targetX - g.player.x;
+      const behind = g.player.y - targetY; // positive: behind plan; negative: ahead
+      let move = false;
+      if (behind > 0.5) move = true;
+      else if (g.player.y - advance >= targetY - 0.5) move = true;
+      else if (Math.abs(errorX) > 4 && behind > -4) move = true;
+      step(g, dt, move
+        ? { left: errorX < -1, right: errorX > 1 }
+        : { left: true, right: true });
+      if (afterStep) afterStep();
+    }
+    x = endX;
+    y = endY;
+  }
+}
+
+export function replayPlannedRouteAtBasePace(g, route, substep = 0.025, afterStep) {
+  // Fairness-proof replay at the exact pace the planner proved: FLOW is
+  // pinned to zero after every substep, so the v2 speed tiers and the
+  // near-miss kick never engage and the head reproduces the planned
+  // trajectory (and its crowd-avoidance coupling) as in the v1 replays.
+  // Pass detection, courtesy, traffic and arrival all stay live; only the
+  // combo pace is held at base. Full-physics completion is covered
+  // separately by the v2 driver test in tests/combo.test.js.
+  return replayPlannedRoute(g, route, substep, () => {
+    g.combo.flow = 0;
+    g.combo.kickUntil = 0;
+    if (afterStep) afterStep();
+  });
 }

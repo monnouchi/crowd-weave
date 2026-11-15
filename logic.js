@@ -432,6 +432,26 @@ function placePassingPair(crowd, stage) {
     if (person.spot) person.spot = { x, y };
   });
 }
+// Five forward-speed tiers, indexed by the FLOW threshold reached.
+export const FLOW_TIERS = Object.freeze([
+  { min: 0, multiplier: 1 }, { min: 3, multiplier: 1.12 },
+  { min: 6, multiplier: 1.25 }, { min: 10, multiplier: 1.4 },
+  { min: 15, multiplier: 1.6 },
+]);
+export function flowTier(flow) {
+  return FLOW_TIERS.findLastIndex((tier) => flow >= tier.min);
+}
+// 120px covers the 108px crowd-flow observation zone with a small margin.
+export const PASS_ENGAGEMENT = 120;
+// Allow 14px beyond the body's safe gap, measured from the radii.
+export const NEAR_MISS_CLEARANCE = BODY_GAP + 14;
+function resetCombo(combo) {
+  combo.flow = 0;
+  combo.kickUntil = 0;
+  combo.lastPassAt = null;
+  combo.nextDecayAt = null;
+}
+
 export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
   const config = STAGES[stage];
   const scene = SCENES[stage];
@@ -489,6 +509,8 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     },
     elapsed: 0,
     worldTime: 0,
+    combo: { flow: 0, maxFlow: 0, score: 0, lastPassAt: null,
+      nextDecayAt: null, kickUntil: 0, nearMissSerial: 0 },
     crossings,
     traffic: crossings[0] || null,
     hits: 0,
@@ -533,6 +555,13 @@ export function step(g, dt, input) {
   const hitsBeforeStep = g.hits;
   g.elapsed += dt;
   g.worldTime += dt;
+  const combo = g.combo;
+  while (combo.flow > 0 && combo.nextDecayAt !== null &&
+      g.worldTime > combo.nextDecayAt + 1e-9) {
+    combo.flow--;
+    combo.nextDecayAt += 1;
+  }
+  const previousCrowd = new Map(g.crowd.map((p) => [p, { x: p.x, y: p.y }]));
   if (!activeSpeech(g)) g.speech = null;
   updateCallGesture(g, input);
   updateHopGesture(g, input);
@@ -543,7 +572,7 @@ export function step(g, dt, input) {
   const nearbyAnimals = g.animals.filter((animal) =>
     previousTeam.some((member) => Math.abs(animal.y - member.y) < 100));
   const people = [...g.crowd.filter(visiblePerson), ...nearbyAnimals],
-    blockedContacts = new Map();
+    blockedContacts = new Map(), playerContacts = new Set();
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
   g.stun = Math.max(0, g.stun - dt);
@@ -563,7 +592,9 @@ export function step(g, dt, input) {
         lateralIntent = direction;
         g.player.x += direction * 100 * dt;
       }
-      g.player.y -= 75 * dt;
+      const tier = flowTier(combo.flow);
+      const kick = g.worldTime < combo.kickUntil ? 1.25 : 1;
+      g.player.y -= 75 * FLOW_TIERS[tier].multiplier * kick * dt;
     }
   }
   const attemptedEdge = dt > 0 && lateralIntent < 0 && g.player.x <= 30
@@ -605,7 +636,10 @@ export function step(g, dt, input) {
       people,
     );
     Object.assign(g.player, result.point);
-    for (const id of result.contacts) blockedContacts.set(id, 0);
+    for (const id of result.contacts) {
+      blockedContacts.set(id, 0);
+      playerContacts.add(id);
+    }
   }
   constrainTraffic(g, previousPlayer, input);
   g.player.x = Math.max(30, Math.min(W - 30, g.player.x));
@@ -688,6 +722,12 @@ export function step(g, dt, input) {
     }
     if (overlaps) touching.push(p.id);
   }
+  // Remember every player-body contact, including contacts during cooldown.
+  for (const p of g.crowd) {
+    if (playerContacts.has(p.id) ||
+        Math.hypot(p.x - g.player.x, p.y - g.player.y) <
+          p.r + g.player.r + BODY_GAP + 0.3) p.comboContacted = true;
+  }
   g.touchingIds = touching;
   if (contacted) {
     if (!contacted.animal) reactToContact(contacted, contactMember);
@@ -708,8 +748,34 @@ export function step(g, dt, input) {
       }
     }
   }
-  if (g.violationEvent?.id !== previousViolationId &&
-      g.violationEvent?.memberId) {
+  const newViolation = !!g.violationEvent && g.violationEvent.id !== previousViolationId;
+  if (contacted || newViolation) resetCombo(combo);
+  // Interpolate relative positions at the crossing, including lateral motion.
+  for (const p of g.crowd) {
+    const before = previousCrowd.get(p);
+    if (!before || p.animal || p.comboPassed || p.comboContacted || p.yieldedToCall) continue;
+    const beforeDy = before.y - previousPlayer.y;
+    const afterDy = p.y - g.player.y;
+    if (beforeDy >= 0 || afterDy <= 0) continue;
+    const fraction = -beforeDy / (afterDy - beforeDy);
+    const dx = (before.x - previousPlayer.x) + fraction *
+      ((p.x - g.player.x) - (before.x - previousPlayer.x));
+    if (Math.abs(dx) > PASS_ENGAGEMENT) continue;
+    p.comboPassed = true;
+    // A reset in this step wins over all crossing credits.
+    if (contacted || newViolation) continue;
+    const near = Math.abs(dx) - (g.player.r + p.r) <= NEAR_MISS_CLEARANCE;
+    combo.flow += near ? 2 : 1;
+    combo.maxFlow = Math.max(combo.maxFlow, combo.flow);
+    combo.score += (near ? 200 : 100) * (flowTier(combo.flow) + 1);
+    combo.lastPassAt = g.worldTime;
+    combo.nextDecayAt = g.worldTime + 3;
+    if (near) {
+      combo.kickUntil = g.worldTime + 0.6;
+      combo.nearMissSerial++;
+    }
+  }
+  if (newViolation && g.violationEvent?.memberId) {
     say(g, "hazard", g.violationEvent.memberId,
       g.violationEvent.message, 1.8);
   }

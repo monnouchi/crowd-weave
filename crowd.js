@@ -630,6 +630,7 @@ export function courtesyUnavailableReason(crowd, player, crossings = [], stage =
 export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
   const targets = availableCourtesyTargets(crowd, player, crossings, stage);
   for (const { person: p, targetX } of targets) {
+    p.yieldedToCall = true;
     if (p.courtesy) p.courtesy.remaining = COURTESY.duration;
     else p.courtesy = {
       targetX, remaining: COURTESY.duration,
