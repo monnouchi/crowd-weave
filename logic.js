@@ -738,6 +738,11 @@ export function step(g, dt, input) {
       return result.fraction;
     },
   });
+  // A recovery is a relocation, not a swept movement through traffic.
+  g.party.members.forEach((member, i) => {
+    if ((member.recoveryCount || 0) !== (previousTeam[i + 1]?.recoveryCount || 0))
+      previousTeam[i + 1] = { ...member };
+  });
   for (const [id, memberId] of blockedContacts) {
     if (!memberId) continue;
     const person = people.find((p) => p.id === id),

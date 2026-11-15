@@ -1,6 +1,7 @@
 import { appearanceFor } from "./appearance.js";
 import { drawRadar } from "./radar-view.js";
 import { previewTurn } from "../crowd.js";
+import { RECOVERY_FADE_SECONDS } from "../party.js";
 import { activeCallRipple, flowTier, HOP_DISTANCE } from "../logic.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
@@ -972,7 +973,7 @@ function person(ctx, c, actor, game, view, shadowPass = false) {
   const r = (actor.r || 13) * s;
   if (px + r * 2 < -35 || px - r * 2 > c.width + 35 || foot < -70 || foot - 65 * s > c.height + 70) return;
   ctx.save();
-  ctx.globalAlpha *= edgeOpacity;
+  ctx.globalAlpha *= edgeOpacity * (actor.recovering ? Math.max(0, 1 - actor.recovering / RECOVERY_FADE_SECONDS) : 1);
   const look = appearanceFor(actor);
   const clothes = look.torso || (actor.appearanceId === 12 ? "#cda65e" : actor.shirt || (c.stage === 4
     ? ["#9b5974", "#617b9b", "#b2806e", "#788c84", "#ae9b75"][(actor.color ?? actor.id ?? 0) % 5]

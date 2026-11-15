@@ -11,6 +11,13 @@ export const PARTY_SPACING = 30;
 // World y decreases along both a stage and the seamless course.
 export const FOLLOWER_PROGRESS_MARGIN = 1;
 const YIELD_CLEARANCE = 24;
+// Even the fourth friend normally trails by only 120 units. These limits
+// leave room for stops and detours while still rescuing a stranded party.
+export const LEASH_DISTANCE = 400;
+export const LEASH_STALL_DISTANCE = 200;
+export const LEASH_STALL_SECONDS = 6;
+export const RECOVERY_FADE_SECONDS = 0.3;
+const STALL_MOVEMENT = 3;
 
 function constrainFollowTarget(target, member, player) {
   const floor = player.y + FOLLOWER_PROGRESS_MARGIN;
@@ -128,6 +135,7 @@ export function moveParty(
   for (let i = 0; i < party.members.length; i++) {
     const m = party.members[i];
     m.flash = Math.max(0, m.flash - dt);
+    m.recovering = Math.max(0, (m.recovering || 0) - dt);
     if (stunned || m.docked) continue;
     if (
       arriving &&
@@ -143,6 +151,40 @@ export function moveParty(
         m.docked = true;
         m.state = "docked";
       }
+      continue;
+    }
+    // Measure displacement over a window, not per frame, so slow motion
+    // counts as progress and a stationary player does not accumulate stalls.
+    const lag = m.y - player.y;
+    if (lag > LEASH_STALL_DISTANCE) {
+      const origin = m.stallOrigin || { x: m.x, y: m.y };
+      if (Math.hypot(m.x - origin.x, m.y - origin.y) >= STALL_MOVEMENT) {
+        m.stallOrigin = { x: m.x, y: m.y };
+        m.stallTime = 0;
+      } else {
+        m.stallOrigin = origin;
+        m.stallTime = (m.stallTime || 0) + dt;
+      }
+    } else {
+      m.stallOrigin = null;
+      m.stallTime = 0;
+    }
+    if (lag > LEASH_DISTANCE || (lag > LEASH_STALL_DISTANCE &&
+        m.stallTime >= LEASH_STALL_SECONDS)) {
+      const s = party.distance - (i + 1) * spacing;
+      const point = sampleTrail(party.trail, s);
+      m.s = s;
+      m.y = Math.max(point.y, player.y + FOLLOWER_PROGRESS_MARGIN);
+      let side = point.x < player.x ? -1 : 1;
+      if (player.x + side * YIELD_CLEARANCE < 30 ||
+          player.x + side * YIELD_CLEARANCE > 450) side *= -1;
+      m.x = Math.abs(point.x - player.x) >= YIELD_CLEARANCE
+        ? point.x : player.x + side * YIELD_CLEARANCE;
+      m.recovering = RECOVERY_FADE_SECONDS;
+      m.recoveryCount = (m.recoveryCount || 0) + 1;
+      m.stallOrigin = null;
+      m.stallTime = 0;
+      m.state = "following";
       continue;
     }
     const target = arriving

@@ -11,6 +11,7 @@ import { planRoute, replayPlannedRoute, replayPlannedRouteAtBasePace } from "../
 import { performance } from "node:perf_hooks";
 import { TwoButtons } from "../input.js";
 import { createParty } from "../party.js";
+import { createCourseRun, beginRun } from "../src/run.js";
 const playing = (stage = 0) => {
   const g = createGame(stage);
   g.phase = "playing";
@@ -206,12 +207,18 @@ test("route followers cross, stop for reasons, yield smoothly and re-enter off r
   assert.ok(Math.abs(same[0].vy) < 40);
 });
 test("all stages have a verified clean route, including the full-party signal window", () => {
+  const course = createCourseRun();
+  beginRun(course);
   for (let stage = 0; stage < 5; stage++) {
     const result = planRoute(stage, undefined, 50);
     assert.ok(result, `stage ${stage + 1} route`);
     const g = playing(stage);
     replayPlannedRouteAtBasePace(g, result);
     assert.equal(g.phase, "finished");
+    assert.ok(g.party.members.every((m) => !m.recoveryCount), `stage ${stage + 1} no recovery`);
+    course.startY = course.course.offsets[stage] + STAGES[stage].startY;
+    replayPlannedRouteAtBasePace(course, result);
+    assert.ok(course.party.members.every((m) => !m.recoveryCount), `course stage ${stage + 1} no recovery`);
     assert.equal(g.hits, 0, `stage ${stage + 1} contact`);
     const careless = playing(stage);
     for (let n = 0; n < 4000 && careless.phase === "playing"; n++)
@@ -232,6 +239,7 @@ test("all stages have a verified clean route, including the full-party signal wi
         `stage ${stage + 1} ${g.elapsed} vs ${careless.elapsed}`,
       );
   }
+  assert.equal(course.phase, "finished", "course route completes");
 });
 test("alternate-seed busy stations retain fair routes", () => {
   for (const seed of [17, 2026, 33]) {
