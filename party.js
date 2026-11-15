@@ -8,6 +8,28 @@ export const FRIENDS = [
   { id: 4, name: "友だち4", shirt: "#9788a9" },
 ];
 export const PARTY_SPACING = 30;
+// World y decreases along both a stage and the seamless course.
+export const FOLLOWER_PROGRESS_MARGIN = 1;
+const YIELD_CLEARANCE = 24;
+
+function constrainFollowTarget(target, member, player) {
+  const floor = player.y + FOLLOWER_PROGRESS_MARGIN;
+  if (target.y >= floor) return target;
+  // An already-ahead follower must not be pushed back or advanced further.
+  if (member.y < floor && target.y <= member.y) return { x: member.x, y: member.y };
+  target = { ...target, y: Math.min(floor, Math.max(member.y, target.y)) };
+  // A reversal can put the old trail in front of the player. Give the player
+  // a lane as well as moving the follower behind the current course position.
+  if (Math.abs(target.x - player.x) < YIELD_CLEARANCE) {
+    let side = target.x === player.x
+      ? (player.x <= 240 ? 1 : -1)
+      : Math.sign(target.x - player.x);
+    if (player.x + side * YIELD_CLEARANCE < 30 ||
+        player.x + side * YIELD_CLEARANCE > 450) side *= -1;
+    target.x = Math.max(30, Math.min(450, player.x + side * YIELD_CLEARANCE));
+  }
+  return target;
+}
 export function createParty(count, player) {
   const tail = (count + 2) * PARTY_SPACING;
   return {
@@ -136,12 +158,19 @@ export function moveParty(
           m.s + 140 * dt,
         ),
       ),
-      proposed = sampleTrail(party.trail, proposedS),
+      sampledProposal = sampleTrail(party.trail, proposedS),
+      proposed = !arriving && proposedS > m.s
+        ? constrainFollowTarget(sampledProposal, m, player)
+        : sampledProposal,
       fraction = resolveFollower
         ? Math.max(0, Math.min(1, resolveFollower(m, proposed)))
         : 1;
+    const previousS = m.s;
     m.s += (proposedS - m.s) * fraction;
-    const next = sampleTrail(party.trail, m.s);
+    const sampled = sampleTrail(party.trail, m.s);
+    const next = arriving ? sampled : m.s > previousS
+      ? constrainFollowTarget(sampled, m, player)
+      : previous;
     m.x = next.x;
     m.y = next.y;
     const dx = m.x - previous.x,

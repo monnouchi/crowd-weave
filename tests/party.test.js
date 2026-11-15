@@ -13,20 +13,22 @@ test("party grows one friend per completed scene with visible distinct numbers",
     assert.ok(g.party.members.every((m) => m.y - g.player.y <= 120));
   }
 });
-test("followers replay right-angle path without cutting corners or reversing progress", () => {
-  const player = { x: 0, y: 0 },
+test("followers follow a lateral path without reversing trail progress", () => {
+  const player = { x: 240, y: 0 },
     p = createParty(1, player);
   let last = p.members[0].s;
   for (let i = 0; i < 25; i++) {
     player.x += 4;
     moveParty(p, player, 0.05);
     const m = p.members[0];
-    assert.ok(Math.abs(m.x) < 0.000001 || Math.abs(m.y) < 0.000001);
+    // A lateral trail lies at the player’s y; the safety margin keeps the
+    // visible friend just behind it instead of exactly on that path.
+    assert.ok(m.y >= player.y + 1);
     assert.ok(m.s >= last);
     last = m.s;
   }
-  assert.ok(p.members[0].x > 0);
-  assert.ok(Math.abs(p.members[0].y) < 0.000001);
+  assert.ok(p.members[0].x > 240);
+  assert.ok(Math.abs(p.members[0].y - 1) < 0.000001);
   assert.deepEqual(
     sampleTrail(
       [
