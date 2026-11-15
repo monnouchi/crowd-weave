@@ -1,6 +1,6 @@
 import { flowTier } from "../logic.js";
 import { TwoButtons, bindPointerControls, gameplayKey } from "../input.js";
-import { createRun, beginRun, updateRun, advanceRun, retryRun, restartRun, pauseRun, resumeRun, STORY_STAGES } from "./run.js";
+import { createRun, createCourseRun, beginRun, updateRun, advanceRun, retryRun, pauseRun, resumeRun, STORY_STAGES } from "./run.js";
 import { renderWorld } from "./render.js";
 import { Soundscape } from "./audio.js";
 import { recordLocalBest, recordCourseResults, seedShareUrl } from "./replay.js";
@@ -37,7 +37,7 @@ function newSeed() {
   try { return crypto.getRandomValues(new Uint32Array(1))[0]; }
   catch { return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0; }
 }
-let run = createRun(0, newSeed());
+let run = createCourseRun(newSeed());
 let previousPhase = run.phase;
 let cueUntil = 0;
 let contactUntil = 0;
@@ -215,17 +215,20 @@ function resultTotals() {
 function showFinished() {
   const final = run.stage === 4;
   const totals = final ? resultTotals() : { elapsed: run.elapsed, hits: run.hits, score: run.combo.score, maxFlow: run.combo.maxFlow };
+  const segRecord = run.course ? run.records.find((r) => r.stage === run.stage) : null;
+  const segElapsed = segRecord?.elapsed ?? run.elapsed, segHits = segRecord?.hits ?? run.hits;
+  const segScore = segRecord?.score ?? run.combo.score, segMaxFlow = segRecord?.maxFlow ?? run.combo.maxFlow;
   if (final) recordLocalBest(browserStorage(), {
     seed: run.runSeed, stage: run.stage,
-    elapsed: run.elapsed, hits: run.hits, score: run.combo.score, maxFlow: run.combo.maxFlow,
+    elapsed: segElapsed, hits: segHits, score: segScore, maxFlow: segMaxFlow,
   });
   const result = recordLocalBest(browserStorage(), {
     seed: run.runSeed, stage: final ? 5 : run.stage,
     elapsed: totals.elapsed, hits: totals.hits, score: totals.score, maxFlow: totals.maxFlow,
   });
   const course = recordCourseResults(browserStorage(), {
-    stage: run.stage, elapsed: run.elapsed, hits: run.hits,
-    score: run.combo.score, maxFlow: run.combo.maxFlow,
+    stage: run.stage, elapsed: segElapsed, hits: segHits,
+    score: segScore, maxFlow: segMaxFlow,
     total: totals, totalEligible: final && run.startStage === 0,
   });
   const streak = final
@@ -260,7 +263,8 @@ function showFinished() {
     const scoreBest = course?.scoreImproved ? course.best.score
       : course?.stageResult?.scoreImproved ? course.stageResult.best.score : null;
     const scoreText = scoreBest !== null ? `スコアベスト更新！ ${scoreBest}` : "";
-    $("result-record").textContent = [bestText, courseText, streakText, scoreText].filter(Boolean).join("\n");
+    const splitsText = final && run.course ? run.records.map((r, i) => `${i + 1}区間 ${clock(r.elapsed)}`).join(" ／ ") : "";
+    $("result-record").textContent = [bestText, courseText, streakText, scoreText, splitsText].filter(Boolean).join("\n");
   };
   if (!final || reducedMotion.matches) return reveal();
 
@@ -331,7 +335,7 @@ function action() {
   }
   if (run.phase === "finished") {
     if (run.stage < 4) setRun(advanceRun(run));
-    else setRun(restartRun(newSeed()));
+    else setRun(createCourseRun(newSeed()));
     return begin();
   }
 }
@@ -466,6 +470,7 @@ function consumeEvents() {
     else if (kind === "contact") { cue("おっと、ゆっくり", .85); contactUntil = performance.now() + 250; }
     else if (kind === "nearMiss") cue("際どい！", .85);
     else if (kind === "closePass") cue(Number(event.streak) >= 2 ? "続けて、すきまを抜けた！" : "すきまを抜けた", .85);
+    else if (kind === "split") cue(`${event.stage + 1}区間 スプリット ${clock(event.split)}`, 2.2);
     else if (kind === "reunion") cue("追いついた！", 1.1);
     else if (kind === "danger") dangerUntil = performance.now() + 550;
   }

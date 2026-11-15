@@ -12,7 +12,7 @@ const CAMERA_BACK = 230;
 const CAMERA_UP = 98;
 const TAU = Math.PI * 2;
 
-const THEMES = [
+export const THEMES = [
   { sky: ["#f4c8a5", "#c8e5dc"], haze: "#b9d5c9", ground: "#d5cbb4", path: "#e8dfca", edge: "#b0a88f", line: "#fff6dc", wall: ["#f1d8b9", "#d4a98b", "#b97862"], roof: "#885b58", ink: "#314a4b", accent: "#f0bd6d", glass: "#90b4ae" },
   { sky: ["#bcd8df", "#e5e1d4"], haze: "#b4c7cb", ground: "#c5cbc3", path: "#dbe3dd", edge: "#8da6a8", line: "#f2efdc", wall: ["#c9d8d6", "#a4bcbf", "#647f8b"], roof: "#54747d", ink: "#274c59", accent: "#f3bd69", glass: "#86bccb" },
   { sky: ["#f7d2aa", "#ebdec0"], haze: "#d8bda5", ground: "#c7aa8f", path: "#ead9bd", edge: "#bb896f", line: "#fff2d1", wall: ["#e8bc96", "#c8846b", "#915f60"], roof: "#9b5f54", ink: "#533f4b", accent: "#ffd079", glass: "#90b9b1" },
@@ -21,6 +21,21 @@ const THEMES = [
 ];
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+export function lerpTheme(a, b, t) {
+  const color = (x, y) => "#" + [1, 3, 5].map((i) =>
+    Math.round(parseInt(x.slice(i, i + 2), 16) * (1 - t) +
+      parseInt(y.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+  return Object.fromEntries(Object.keys(a).map((key) => [key,
+    Array.isArray(a[key]) ? a[key].map((value, i) => color(value, b[key][i])) : color(a[key], b[key])]));
+}
+
+export function courseThemeBlend(game) {
+  if (!game?.course || game.course.index >= 4) return null;
+  const from = game.course.index;
+  const boundaryY = game.course.offsets[from] + 84;
+  return { t: clamp((boundaryY + 170 - game.player.y) / 340, 0, 1), from, to: from + 1 };
+}
+
 const fract = (n) => n - Math.floor(n);
 const hash = (n) => fract(Math.sin(n * 127.1 + 311.7) * 43758.5453);
 
@@ -180,7 +195,10 @@ function sky(ctx, c, theme, game, view) {
   const g = ctx.createLinearGradient(0, 0, 0, c.horizon + 110);
   g.addColorStop(0, theme.sky[0]); g.addColorStop(1, theme.sky[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, c.height);
-  if (c.stage === 2) {
+  const interiorAlpha = c.interiorAlpha ?? (c.stage === 2 ? 1 : 0);
+  if (interiorAlpha > .001) {
+    ctx.save();
+    ctx.globalAlpha = interiorAlpha;
     rect(ctx, 0, 0, c.width, c.horizon, "#e8d6bb");
     rect(ctx, 0, 0, c.width, c.horizon * .30, "#b99582");
     for (const x of [.08, .92])
@@ -192,6 +210,7 @@ function sky(ctx, c, theme, game, view) {
     }
     for (const x of [.12, .42, .72])
       rect(ctx, c.width * x, c.horizon * .08, c.width * .16, 5, "#fff4d6", 2);
+    ctx.restore();
     return;
   }
   if (c.stage === 4) {
@@ -618,11 +637,12 @@ function worldLabel(ctx, c, x, y, z, text, fill, ink,
 }
 
 function destination(ctx, c, theme, game) {
-  if (c.py < 70) return;
+  const oy = game.segOriginY || 0;
+  if (c.py < oy + 70) return;
   const stage = c.stage;
   const x0 = stage === 4 ? 95 : 177;
   const x1 = stage === 4 ? 385 : 303;
-  const y = 83;
+  const y = oy + 83;
   const arch = stage === 4 ? 91 : 82;
   const dark = stage === 4 ? "#5b4967" : theme.ink;
   const bright = stage === 4 ? "#f1b77f" : theme.accent;
@@ -644,24 +664,24 @@ function destination(ctx, c, theme, game) {
   }
   if (stage === 4) {
     // A banner and a pair of small trusses stand on the approach to the arch.
-    for (const x of [145, 335]) worldLine(ctx, c, [x, 115, 0], [x, 115, 76], "#a3b9bf", 2);
-    worldFace(ctx, c, [[145, 115, 58], [335, 115, 58], [335, 115, 75], [145, 115, 75]], "#d78583");
-    worldFace(ctx, c, [[145, 115, 58], [335, 115, 58], [335, 115, 64], [145, 115, 64]], "#efbb87");
+    for (const x of [145, 335]) worldLine(ctx, c, [x, oy + 115, 0], [x, oy + 115, 76], "#a3b9bf", 2);
+    worldFace(ctx, c, [[145, oy + 115, 58], [335, oy + 115, 58], [335, oy + 115, 75], [145, oy + 115, 75]], "#d78583");
+    worldFace(ctx, c, [[145, oy + 115, 58], [335, oy + 115, 58], [335, oy + 115, 64], [145, oy + 115, 64]], "#efbb87");
     for (const x of [105, 375]) {
-      worldLine(ctx, c, [x, 110, 0], [x, 110, 68], "#8eaab2", 2);
+      worldLine(ctx, c, [x, oy + 110, 0], [x, oy + 110, 68], "#8eaab2", 2);
       for (const z of [40, 61]) {
         const hue = z === 40 ? "#87e1db" : "#e88dbc";
-        worldFace(ctx, c, [[x - 3, 110, z], [x + 3, 110, z],
-          [240 + (x - 240)*.7, 150, 2], [240 + (x - 240)*.85, 150, 2]], hue + "20");
-        const light = screenPoint(c, x, 110, z);
+        worldFace(ctx, c, [[x - 3, oy + 110, z], [x + 3, oy + 110, z],
+          [240 + (x - 240)*.7, oy + 150, 2], [240 + (x - 240)*.85, oy + 150, 2]], hue + "20");
+        const light = screenPoint(c, x, oy + 110, z);
         if (light) ellipse(ctx, light.x, light.y, 4*light.scale, 4*light.scale, hue);
       }
     }
     for (let i = 0; i < 6; i++) {
       const x = 134 + i * 42;
       const color = i % 2 ? "#e88dbc" : "#87e1db";
-      worldLine(ctx, c, [x, 16, 48], [240 + (x - 240) * .24, 60, 3], color + "55", 1.1);
-      const p = screenPoint(c, x, 16, 49);
+      worldLine(ctx, c, [x, oy + 16, 48], [240 + (x - 240) * .24, oy + 60, 3], color + "55", 1.1);
+      const p = screenPoint(c, x, oy + 16, 49);
       if (p) ellipse(ctx, p.x, p.y, Math.max(1, p.scale * 4), Math.max(1, p.scale * 4), color);
     }
   }
@@ -743,7 +763,8 @@ function stageMusician(ctx, c, x, y, kind, game, view) {
 
 function concertStage(ctx, c, game, view) {
   if (c.stage !== 4) return;
-  const back = -215, front = -25;
+  const oy = game.segOriginY || 0;
+  const back = oy - 215, front = oy - 25;
   // A real raised stage sits beyond the front barrier. Its backdrop, platform
   // and performers all share the same perspective as the playable hall.
   worldFace(ctx, c, [[72, back, 18], [408, back, 18],
@@ -765,14 +786,14 @@ function concertStage(ctx, c, game, view) {
     { x: 314, target: 294, hue: "#e8afda" },
   ];
   for (const lamp of lamps) {
-    worldFace(ctx, c, [[lamp.x - 3, -191, 132], [lamp.x + 3, -191, 132],
-      [lamp.target + 35, -100, 19], [lamp.target - 35, -100, 19]],
+    worldFace(ctx, c, [[lamp.x - 3, oy - 191, 132], [lamp.x + 3, oy - 191, 132],
+      [lamp.target + 35, oy - 100, 19], [lamp.target - 35, oy - 100, 19]],
     lamp.hue + (game.arriving || game.phase === "finished" ? "3a" : "24"));
-    const light = screenPoint(c, lamp.x, -191, 132);
+    const light = screenPoint(c, lamp.x, oy - 191, 132);
     if (light) ellipse(ctx, light.x, light.y,
       Math.max(1.5, 4 * light.scale), Math.max(1.5, 4 * light.scale), lamp.hue);
   }
-  worldLine(ctx, c, [87, -190, 132], [393, -190, 132], "#b4c8cb", 2);
+  worldLine(ctx, c, [87, oy - 190, 132], [393, oy - 190, 132], "#b4c8cb", 2);
   for (const z of [54, 69, 84]) {
     for (let x = 109; x < 371; x += 13) {
       const z2 = z + Math.sin(x / 23 + z / 9) * 4;
@@ -785,15 +806,15 @@ function concertStage(ctx, c, game, view) {
     [412, front, 18], [68, front, 18]], "#55405b");
   for (const x of [105, 175, 240, 305, 375])
     worldLine(ctx, c, [x, back + 1, 18.4], [x, front - 1, 18.4], "#dca98b32", 1);
-  for (const [x, y, fill] of [[190, -136, "#91e5d770"],
-    [240, -117, "#ffe2ae72"], [291, -149, "#d9acdc71"]]) {
+  for (const [x, y, fill] of [[190, oy - 136, "#91e5d770"],
+    [240, oy - 117, "#ffe2ae72"], [291, oy - 149, "#d9acdc71"]]) {
     const p = screenPoint(c, x, y, 18.5);
     if (p) ellipse(ctx, p.x, p.y,
       Math.max(2, 18 * p.scale), Math.max(1, 5 * p.scale), fill);
   }
-  stageMusician(ctx, c, 290, -150, 2, game, view);
-  stageMusician(ctx, c, 190, -136, 0, game, view);
-  stageMusician(ctx, c, 240, -117, 1, game, view);
+  stageMusician(ctx, c, 290, oy - 150, 2, game, view);
+  stageMusician(ctx, c, 190, oy - 136, 0, game, view);
+  stageMusician(ctx, c, 240, oy - 117, 1, game, view);
   worldFace(ctx, c, [[68, front, 0], [412, front, 0],
     [412, front, 18], [68, front, 18]], "#402c49");
   worldLine(ctx, c, [68, front, 18], [412, front, 18], "#ffd49a", 3);
@@ -1301,7 +1322,11 @@ function speedLines(ctx, c, game, view) {
 export function renderWorld(ctx, game, view = {}) {
   if (!ctx || !game?.player) return;
   const c = camera(game, view);
-  const theme = THEMES[c.stage];
+  const blend = courseThemeBlend(game);
+  const theme = blend && blend.t > 0 ? lerpTheme(THEMES[blend.from], THEMES[blend.to], blend.t) : THEMES[c.stage];
+  c.interiorAlpha = blend
+    ? (blend.from === 2 ? 1 : 0) * (1 - blend.t) + (blend.to === 2 ? 1 : 0) * blend.t
+    : (c.stage === 2 ? 1 : 0);
   ctx.save();
   ctx.beginPath(); ctx.rect(0, 0, c.width, c.height); ctx.clip();
   sky(ctx, c, theme, game, view);
@@ -1310,7 +1335,9 @@ export function renderWorld(ctx, game, view = {}) {
   routeMarks(ctx, c, game);
   const items = [];
   const stride = c.stage === 0 ? 235 : c.stage === 4 ? 185 : 210;
-  for (let i = -1; i < Math.ceil((game.worldHeight || 2200) / stride) + 1; i++) {
+  const firstRow = Math.floor((c.py - FAR) / stride) - 1;
+  const lastRow = Math.ceil((c.py + 30) / stride) + 1;
+  for (let i = firstRow; i <= lastRow; i++) {
     const y = i * stride + (c.stage === 2 ? 15 : 0);
     if (y > c.py + 30 || y + stride < c.py - FAR) continue;
     for (const side of [-1, 1]) {
@@ -1325,8 +1352,8 @@ export function renderWorld(ctx, game, view = {}) {
   for (const t of game.crossings || [])
     items.push({ y: t.bottom + 18, draw: () => crossing(ctx, c, t, theme) });
   if (c.stage === 4)
-    items.push({ y: -24, draw: () => concertStage(ctx, c, game, view) });
-  items.push({ y: 84, draw: () => destination(ctx, c, theme, game) });
+    items.push({ y: (game.segOriginY || 0) - 24, draw: () => concertStage(ctx, c, game, view) });
+  items.push({ y: (game.segOriginY || 0) + 84, draw: () => destination(ctx, c, theme, game) });
   if (game.meetingPartner && game.meetingPartner.state !== "met")
     items.push({ y: game.meetingPartner.y, draw: () => person(ctx, c,
       game.meetingPartner, game, view) });
