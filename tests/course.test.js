@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { STAGES, courseOffsets, createCourseRun, createRun, beginRun, updateRun, retryRun } from "../src/run.js";
 import { FRIEND_LOOKS } from "../src/appearance.js";
+import { visiblePerson } from "../crowd.js";
+import { radarSnapshot } from "../src/radar.js";
 
 const round4 = (n) => Math.round(n * 10000) / 10000;
 function crowdHash(crowd, dy = 0) {
@@ -38,6 +40,47 @@ test("course preserves seeded stage crowds and unique IDs", () => {
 
 test("course crowd is deterministic", () => {
   assert.equal(crowdHash(createCourseRun(20261115).crowd), crowdHash(createCourseRun(20261115).crowd));
+});
+
+test("course visibility matches each seeded single-stage crowd", () => {
+  const seed = 1402485690, course = createCourseRun(seed);
+  for (let k = 0; k < STAGES.length; k++) {
+    const courseVisible = course.crowd.filter((p) => p.seg === k && visiblePerson(p)).length;
+    const stageVisible = createRun(k, (seed + k * 97) >>> 0).crowd.filter(visiblePerson).length;
+    assert.equal(courseVisible, stageVisible, `segment ${k}`);
+  }
+});
+
+test("course pedestrians register contact in every segment", () => {
+  for (let k = 0; k < STAGES.length; k++) {
+    const states = k === 2 ? ["walking", "queuing"] : [null];
+    for (const state of states) {
+      const run = createCourseRun();
+      beginRun(run);
+      const person = run.crowd.find((p) => p.seg === k && p.active && !p.friend &&
+        (!state || p.state === state));
+      assert.ok(person, `segment ${k} ${state || "pedestrian"} exists`);
+      Object.assign(run.player, { x: person.x, y: person.y });
+      const hits = run.hits;
+      updateRun(run, 1 / 60, {});
+      updateRun(run, 1 / 60, {});
+      assert.ok(run.hits > hits || run.touchingIds.includes(person.id),
+        `segment ${k} ${state || person.state} registers contact`);
+    }
+  }
+});
+
+test("course radar locates pedestrians in every middle segment", () => {
+  const run = createCourseRun();
+  for (let k = 1; k <= 3; k++) {
+    const person = run.crowd.find((p) => p.seg === k && p.active && !p.friend);
+    assert.ok(person, `segment ${k} pedestrian exists`);
+    Object.assign(run.player, { x: person.x - 12, y: person.y + 25 });
+    const actor = radarSnapshot(run).actors.find((a) => a.id === person.id);
+    assert.ok(actor, `segment ${k} pedestrian appears on radar`);
+    assert.equal(actor.x, person.x - run.player.x);
+    assert.equal(actor.y, run.player.y - person.y);
+  }
 });
 
 function stepFrames(run, frames) {

@@ -1542,7 +1542,7 @@ export function extendJourney(crowd, stage, seed, config) {
   }
 }
 export function visiblePerson(p) {
-  const oy = p.environment === "party" ? (p.originY || 0) : 0;
+  const oy = p.originY || 0;
   return (
     p.active &&
     p.x > 18 &&
