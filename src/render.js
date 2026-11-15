@@ -818,6 +818,13 @@ export function pedestrianFacing(actor) {
   // the head can briefly glance toward the person who called.
   const body = (actor.acknowledge && !actor.courtesy) || actor.state === "waiting"
     ? { profile: 0, front: true } : direction(ux, uy);
+  const telegraph = actor.crossingTelegraph || actor.negotiateLean;
+  if (telegraph && !actor.acknowledge) {
+    const headX = telegraph;
+    const head = direction(headX, 0);
+    return { ...body, headProfile: head.profile, headFront: head.front,
+      headLean: headX * 1.6, headGaze: headX };
+  }
   if (actor.acknowledge && actor.courtesy) {
     const preparing = actor.courtesy.phase === "prepare";
     const weight = preparing
@@ -919,7 +926,9 @@ function person(ctx, c, actor, game, view) {
   const headProfile = facing.headProfile;
   const moving = Math.abs(actor.vx || 0) + Math.abs(actor.vy || 0) > 8;
   const stride = !view.reducedMotion && moving ? Math.sin((actor.walk || game.worldTime * 15) * .28 + (actor.id || 0)) * 3.2 : 0;
-  const bow = actor.acknowledge
+  const checkingPhone = actor.behavior === "phone" ||
+    (actor.behavior === "stopper" && actor.stopPhase === "stopped");
+  const bow = checkingPhone ? 2.5 : actor.acknowledge
     ? actor.courtesy?.phase === "prepare" ? 1.8 : 1.2 : 0;
   const outlined = friend ? "#fff0bd" : "#30444baa";
   blobShadow(ctx, c, px, foot, s, 13);
@@ -1047,6 +1056,12 @@ function person(ctx, c, actor, game, view) {
   ellipse(ctx, px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
     2.4 * s, 3 * s, look.skin);
   ellipse(ctx, rightHandX, bodyTop + (audienceRaised ? -7 : 19) * s, 2.4 * s, 3 * s, look.skin);
+  if (checkingPhone) {
+    limb(px + shoulder * s, bodyTop + 5 * s, px + 3 * s,
+      bodyTop + 10 * s, 3.4 * s, sleeve, outlined);
+    rect(ctx, px, bodyTop + 6 * s, 5 * s, 8 * s, "#28343c", s);
+    rect(ctx, px + s, bodyTop + 7 * s, 3 * s, 5 * s, "#9cc8cc", .5 * s);
+  }
   if (look.accessory === "shoppingBag" || look.accessory === "toteBag") {
     const hx = px + hand * s, hy = bodyTop + 19 * s;
     const tote = look.accessory === "toteBag";

@@ -55,7 +55,21 @@ const BUSY_STRETCHES = [
 const MAX_DT = 0.05;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// V2-5: people conscripted into designed encounters (redirect /
+// sendAcrossFlow) are cast members — they keep baseline "flow" behaviour
+// so the encounter plays as designed; exception archetypes belong to the
+// ambient crowd.
+function calmBehavior(person) {
+  person.behavior = "flow";
+  person.stopPhase = undefined;
+  person.crossPhase = undefined;
+  person.crossingTelegraph = 0;
+  person.negotiate = null;
+  person.negotiateLean = 0;
+}
+
 function redirect(person, x, y, run) {
+  calmBehavior(person);
   person.anchor = false;
   person.habit = "direct";
   person.state = "walking";
@@ -94,6 +108,7 @@ function sendAcrossFlow(person, run) {
     Math.hypot(other.x - x, other.y - y) >= 42));
   if (!opening) return false;
   const [x, y] = opening;
+  calmBehavior(person);
   const target = { x: 170, y: 300 };
   const dx = target.x - x, dy = target.y - y;
   const distance = Math.hypot(dx, dy);
@@ -111,6 +126,11 @@ function sendAcrossFlow(person, run) {
 }
 
 function naturalizeCrowd(run) {
+  // V2-5: intent negotiation is a live-play behaviour. The route planner
+  // and the simulation proofs advance the crowd on a player-independent
+  // timeline (the same separation as awarePlayer below), so negotiation is
+  // enabled here, at the run layer, and nowhere else.
+  run.negotiationEnabled = true;
   const anchors = run.crowd.filter((person) => person.anchor)
     .sort((a, b) => a.x - b.x);
   const anchorY = anchors.length

@@ -41,7 +41,11 @@ function gatherSafely(head, party, crowd, model) {
     moveParty(party, head, 0.025, { arriving: true });
     model.worldTime += 0.025;
     updateTraffic(model, 0.025);
-    moveCrowd(people, 0.025, model.crossings);
+    // The planner advances the crowd with the same static obstacles the
+    // real step() applies (animals), so planned positions are the
+    // positions the replay will actually meet. (V2-5: the denser crowd
+    // made the old obstacle-free approximation diverge at coarse steps.)
+    moveCrowd(people, 0.025, model.crossings, model.animals);
     if (!safeTeam(head, party, people.filter(visiblePerson))) return null;
     if (
       partyArrived(party) &&
@@ -85,7 +89,7 @@ export function planRoute(stage, seed, maxSeconds = 25, initialWait = 0,
     for (let k = 0; k < substeps; k++) {
       model.worldTime += dt / substeps;
       updateTraffic(model, dt / substeps);
-      moveCrowd(crowd, dt / substeps, model.crossings);
+      moveCrowd(crowd, dt / substeps, model.crossings, model.animals);
       signals.push(model.crossings.map((t) => ({ ...t })));
       snapshots.push(
         crowd.filter(visiblePerson).map((p) => ({ x: p.x, y: p.y })),

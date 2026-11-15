@@ -156,6 +156,9 @@ export function makeCrowd(
     readerY = traffic ? 175 : 320;
   const rand = random(seed),
     crowd = [];
+  // V2-5 behaviour assignment draws from its own seeded stream so the main
+  // stream (spawn positions, routes) keeps its exact baseline sequence.
+  const brand = random(seed ^ 0x9e3779b9);
   for (let id = 0; id < count; id++) {
     const flow =
       environment === "cafe" && id % 10 >= 2
@@ -183,7 +186,39 @@ export function makeCrowd(
             : id % 3 === 0
               ? "relaxed"
               : "steady";
-    const lane = 65 + rand() * 350,
+    // V2-5 behaviour archetypes (documented distribution, ordinary walkers;
+    // non-"direct" habits and special roles are downgraded/overridden below):
+    //   opposing: phone 10%, against 8%, stopper 12%, crosser 6%, flow rest
+    //   along:    phone 8%, stopper 12%, crosser 6%, flow rest
+    //   crossing: phone 8%, flow rest
+    // The venue environment (rain, the densest crowd, two signalised
+    // crossings) scales every exception share by 0.7: people hurry along
+    // to the concert, and that stage's fairness contract (a bounded clean
+    // arrival at both the normal and the capped low frame rate) has the
+    // least slack for dawdling and stopping. 0.7 is the calibrated value
+    // at which both frame-rate proofs hold for the venue stage.
+    const exceptionScale = environment === "venue" ? 0.7 : 1;
+    const behaviorDraw = brand();
+    const behavior =
+      flow === "opposing"
+        ? behaviorDraw < 0.10 * exceptionScale ? "phone"
+          : behaviorDraw < 0.18 * exceptionScale ? "against"
+            : behaviorDraw < 0.30 * exceptionScale ? "stopper"
+              : behaviorDraw < 0.36 * exceptionScale ? "crosser" : "flow"
+        : flow === "along"
+          ? behaviorDraw < 0.08 * exceptionScale ? "phone"
+            : behaviorDraw < 0.20 * exceptionScale ? "stopper"
+              : behaviorDraw < 0.26 * exceptionScale ? "crosser" : "flow"
+          : behaviorDraw < 0.08 * exceptionScale ? "phone" : "flow";
+    // V2-5 flow lanes: same-direction walkers keep the west band, oncoming
+    // walkers the east band (each crowd keeps to its own left); the rare
+    // "against" walker deliberately uses the player's (west) band.
+    const lane =
+      flow === "along" || behavior === "against"
+        ? 60 + rand() * 235
+        : flow === "opposing"
+          ? 185 + rand() * 235
+          : 65 + rand() * 350,
       slope = (rand() - 0.5) * 60;
     const eastbound = id % 2 === 0;
     const origin =
@@ -310,6 +345,12 @@ export function makeCrowd(
       if (reserved && crowd.every((p) => Math.hypot(p.x - x, p.y - y) > 38))
         break;
     }
+    // Lane-coherent exits (b.x = lane + slope) were tried and REJECTED:
+    // concentrating every exit on the lane bands erased verified
+    // no-contact routes at signal crossings (traffic route proofs failed).
+    // Lanes therefore live in the entry band + laneInfo; exits stay
+    // spawn-anchored, which also keeps the mid-field mixed like a real
+    // crowd instead of two sealed streams.
     if (flow !== "crossing") b.x = Math.max(50, Math.min(430, x + slope));
     // Starting positions are walkers already en route, rather than simultaneous entries.
     const pace =
@@ -320,9 +361,12 @@ export function makeCrowd(
       (environment === "cafe" && flow === "crossing"
         ? [1, 0.78, 1.2][cafeBand]
         : 1);
+    const finalBehavior = habit === "direct" ? behavior : "flow";
     const p = {
       id,
       environment,
+      behavior: finalBehavior,
+      laneInfo: { flow, centre: lane },
       role: profile.role,
       originName: profile.places[origin],
       destinationName: profile.places[destination],
@@ -366,6 +410,35 @@ export function makeCrowd(
       walk: rand() * 30,
       reaction: null,
     };
+    if (finalBehavior === "phone") {
+      // Calibrated at 0.72 (not lower): the pace-of-person-ahead rule caps
+      // whole platoons at the slowest member, and at 0.55 the venue
+      // stage's signal queues stopped draining within the fairness
+      // contract's bounded time. 0.72 still reads as dawdling.
+      p.fullPace = p.pace;
+      p.pace *= 0.72;
+    }
+    if (finalBehavior === "stopper") {
+      p.stopPhase = "walking";
+      p.stopIn = 4 + brand() * 8;
+      p.stopDuration = 1 + brand();
+      p.stopFactor = 1;
+      p.stopT = 0;
+      p.stopCount = 0;
+    }
+    if (finalBehavior === "crosser") {
+      // The crossing trigger is a PLACE (crossAtY), armed in moveCrowd —
+      // never an accumulated-distance threshold. A distance trigger turns
+      // any micro-divergence between two simulations of the same crowd
+      // into a 100+ unit lateral dash at a different place; a place
+      // trigger keeps the crossing where every timeline expects it.
+      p.crossAtY = null;
+      p.crossCycle = -1;
+      p.crossDir = 0;
+      p.crossPhase = "pending";
+      p.crossT = 0;
+      p.crossingTelegraph = 0;
+    }
     if (
       habit === "queuing" ||
       id === 7 ||
@@ -383,6 +456,7 @@ export function makeCrowd(
         ? id === 17 ? 255 : 210
         : id === 17 ? 110 : 155;
       p.group = "family";
+      p.behavior = "pair";
       p.origin = "south";
       p.destination = "north";
       p.flow = "along";
@@ -399,6 +473,7 @@ export function makeCrowd(
     }
     if ((environment === "venue" || environment === "party") && isVisitor(id)) {
       p.group = `visitors-${Math.floor(id / 6)}`;
+      p.behavior = "pair";
       p.archetype = "visitor";
       const partner = crowd.find((q) => q.group === p.group);
       if (partner) {
@@ -483,6 +558,69 @@ export function makeCrowd(
         uy: -1,
         role: "待ち合わせ中の人",
       });
+    }
+  }
+  // V2-5 pair formation: a chat pair is two ordinary walkers who stop and
+  // face each other (one wide, readable obstacle); a walking pair is two
+  // along-flow walkers sharing a group so the existing group cohesion keeps
+  // them abreast. Both consume ordinary slots — headcounts never change.
+  const pairCandidates = crowd.filter((p) =>
+    p.behavior === "flow" && p.habit === "direct" &&
+    p.state === "walking" && !p.group);
+  const pairUsed = new Set();
+  if (environment !== "venue") {
+    let formed = 0;
+    for (const p of pairCandidates) {
+      if (formed >= 2 || pairUsed.has(p)) continue;
+      const q = pairCandidates.find((o) =>
+        o !== p && !pairUsed.has(o) &&
+        Math.hypot(o.x - p.x, o.y - p.y) < 95);
+      if (!q) continue;
+      pairUsed.add(p);
+      pairUsed.add(q);
+      formed++;
+      for (const [a, b] of [[p, q], [q, p]]) {
+        a.behavior = "chat";
+        a.habit = "meeting";
+        a.state = "meeting";
+        a.pauseDuration = 18 + brand() * 14;
+        a.wait = a.pauseDuration;
+        a.route = [{ x: a.x, y: a.y }, ...a.route];
+        a.leg = 0;
+        const dx = b.x - a.x,
+          dy = b.y - a.y,
+          d = Math.hypot(dx, dy) || 1;
+        a.ux = dx / d;
+        a.uy = dy / d;
+        a.vx = 0;
+        a.vy = 0;
+        a.chatPartner = b.id;
+      }
+    }
+  }
+  {
+    let formed = 0;
+    for (const p of pairCandidates) {
+      if (formed >= 2 || pairUsed.has(p) || p.flow !== "along") continue;
+      const q = pairCandidates.find((o) =>
+        o !== p && !pairUsed.has(o) && o.flow === "along" &&
+        Math.hypot(o.x - p.x, o.y - p.y) < 110);
+      if (!q) continue;
+      pairUsed.add(p);
+      pairUsed.add(q);
+      formed++;
+      const group = `walkpair-${p.id}`,
+        pace = Math.min(p.pace, q.pace),
+        end = p.route.at(-1);
+      for (const a of [p, q]) {
+        a.behavior = "pair";
+        a.group = group;
+        a.pace = pace;
+      }
+      q.route = q.route.map((t, i) =>
+        i === q.route.length - 1
+          ? { x: Math.max(50, Math.min(430, end.x + 34)), y: end.y }
+          : t);
     }
   }
   return crowd;
@@ -646,8 +784,119 @@ export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
   }
   return targets.length;
 }
-export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
+// V2-5 intent negotiation (読み合い): a normal oncoming walker reads the
+// player's committed line and yields to the opposite side, telegraphed by a
+// lean before any lateral shift. Ambiguous side-switching is mirrored (at
+// most maxMirrors times); holding a line or braking lets the walker commit.
+// Negotiation NEVER moves a walker toward the player's committed line, and
+// its worst case (mirror overflow) is exactly the pre-V2-5 behaviour (the
+// walker holds his lane). It only runs when the caller supplies a player
+// context: direct moveCrowd callers (the route planner's crowd advance,
+// tests) pass none, so their crowd evolution is unchanged by design.
+const NEGOTIATE = Object.freeze({
+  bandNear: 26,
+  bandFar: 190,
+  lineWidth: 58,
+  leanTime: 0.32,
+  lateralSpeed: 70,
+  clearGap: 50,
+  maxShift: 64,
+  maxMirrors: 2,
+  holdTime: 0.3,
+});
+function updateNegotiation(crowd, dt, ctx) {
+  if (!ctx) return;
+  for (const p of crowd) {
+    const n = p.negotiate;
+    if (!n) {
+      if (!p.active || p.anchor || p.state !== "walking" || p.reaction ||
+          p.courtesy || p.group)
+        continue;
+      if (p.behavior === "phone" || p.behavior === "chat" ||
+          p.behavior === "crosser")
+        continue;
+      if (p.flow !== "opposing") continue;
+      const d = ctx.y - p.y;
+      if (d < NEGOTIATE.bandNear || d > NEGOTIATE.bandFar) continue;
+      if (Math.abs(p.x - ctx.x) >= NEGOTIATE.lineWidth) continue;
+      if (p.uy <= 0.2) continue;
+      p.negotiate = {
+        phase: "watch", side: 0, mirrors: 0, leanT: 0, holdT: 0, shifted: 0,
+      };
+      continue;
+    }
+    if (p.courtesy || p.reaction || !p.active || p.state !== "walking") {
+      p.negotiate = null;
+      p.negotiateLean = 0;
+      continue;
+    }
+    const d = ctx.y - p.y;
+    if (d < 12 || d > 240 || p.y > ctx.y + 6) {
+      p.negotiate = null;
+      p.negotiateLean = 0;
+      continue;
+    }
+    const commit = ctx.commitSide || 0;
+    if (n.phase !== "giveup" && n.phase !== "committed") {
+      if (commit !== 0) {
+        const desired = -commit;
+        if (n.side === 0) {
+          n.side = desired;
+          n.phase = "lean";
+          n.leanT = NEGOTIATE.leanTime;
+          p.negotiateLean = n.side;
+        } else if (desired !== n.side) {
+          if (n.mirrors < NEGOTIATE.maxMirrors) {
+            n.mirrors++;
+            n.side = desired;
+            n.phase = "lean";
+            n.leanT = NEGOTIATE.leanTime;
+            p.negotiateLean = n.side;
+          } else {
+            n.phase = "giveup";
+            p.negotiateLean = 0;
+          }
+        }
+        n.holdT = 0;
+      } else if (ctx.braking || ctx.still) {
+        n.holdT += dt;
+        if (n.side === 0 && n.holdT >= NEGOTIATE.holdTime) {
+          n.side = ctx.x < p.x - 4 ? 1
+            : ctx.x > p.x + 4 ? -1
+              : 425 - p.x > p.x - 55 ? 1 : -1;
+          n.phase = "lean";
+          n.leanT = NEGOTIATE.leanTime;
+          p.negotiateLean = n.side;
+        }
+      } else n.holdT = 0;
+    }
+    if (n.phase === "committed") {
+      // Committed: maintain the cleared gap until he has passed, but do not
+      // keep sidestepping away once the gap is comfortably open.
+      n.holdGap = Math.abs(p.x - ctx.x) < NEGOTIATE.clearGap + 10;
+    }
+    if (n.phase === "lean") {
+      n.leanT -= dt;
+      if (n.leanT <= 0) n.phase = "shift";
+    } else if (n.phase === "shift") {
+      n.shifted += NEGOTIATE.lateralSpeed * dt;
+      if (Math.abs(p.x - ctx.x) >= NEGOTIATE.clearGap ||
+          n.shifted >= NEGOTIATE.maxShift) {
+        n.phase = "committed";
+        p.negotiateLean = 0;
+      }
+    }
+  }
+}
+export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
+    playerCtx = null) {
+  updateNegotiation(crowd, dt, playerCtx);
   const crossings = traffic;
+  // V2-5 crossing etiquette: nobody stops, dashes or dawdles inside a
+  // signalised crossing band — the party's green window must stay usable.
+  const inCrossingBand = (p, extra = 30) =>
+    crossings !== null && crossings !== undefined && crossings.some((t) =>
+      p.y > t.top - extra && p.y < t.bottom + extra);
   const velocities = crowd.map((p) => {
     const traffic = walkerTraffic(p, p.route[p.leg], crossings);
     if (!p.active || p.anchor || p.state !== "walking" || p.reaction ||
@@ -659,8 +908,14 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
       d = Math.hypot(dx, dy) || 1;
     const ux = dx / d,
       uy = dy / d;
-    let vx = ux * p.pace,
-      vy = uy * p.pace,
+    // A phone walker dawdles on the pavement but crosses the road at his
+    // full pace like everyone else (crossing etiquette).
+    const effectivePace = p.behavior === "phone" &&
+        p.fullPace !== undefined && inCrossingBand(p, 10)
+      ? p.fullPace
+      : p.pace;
+    let vx = ux * effectivePace,
+      vy = uy * effectivePace,
       paceFactor = 1;
     for (const q of crowd) {
       if (q === p || !q.active) continue;
@@ -675,17 +930,21 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
           paceFactor,
           0.35 + 0.65 * Math.min(1, distance / p.personalSpace),
         );
-        const turn = (1 - distance / p.personalSpace) * 30 * p.yielding;
-        vx += -uy * turn;
-        vy += ux * turn;
+        // A phone walker never reacts: no voluntary steering away, though
+        // the pace of the person ahead still physically limits him.
+        if (p.behavior !== "phone") {
+          const turn = (1 - distance / p.personalSpace) * 30 * p.yielding;
+          vx += -uy * turn;
+          vy += ux * turn;
+        }
       }
-      if (distance < 38) {
+      if (distance < 38 && p.behavior !== "phone") {
         const push = (1 - distance / 38) * 48 * p.yielding;
         vx += (rx / distance) * push;
         vy += (ry / distance) * push;
       }
     }
-    if (p.awarePlayer) {
+    if (p.awarePlayer && p.behavior !== "phone") {
       const behind = p.awarePlayer.y - p.y;
       const side = p.x - p.awarePlayer.x;
       if (behind > 8 && behind < 105 && Math.abs(side) < 47) {
@@ -708,6 +967,21 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
     }
     vx *= paceFactor;
     vy *= paceFactor;
+    if (p.behavior === "stopper") {
+      const factor = p.stopFactor ?? 1;
+      vx *= factor;
+      vy *= factor;
+    }
+    if (p.behavior === "crosser" && p.crossPhase === "crossing")
+      vx += (p.crossDir || 1) * 55;
+    if (p.negotiate?.phase === "shift" ||
+        (p.negotiate?.phase === "committed" && p.negotiate.holdGap))
+      vx += p.negotiate.side * NEGOTIATE.lateralSpeed;
+    // A stopper pulls toward the nearer street edge while decelerating,
+    // so the stopped body rests at the side instead of plugging the
+    // corridor — and drift + slowdown together telegraph the stop.
+    if (p.behavior === "stopper" && p.stopPhase === "decelerating")
+      vx += (p.x < 240 ? -1 : 1) * 55 * (p.stopFactor ?? 1);
     const blend = 1 - Math.exp(-dt * (p.acceleration || 5));
     if (trafficBlocks(p, vy, traffic, dt)) {
       p.trafficWait = true;
@@ -785,6 +1059,83 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = []) {
     if (p.acknowledge) {
       p.acknowledge.remaining = Math.max(0, p.acknowledge.remaining - dt);
       if (!p.acknowledge.remaining) p.acknowledge = null;
+    }
+    // V2-5 stopper: every stop is preceded by a 0.6s deceleration and
+    // followed by a 0.5s acceleration — never an instantaneous halt.
+    if (p.behavior === "stopper" && p.active && p.state === "walking" &&
+        !p.courtesy && !p.reaction && !inCrossingBand(p)) {
+      if (p.stopPhase === "walking") {
+        p.stopIn -= dt;
+        if (p.stopIn <= 0) {
+          p.stopPhase = "decelerating";
+          p.stopT = 0.6;
+        }
+      } else if (p.stopPhase === "decelerating") {
+        p.stopT -= dt;
+        p.stopFactor = Math.max(0, p.stopT / 0.6);
+        if (p.stopT <= 0) {
+          p.stopPhase = "stopped";
+          p.stopT = p.stopDuration;
+          p.stopFactor = 0;
+        }
+      } else if (p.stopPhase === "stopped") {
+        p.stopT -= dt;
+        if (p.stopT <= 0) {
+          p.stopPhase = "accelerating";
+          p.stopT = 0.5;
+        }
+      } else if (p.stopPhase === "accelerating") {
+        p.stopT -= dt;
+        p.stopFactor = 1 - Math.max(0, p.stopT / 0.5);
+        if (p.stopT <= 0) {
+          p.stopPhase = "walking";
+          p.stopFactor = 1;
+          p.stopCount++;
+          p.stopIn = 6 + ((p.id * 7 + p.stopCount * 13) % 8);
+        }
+      }
+    }
+    // V2-5 crosser: the head-turn telegraph (crossingTelegraph) is set a
+    // full 0.6s before the lateral crossing movement begins. The trigger
+    // is the place crossAtY, re-armed each route cycle.
+    if (p.behavior === "crosser" && p.active && !p.courtesy && !p.reaction) {
+      if (p.crossCycle !== p.cycle) {
+        p.crossCycle = p.cycle;
+        p.crossPhase = "pending";
+        p.crossAtY = null;
+        p.crossingTelegraph = 0;
+      }
+      if (p.state !== "walking") {
+        // Not currently travelling; wait for the next walking stretch.
+      } else if (p.crossPhase === "pending" && p.crossAtY === null) {
+        const offset = 60 + ((p.id * 37 + p.cycle * 91) % 200);
+        p.crossAtY = p.y + (p.uy >= 0 ? offset : -offset);
+        // Crossing etiquette: never arm a dash inside a crossing band —
+        // push the crossing place beyond the far edge of the band.
+        if (crossings) for (const t of crossings)
+          if (p.crossAtY > t.top - 45 && p.crossAtY < t.bottom + 45)
+            p.crossAtY = p.uy >= 0 ? t.bottom + 45 : t.top - 45;
+      } else if (p.crossPhase === "pending" && !p.trafficWait &&
+          !inCrossingBand(p, 45) &&
+          ((p.uy < 0 && p.y <= p.crossAtY) ||
+           (p.uy > 0 && p.y >= p.crossAtY))) {
+        p.crossPhase = "telegraph";
+        p.crossDir = p.x < 240 ? 1 : -1;
+        p.crossingTelegraph = p.crossDir;
+        p.crossT = 0.6;
+      } else if (p.crossPhase === "telegraph") {
+        p.crossT -= dt;
+        if (p.crossT <= 0) {
+          p.crossPhase = "crossing";
+          p.crossT = 2.4;
+        }
+      } else if (p.crossPhase === "crossing") {
+        p.crossT -= dt;
+        if (p.crossT <= 0) {
+          p.crossPhase = "done";
+          p.crossingTelegraph = 0;
+        }
+      }
     }
     if (!p.active) {
       p.wait -= dt;
@@ -1110,6 +1461,12 @@ export function extendJourney(crowd, stage, seed, config) {
     p.group = undefined;
     p.anchor = false;
     p.reaction = null;
+    // The southern waves have their own choreography (standing / along /
+    // crossing slots below); V2-5 exception behaviours do not apply.
+    p.behavior = "flow";
+    p.stopPhase = undefined;
+    p.crossPhase = undefined;
+    p.crossingTelegraph = 0;
     p.leg = 0;
     p.cycle = 0;
     p.active = true;

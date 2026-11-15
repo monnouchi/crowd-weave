@@ -509,6 +509,8 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     },
     elapsed: 0,
     worldTime: 0,
+    playerTrail: [],
+    negotiationEnabled: false,
     combo: { flow: 0, maxFlow: 0, score: 0, lastPassAt: null,
       nextDecayAt: null, kickUntil: 0, nearMissSerial: 0 },
     crossings,
@@ -568,7 +570,29 @@ export function step(g, dt, input) {
   const previousTeam = [g.player, ...g.party.members].map((p) => ({ ...p }));
   updateTraffic(g, dt);
   moveAnimals(g.animals, dt);
-  moveCrowd(g.crowd, dt, g.crossings, g.animals);
+  // V2-5 negotiation context: the player's sustained lateral commitment
+  // over the last ~0.5s of game time, derived only from simulated history.
+  g.playerTrail.push({ t: g.worldTime, x: g.player.x });
+  while (g.playerTrail.length && g.playerTrail[0].t < g.worldTime - 0.5)
+    g.playerTrail.shift();
+  const trailOldest = g.playerTrail[0];
+  const trailSpan = trailOldest ? g.worldTime - trailOldest.t : 0;
+  const commitDx = trailSpan >= 0.3 ? g.player.x - trailOldest.x : 0;
+  const commitSide = commitDx <= -16 ? -1 : commitDx >= 16 ? 1 : 0;
+  const lateralInput = Number.isFinite(input.axis)
+    ? input.axis
+    : Number(!!input.right) - Number(!!input.left);
+  // Negotiation runs only when the run layer enabled it (see run.js);
+  // planner/proof simulations keep a player-independent crowd timeline.
+  moveCrowd(g.crowd, dt, g.crossings, g.animals, g.negotiationEnabled
+    ? {
+        x: g.player.x,
+        y: g.player.y,
+        commitSide,
+        braking: !!(input.left && input.right),
+        still: commitSide === 0 && lateralInput === 0,
+      }
+    : null);
   const nearbyAnimals = g.animals.filter((animal) =>
     previousTeam.some((member) => Math.abs(animal.y - member.y) < 100));
   const people = [...g.crowd.filter(visiblePerson), ...nearbyAnimals],

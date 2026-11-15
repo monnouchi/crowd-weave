@@ -190,6 +190,16 @@ test("the fork renders both road markings without branch labels", () => {
   assert.ok(strokes.includes("#86d9d0cc"), "wide branch marking is drawn");
 });
 
+test("a crossing telegraph turns the head while the body keeps its heading", () => {
+  for (const side of [-1, 1]) {
+    const facing = pedestrianFacing({ ux: 0, uy: -1, state: "walking",
+      crossingTelegraph: side });
+    assert.equal(facing.profile, 0);
+    assert.equal(facing.headProfile, side);
+    assert.equal(Math.sign(facing.headLean), side);
+  }
+});
+
 test("hair and outfit choices change the person drawing calls", () => {
   function callsFor(headMass, outfit) {
     const run = createRun(0, 17);
