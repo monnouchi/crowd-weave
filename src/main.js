@@ -48,6 +48,8 @@ let cameraYaw = 0;
 let pausedBySystem = false;
 let wasBraking = false;
 let callButtonUntil = 0;
+let finaleReveal = null;
+let finaleStarted = 0;
 const story = (stage = run.stage) => STORY_STAGES?.[stage] || {};
 const storyName = (stage = run.stage) => story(stage).title || run.scene?.place || `区間 ${stage + 1}`;
 const clock = (seconds) => {
@@ -235,25 +237,48 @@ function showFinished() {
   $("result-score").textContent = String(totals.score);
   $("result-max-flow").textContent = String(totals.maxFlow);
   const next = STORY_STAGES?.[run.stage + 1];
-  setOverlay({
-    kicker: final ? "雑踏突破 / THE FRONT ROW" : `雑踏突破 / ${String(run.stage + 1).padStart(2,"0")} CLEAR`,
-    title: final ? "最前列に、ついた！" : "たどり着いた。",
-    body: final ? "人波を抜けきった先に、舞台が開けた。後ろからは仲間の声。みんな、間に合った！" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
-    extra: final ? fixedSeed === null
-      ? "また最初から、今度は違うすきまを抜けてみよう。"
-      : "同じ配置で、別のすきまを探せます。"
-      : next ? `次の友だちから：${next.message || next.title}` : "",
-    action: final ? "もう一度歩く" : "次の区間へ", stats: true, replay: true,
-    secondary: !final, secondaryLabel: "この区間を再挑戦",
-  });
-  if (final) spawnConfetti();
-  const bestText = result.stored && result.best
-    ? `${result.improved ? "自己ベスト更新" : "自己ベスト"} ${clock(result.best.elapsed)} ／ 接触${result.best.hits}`
-    : "";
-  const streakText = streak > 1 ? `人波を無接触で ${streak} 区間連続突破`
-    : streak === 1 ? "人波を無接触で 1 区間突破" : "";
-  const courseText = course ? `${course.improved ? "通しベスト更新！" : "通しベスト"} ${clock(course.best.elapsed)} ／ 接触${course.best.hits}` : "";
-  $("result-record").textContent = [bestText, courseText, streakText].filter(Boolean).join("\n");
+  const reveal = () => {
+    setOverlay({
+      kicker: final ? "雑踏突破 / THE FRONT ROW" : `雑踏突破 / ${String(run.stage + 1).padStart(2,"0")} CLEAR`,
+      title: final ? "最前列に、ついた！" : "たどり着いた。",
+      body: final ? "人波を抜けきった先に、舞台が開けた。後ろからは仲間の声。みんな、間に合った！" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
+      extra: final ? fixedSeed === null
+        ? "また最初から、今度は違うすきまを抜けてみよう。"
+        : "同じ配置で、別のすきまを探せます。"
+        : next ? `次の友だちから：${next.message || next.title}` : "",
+      action: final ? "もう一度歩く" : "次の区間へ", stats: true, replay: true,
+      secondary: !final, secondaryLabel: "この区間を再挑戦",
+    });
+    if (final) spawnConfetti();
+    const bestText = result.stored && result.best
+      ? `${result.improved ? "自己ベスト更新" : "自己ベスト"} ${clock(result.best.elapsed)} ／ 接触${result.best.hits}`
+      : "";
+    const streakText = streak > 1 ? `人波を無接触で ${streak} 区間連続突破`
+      : streak === 1 ? "人波を無接触で 1 区間突破" : "";
+    const courseText = course ? `${course.improved ? "通しベスト更新！" : "通しベスト"} ${clock(course.best.elapsed)} ／ 接触${course.best.hits}` : "";
+    $("result-record").textContent = [bestText, courseText, streakText].filter(Boolean).join("\n");
+  };
+  if (!final || reducedMotion.matches) return reveal();
+
+  // Keep the existing confetti visible outside the hidden result dialog.
+  const layer = $("confetti");
+  $("app").append(layer);
+  layer.classList.add("scene-confetti");
+  $("app").classList.add("celebrating");
+  $("controls").inert = true;
+  resetVoiceEffect();
+  spawnConfetti();
+  finaleStarted = performance.now();
+  const timer = setTimeout(() => finaleReveal?.(), 1800);
+  finaleReveal = () => {
+    clearTimeout(timer);
+    finaleReveal = null;
+    $("app").classList.remove("celebrating");
+    layer.classList.remove("scene-confetti");
+    $("overlay").querySelector(".overlay-card").prepend(layer);
+    reveal();
+  };
+  $("screen-reader-update").textContent = "最前列に、ついた！";
 }
 function showGameOver() {
   setOverlay({
@@ -293,6 +318,7 @@ function resume() {
   closeOverlay();
 }
 function action() {
+  if (finaleReveal) return finaleReveal();
   if (run.phase === "paused") return resume();
   if (run.phase === "ready") return begin();
   if (run.phase === "gameover") {
@@ -306,6 +332,7 @@ function action() {
   }
 }
 $("action").addEventListener("click", action);
+canvas.addEventListener("pointerdown", () => { if (finaleReveal) finaleReveal(); });
 STORY_STAGES.forEach((stage, index) => {
   const button = document.createElement("button");
   button.type = "button";
@@ -470,7 +497,8 @@ function frame(now) {
   $("flash").classList.toggle("contact", now < contactUntil);
   $("flash").classList.toggle("danger", now < dangerUntil);
   updateHud();
-  renderWorld(ctx, run, { ...viewport, yaw: cameraYaw, danger: now < dangerUntil, contactPulse: now < contactUntil ? 1 : 0 });
+  const scene = finaleReveal ? { ...run, worldTime: run.worldTime + (now - finaleStarted) / 1000 } : run;
+  renderWorld(ctx, scene, { ...viewport, yaw: cameraYaw, danger: now < dangerUntil, contactPulse: now < contactUntil ? 1 : 0 });
   requestAnimationFrame(frame);
 }
 showReady();

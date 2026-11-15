@@ -81,6 +81,9 @@ button:disabled { opacity: .42; cursor: default; }
 .overlay { position: absolute; z-index: 5; inset: 0; display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom)); background: rgba(9,17,24,.67); backdrop-filter: blur(9px); overflow-y: auto; }
 .overlay-card { position: relative; width: min(100%, 440px); margin: auto; padding: clamp(23px, 6vw, 36px); border: 1px solid rgba(255,239,207,.63); border-radius: 18px; background: linear-gradient(160deg, #f9f0d9, #e9dfcc 60%, #d8d5c4); color: #193039; box-shadow: 7px 7px 0 rgba(23,57,63,.9), inset 0 1px 0 #fff6e8; }
 .confetti { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; border-radius: 18px; }
+.scene-confetti { z-index: 4; border-radius: 0; }
+.celebrating .hud, .celebrating .controls, .celebrating .cue,
+.celebrating .road-warning, .celebrating .hint, .celebrating #flash { display: none; }
 .confetti i { position: absolute; top: -12px; animation: confetti-fall 3s ease-in both; }
 @keyframes confetti-fall {
   0% { transform: translate(0, 0) skewX(-12deg) rotate(-20deg); opacity: 1; }
