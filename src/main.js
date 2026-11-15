@@ -246,7 +246,7 @@ function showFinished() {
     setOverlay({
       kicker: final ? "雑踏突破 / THE FRONT ROW" : `雑踏突破 / ${String(run.stage + 1).padStart(2,"0")} CLEAR`,
       title: final ? "最前列に、ついた！" : "たどり着いた。",
-      body: final ? "人波を抜けきった先に、舞台が開けた。後ろからは仲間の声。みんな、間に合った！" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
+      body: final ? "人波を抜けきった先に、舞台が開けた。後ろからは友達の声。みんな、間に合った！" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
       extra: final ? fixedSeed === null
         ? "また最初から、今度は違うすきまを抜けてみよう。"
         : "同じ配置で、別のすきまを探せます。"
@@ -419,7 +419,7 @@ function updateHud() {
   $("stage-name").textContent = storyName();
   $("time").textContent = clock(run.elapsed);
   $("hits").textContent = `接触 ${run.hits}`;
-  const comboText = `FLOW ${run.combo.flow}`;
+  const comboText = `コンボ ${run.combo.flow}`;
   if ($("combo-flow").textContent !== comboText) $("combo-flow").textContent = comboText;
   const comboClass = `combo-meter tier-${flowTier(run.combo.flow)}`;
   if ($("combo-meter").className !== comboClass) $("combo-meter").className = comboClass;
