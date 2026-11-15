@@ -173,21 +173,21 @@ test("world speech bubbles remain readable at the edge without losing their acto
   }
 });
 
-test("both route names remain visible on a narrow screen near the fork", () => {
+test("the fork renders both road markings without branch labels", () => {
   const run = createRun(1, 17);
   run.phase = "playing";
   run.player.x = 240;
   run.player.y = run.routeBranch.fork.y + 81;
   const labels = [];
+  const strokes = [];
   const ctx = drawingContext();
-  ctx.fillText = (value, x) => labels.push({ value, x });
+  ctx.fillText = (value) => labels.push(value);
+  ctx.stroke = () => strokes.push(ctx.strokeStyle);
   renderWorld(ctx, run, { width: 320, height: 568 });
-  const wide = labels.find((label) => label.value.includes("ひろい道"));
-  const short = labels.find((label) => label.value === "近道");
-  assert.ok(wide);
-  assert.ok(short);
-  assert.ok(wide.x > 8 && wide.x < 160);
-  assert.ok(short.x > wide.x);
+  // The owner removed the teaching labels while keeping both roads visible.
+  assert.ok(!labels.some((label) => /ひろい道|近道/.test(label)));
+  assert.ok(strokes.includes("#e5a95eaa"), "short branch marking is drawn");
+  assert.ok(strokes.includes("#86d9d0cc"), "wide branch marking is drawn");
 });
 
 test("hair and outfit choices change the person drawing calls", () => {

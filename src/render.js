@@ -1113,18 +1113,6 @@ function animal(ctx, c, a, view) {
   }
 }
 
-function routeSign(ctx, c, game) {
-  const b = game.routeBranch;
-  if (!b || c.stage !== 1) return;
-  const y = b.fork?.y;
-  if (!Number.isFinite(y) || y > c.py - 25 || y < c.py - 650) return;
-  // The wider branch leaves the phone's narrow view as it approaches. Keep
-  // its label at the edge with an arrow until the fork is actually passed.
-  worldLabel(ctx, c, 126, y - 33, 31, "← ひろい道", "#275e65", "#e9fff4",
-    14, 25, FAR, true);
-  worldLabel(ctx, c, 267, y - 33, 31, "近道", "#a46d4d", "#fff0cf", 14, 25);
-}
-
 function rain(ctx, c, game, view) {
   if (c.stage !== 3) return;
   const t = view.reducedMotion ? 0 : game.worldTime || 0;
@@ -1269,8 +1257,6 @@ export function renderWorld(ctx, game, view = {}) {
     items.push({ y: p.y, draw: () => person(ctx, c, p, game, view) });
   for (const a of game.animals || [])
     items.push({ y: a.y, draw: () => animal(ctx, c, a, view) });
-  if (game.routeBranch) items.push({ y: game.routeBranch.fork.y - 33,
-    draw: () => routeSign(ctx, c, game) });
   items.sort((a, b) => a.y - b.y);
   for (const item of items) item.draw();
   // High signal heads stay legible above foreground walkers. The supports and
