@@ -832,6 +832,7 @@ export function step(g, dt, input) {
   // Remember every player-body contact, including contacts during cooldown.
   for (const p of g.crowd) {
     if (p.friend) continue;
+    if (playerContacts.has(p.id)) p.tenseUntil = g.worldTime + 0.7;
     if (playerContacts.has(p.id) ||
         Math.hypot(p.x - g.player.x, p.y - g.player.y) <
           p.r + g.player.r + BODY_GAP + 0.3) p.comboContacted = true;
@@ -887,6 +888,7 @@ export function step(g, dt, input) {
     combo.lastPassAt = g.worldTime;
     combo.nextDecayAt = g.worldTime + 3;
     if (near) {
+      p.tenseUntil = g.worldTime + 0.7;
       combo.kickUntil = g.worldTime + 0.6;
       combo.nearMissSerial++;
     }

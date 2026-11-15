@@ -1022,6 +1022,54 @@ export function pedestrianFacing(actor) {
     headLean: clamp((headX - ux) * 1.8, -1.6, 1.6), headGaze: headX };
 }
 
+// Stable per-person quantile: raising hate moves thresholds, not the draw.
+export function pedestrianExpression(actor, game = {}) {
+  if (actor.friend || actor.partner || actor.newFriend) {
+    if (actor.leaveTime != null) return "grim";
+    return actor.acknowledge || (game.reunionUntil > game.worldTime) ? "smile" : "normal";
+  }
+  if ((actor.reaction?.remaining || 0) > 0 || (actor.tenseUntil || 0) > (game.worldTime || 0)) return "grim";
+  if (actor.acknowledge) return "smile";
+  const oncoming = (actor.uy || 0) > .18;
+  const fast = actor.archetype === "brisk" || actor.urgency === "hurried" || actor.pace >= 45;
+  const phone = actor.behavior === "phone" || actor.habit === "phone";
+  const distance = game.player ? Math.hypot(actor.x - game.player.x, actor.y - game.player.y) : Infinity;
+  const nearby = Number.isFinite(distance) ? clamp(1 - distance / 300, 0, 1) : 0;
+  const hate = clamp(Number(game.hate) || 0, 0, 1);
+  const chance = clamp(.18 + (oncoming ? .23 : 0) + (fast ? .16 : 0) + (phone ? .12 : 0) +
+    hate * (.12 + (oncoming ? .12 : 0) + nearby * .16), 0, .86);
+  const id = Number(actor.id) || 0;
+  const sample = hash(id * 3.17 + 19);
+  if (sample >= chance) return "normal";
+  const variant = hash(id * 7.31 + 43);
+  if (phone || (!oncoming && !fast)) return variant < .65 ? "tired" : "hurried";
+  return variant < .55 ? "hurried" : variant < .9 ? "grim" : "tired";
+}
+
+// Face marks are deliberately gated here so no expression can leak onto a back view.
+export function drawPedestrianFace(ctx, x, y, s, facing, expression, gaze = 0) {
+  if (!facing.headFront || facing.headProfile || s <= .6) return;
+  const line = (x1, y1, x2, y2, color = "#33434b") => {
+    ctx.beginPath(); ctx.moveTo(x + x1 * s, y + y1 * s); ctx.lineTo(x + x2 * s, y + y2 * s);
+    ctx.lineCap = "round"; ctx.lineWidth = Math.max(.8, .6 * s); ctx.strokeStyle = color; ctx.stroke();
+  };
+  const eye = expression === "surprised" ? .95 : .65;
+  for (const side of [-1, 1]) {
+    ellipse(ctx, x + (side * 3.3 + gaze) * s, y + .4 * s, Math.max(.6, eye * s), Math.max(.6, eye * s), "#33434b");
+    if (expression === "grim" || expression === "hurried")
+      line(side * 5.1, -3.1, side * 1.8, expression === "grim" ? -2 : -1.5);
+    if (expression === "tired") line(side * 5, -.8, side * 1.8, -.5);
+  }
+  if (expression === "surprised") ellipse(ctx, x, y + 4.5 * s, 1.2 * s, 1.6 * s, "#83594e");
+  else if (expression === "smile") {
+    ctx.beginPath(); ctx.arc(x, y + 3.3 * s, 2.1 * s, .1, Math.PI - .1);
+    ctx.strokeStyle = "#83594e"; ctx.lineWidth = Math.max(.8, .6 * s); ctx.stroke();
+  } else if (expression === "grim") {
+    line(-1.6, 5, 0, 4.3, "#83594e"); line(0, 4.3, 1.6, 5, "#83594e");
+  } else if (expression === "tired") line(-1.1, 4.5, 1.1, 5, "#83594e");
+  else line(-1.3, 4.5, 1.3, 4.5, "#83594e");
+}
+
 function protagonist(ctx, c, game, view, shadowPass = false) {
   const p = screenActor(c, game.player.x, game.player.y);
   if (!p || p.depth > FAR) return;
@@ -1099,8 +1147,9 @@ function person(ctx, c, actor, game, view, shadowPass = false) {
   const stride = !view.reducedMotion && moving ? Math.sin((actor.walk || game.worldTime * 15) * .28 + (actor.id || 0)) * 3.2 : 0;
   const checkingPhone = actor.behavior === "phone" ||
     (actor.behavior === "stopper" && actor.stopPhase === "stopped");
-  const bow = checkingPhone ? 2.5 : actor.acknowledge
-    ? actor.courtesy?.phase === "prepare" ? 1.8 : 1.2 : 0;
+  const bow = (checkingPhone ? 2.5 : actor.acknowledge
+    ? actor.courtesy?.phase === "prepare" ? 1.8 : 1.2 : 0) +
+    (moving && (actor.archetype === "brisk" || actor.urgency === "hurried" || actor.pace >= 45) ? .8 : 0);
   const outlined = friend ? "#fff0bd" : "#30444baa";
   if (shadowPass) {
     blobShadow(ctx, c, px, foot, s, 13);
@@ -1305,19 +1354,8 @@ function person(ctx, c, actor, game, view, shadowPass = false) {
       Math.max(.8, 1.2 * s), Math.max(.7, 1.1 * s), look.skin);
   } else if (facing.headFront && s > .6) {
     const gaze = actor.acknowledge ? 0 : clamp(facing.headGaze * 1.4, -1.2, 1.2);
-    const surprised = (actor.reaction?.remaining || 0) > 0;
-    const eye = surprised ? .95 : .65;
-    ellipse(ctx, headX - 3.3 * s + gaze * s, headY + .4 * s, Math.max(.6, eye * s), Math.max(.6, eye * s), "#33434b");
-    ellipse(ctx, headX + 3.3 * s + gaze * s, headY + .4 * s, Math.max(.6, eye * s), Math.max(.6, eye * s), "#33434b");
-    if (surprised) {
-      ellipse(ctx, headX, headY + 4.5 * s, 1.2 * s, 1.6 * s, "#83594e");
-    } else if (actor.acknowledge || (friend && wave)) {
-      ctx.beginPath(); ctx.arc(headX, headY + 3.3 * s, 2.1 * s, .1, Math.PI - .1);
-      ctx.strokeStyle = "#83594e"; ctx.lineWidth = Math.max(.8, .6 * s); ctx.stroke();
-    } else {
-      limb(headX - 1.3 * s, headY + 4.5 * s, headX + 1.3 * s, headY + 4.5 * s,
-        Math.max(.8, .6 * s), "#83594e");
-    }
+    const expression = friend && wave && actor.leaveTime == null ? "smile" : pedestrianExpression(actor, game);
+    drawPedestrianFace(ctx, headX, headY, s, facing, expression, gaze);
   }
   if (actor.umbrella && c.stage === 3) {
     const uY = foot - 68 * s;
