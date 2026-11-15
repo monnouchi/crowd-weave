@@ -164,6 +164,7 @@ function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats
   $("logo-wrap").hidden = title !== "雑踏突破";
   $("overlay").classList.toggle("with-logo", title === "雑踏突破");
   $("overlay").classList.toggle("finale-result", finale);
+  $("overlay").classList.toggle("result-overlay", stats);
   $("overlay-body").textContent = body;
   $("overlay-extra").textContent = extra;
   $("overlay-extra").hidden = !extra;
@@ -241,16 +242,11 @@ function showFinished() {
   $("result-hits").textContent = String(totals.hits);
   $("result-score").textContent = String(totals.score);
   $("result-max-flow").textContent = String(totals.maxFlow);
-  const next = STORY_STAGES?.[run.stage + 1];
   const reveal = () => {
     setOverlay({
       kicker: final ? "雑踏突破 / THE FRONT ROW" : `雑踏突破 / ${String(run.stage + 1).padStart(2,"0")} CLEAR`,
       title: final ? "最前列に、ついた！" : "たどり着いた。",
-      body: final ? "人波を抜けきった先に、舞台が開けた。後ろからは友達の声。みんな、間に合った！" : story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
-      extra: final ? fixedSeed === null
-        ? "また最初から、今度は違うすきまを抜けてみよう。"
-        : "同じ配置で、別のすきまを探せます。"
-        : next ? `次の友だちから：${next.message || next.title}` : "",
+      body: final ? "人波を抜けて、舞台が開けた！" : (story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。").match(/^.*?[。！？!?]/)?.[0] || story().clear || run.scene?.arrival || "友だちも、もうすぐ追いつく。",
       action: final ? "もう一度歩く" : "次の区間へ", stats: true, replay: true,
       finale: final, secondary: !final, secondaryLabel: "この区間を再挑戦",
     });
@@ -264,8 +260,16 @@ function showFinished() {
     const scoreBest = course?.scoreImproved ? course.best.score
       : course?.stageResult?.scoreImproved ? course.stageResult.best.score : null;
     const scoreText = scoreBest !== null ? `スコアベスト更新！ ${scoreBest}` : "";
-    const splitsText = final && run.course ? run.records.map((r, i) => `${i + 1}区間 ${clock(r.elapsed)}`).join(" ／ ") : "";
-    $("result-record").textContent = [bestText, courseText, streakText, scoreText, splitsText].filter(Boolean).join("\n");
+    const splits = final && run.course ? run.records : [];
+    $("result-splits").replaceChildren(...splits.map((record, i) => {
+      const row = document.createElement("span");
+      row.textContent = `${i + 1}区間 ${clock(record.elapsed)}`;
+      return row;
+    }));
+    $("result-splits").hidden = !splits.length;
+    // The race ends at the player’s arrival, before companions necessarily arrive.
+    $("result-friends").textContent = "記録なし";
+    $("result-record").textContent = [scoreText, bestText, courseText, streakText].filter(Boolean).join("\n");
   };
   if (!final || reducedMotion.matches) return reveal();
 
