@@ -8,6 +8,8 @@ import { flowTier } from "../logic.js";
 const NEAR = 7;
 const FAR = 1550;
 const EYE = 57;
+const CAMERA_BACK = 230;
+const CAMERA_UP = 98;
 const TAU = Math.PI * 2;
 
 const THEMES = [
@@ -32,10 +34,10 @@ function camera(game, view) {
   return {
     width, height, focal, cx: width / 2,
     horizon: height * (.415 + .015 * tall),
-    eye: EYE - 4 * (1 - tall), px: game.player.x,
-    // The result camera steps to the rail after movement is complete. Friends
-    // remain at their real world positions, now beside/behind the viewpoint.
-    py: game.player.y - (frontRowView ? 44 : 0),
+    eye: Math.min(EYE + CAMERA_UP - 4 * (1 - tall),
+      height * .40 * Math.hypot(CAMERA_BACK, 76) / focal), px: game.player.x,
+    // The result camera steps closer to the rail after movement is complete.
+    py: game.player.y + CAMERA_BACK - (frontRowView ? 44 : 0),
     sin: Math.sin(yaw), cos: Math.cos(yaw),
     stage: clamp(game.stage || 0, 0, 4),
   };

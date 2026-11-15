@@ -291,11 +291,11 @@ test("signal head tops attach to the projected gantry rods", () => {
   const view = { width: 390, height: 844 };
   const focal = Math.min(view.width * 1.12, view.height * .91);
   const horizon = view.height * .43;
-  for (const approach of [450, 154, 72]) {
+  for (const approach of [380, 154, 72]) {
     run.player.y = road.bottom + approach;
     const heads = pedestrianSignalProjections(run, road, view);
     assert.ok(heads.length);
-    const rodTop = horizon + (57 - 83) * focal / (approach + 35);
+    const rodTop = horizon + (155 - 83) * focal / (approach + 35 + 230);
     for (const head of heads) assert.ok(Math.abs(head.y - head.height / 2 - rodTop) < 1e-6);
   }
 });
@@ -405,8 +405,10 @@ test("pedestrian shadows follow projected feet and reflect stage lighting", () =
     const actor = { id: 0, x: 240, y, active: true, ux: 0, uy: 1 };
     const calls = recordedScene(stage, { playerY: 1800, crowd: [actor] });
     const alpha = ["70", "70", "28", "20", "40"][stage];
-    const scale = Math.min(1280 * 1.12, 844 * .91) / Math.hypot(1800 - y, 76);
-    const foot = 844 * .43 + 57 * scale;
+    const focal = Math.min(1280 * 1.12, 844 * .91);
+    const scale = focal / Math.hypot(1800 + 230 - y, 76);
+    const eye = Math.min(155, 844 * .40 * Math.hypot(230, 76) / focal);
+    const foot = 844 * .43 + eye * scale;
     const matches = filledEllipses(calls, `#24343c${alpha}`).filter((call) =>
       Math.abs(call.args[2] - 13 * scale) < 1e-6);
     assert.equal(matches.length, 1);
