@@ -42,6 +42,35 @@ test("each chapter renders at phone and desktop sizes without changing simulatio
   }
 });
 
+test("crossing paint precedes all shadows and depth-sorted actors", () => {
+  const run = createRun(1, 17);
+  const road = run.crossings[0];
+  run.player.x = 240;
+  run.player.y = (road.top + road.bottom) / 2;
+  run.crowd = [{ id: 0, x: 240, y: run.player.y + 10, active: true, ux: 0, uy: 1 }];
+  run.party.members = [];
+  run.meetingPartner = null;
+  run.animals = [];
+  road.vehicle.active = false;
+  const calls = [];
+  const ctx = drawingContext();
+  for (const name of ["fill", "translate"]) {
+    ctx[name] = (...args) => calls.push({ name, args, fill: ctx.fillStyle });
+  }
+  renderWorld(ctx, run, { width: 1280, height: 844, reducedMotion: true });
+  const stripes = calls.flatMap((call, i) =>
+    call.name === "fill" && call.fill === (road.canEnter ? "#e5f5e8" : "#e2e5de") ? [i] : []);
+  const shadows = calls.flatMap((call, i) =>
+    call.name === "fill" && call.fill === "#24343c70" ? [i] : []);
+  // The player sorts before the nearby pedestrian and starts with a translate.
+  const firstActor = calls.findIndex((call) => call.name === "translate");
+  assert.ok(stripes.length > 0, "visible crosswalk stripes were drawn");
+  assert.ok(shadows.length >= 2, "player and pedestrian shadows were drawn");
+  assert.ok(firstActor >= 0, "the player was drawn");
+  assert.ok(Math.max(...stripes) < Math.min(...shadows), "all stripes precede shadows");
+  assert.ok(Math.max(...shadows) < firstActor, "all shadows precede actors");
+});
+
 test("real pedestrian lamps stay in the forward view on both road approaches", () => {
   for (const stage of [1, 3]) {
     const run = createRun(stage, 17);

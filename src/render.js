@@ -421,7 +421,7 @@ export function sideScenery(seed, stage, side, row, stride) {
     offset: (hash(key + row * 31.73 + 7) - .5) * stride * .32 };
 }
 
-function streetObject(ctx, c, theme, side, y, index, variant) {
+function streetObject(ctx, c, theme, side, y, index, variant, shadowPass = false) {
   const x = side < 0 ? 42 : 438;
   const base = screenPoint(c, x, y, 0);
   if (!base || base.depth > FAR || base.x < -180 || base.x > c.width + 180) return;
@@ -429,7 +429,10 @@ function streetObject(ctx, c, theme, side, y, index, variant) {
   const tableBase = c.stage === 2 && (variant < 0 || variant === 1)
     ? screenPoint(c, side < 0 ? 19 : 461, y, 0) : null;
   const shadowBase = tableBase || base;
-  blobShadow(ctx, c, shadowBase.x, shadowBase.y, shadowBase.scale, 15);
+  if (shadowPass) {
+    blobShadow(ctx, c, shadowBase.x, shadowBase.y, shadowBase.scale, 15);
+    return;
+  }
   if (variant >= 0) {
     if (c.stage === 0 && variant === 0) {
       rect(ctx, bx - 9*s, by - 35*s, 18*s, 32*s, "#b94e50", 2*s);
@@ -515,7 +518,7 @@ function streetObject(ctx, c, theme, side, y, index, variant) {
   }
 }
 
-function crossing(ctx, c, t, theme) {
+function crossingGround(ctx, c, t) {
   if (!t || t.bottom < c.py - FAR || t.top > c.py + 35) return;
   floorQuad(ctx, c, -220, t.top, 700, t.bottom, c.stage === 3 ? "#465f70" : "#657c83", .18);
   for (let y = t.top + 4; y < t.bottom - 3; y += 15) {
@@ -524,6 +527,10 @@ function crossing(ctx, c, t, theme) {
   }
   floorQuad(ctx, c, t.left - 10, t.bottom + 14, t.right + 10, t.bottom + 17,
     t.canEnter ? "#98e6b7" : "#efcb83", .28);
+}
+
+function crossing(ctx, c, t) {
+  if (!t || t.bottom < c.py - FAR || t.top > c.py + 35) return;
   // A gantry puts the actual pedestrian lamps above the path. The old single
   // curb lamp projected entirely off the right edge of portrait screens.
   // Mount the heads over the near half of the zebra stripes. At the stopping
@@ -535,12 +542,19 @@ function crossing(ctx, c, t, theme) {
     [t.right + 18, signalY, 108], "#344d55", 3.6);
   for (const x of [t.left + 22, (t.left + t.right) / 2, t.right - 22])
     worldLine(ctx, c, [x, signalY, 108], [x, signalY, 83], "#344d55", 2.5);
+}
+
+function crossingVehicle(ctx, c, t, shadowPass = false) {
+  if (!t || t.bottom < c.py - FAR || t.top > c.py + 35) return;
   if (t.vehicle?.active && t.vehicle.x > -120 && t.vehicle.x < 600) {
     const v = t.vehicle;
     const p = screenPoint(c, v.x, v.y, 0);
     if (p && p.depth > NEAR && p.depth < FAR) {
       const s = p.scale, w = (v.width || 45) * s, h = (v.kind === "bicycle" ? 22 : 25) * s;
-      blobShadow(ctx, c, p.x, p.y, s, (v.width || 45) * .58);
+      if (shadowPass) {
+        blobShadow(ctx, c, p.x, p.y, s, (v.width || 45) * .58);
+        return;
+      }
       if (v.kind === "bicycle") {
         for (const dx of [-w * .32, w * .32]) ellipse(ctx, p.x + dx, p.y - 6 * s,
           7 * s, 7 * s, "#263b4b", "#d0e3df", Math.max(1, s));
@@ -652,7 +666,7 @@ function worldLabel(ctx, c, x, y, z, text, fill, ink,
   ctx.fillText(text, labelX, p.y + fontSize * .01);
 }
 
-function destination(ctx, c, theme, game) {
+function destination(ctx, c, theme, game, groundPass = false) {
   const oy = game.segOriginY || 0;
   // The arrival arch and approach banner sit between camera and band.
   // Hide this wayfinding dressing after arrival so neither crosses the tableau.
@@ -665,9 +679,19 @@ function destination(ctx, c, theme, game) {
   const arch = stage === 4 ? 91 : 82;
   const dark = stage === 4 ? "#5b4967" : theme.ink;
   const bright = stage === 4 ? "#f1b77f" : theme.accent;
+  if (groundPass) {
+    for (const x of [x0, x1])
+      worldFace(ctx, c, [[x - 9, y - 12, 0], [x + 9, y - 12, 0],
+        [x + 9, y + 14, 0], [x - 9, y + 14, 0]], "#40576b66");
+    // A segmented ring lies on the floor and shares the arch's perspective.
+    for (let i = 0; i < 32; i++) {
+      const a = TAU * i / 32, b = TAU * (i + 1) / 32;
+      worldLine(ctx, c, [240 + 55 * Math.cos(a), y + 30 * Math.sin(a), .5],
+        [240 + 55 * Math.cos(b), y + 30 * Math.sin(b), .5], bright, 2.5);
+    }
+    return;
+  }
   for (const x of [x0, x1]) {
-    worldFace(ctx, c, [[x - 9, y - 12, 0], [x + 9, y - 12, 0],
-      [x + 9, y + 14, 0], [x - 9, y + 14, 0]], "#40576b66");
     worldFace(ctx, c, [[x - 5, y, 0], [x + 5, y, 0],
       [x + 5, y, arch], [x - 5, y, arch]], dark);
     worldLine(ctx, c, [x, y, 7], [x, y, arch - 7], bright, 1.5);
@@ -675,12 +699,6 @@ function destination(ctx, c, theme, game) {
   worldFace(ctx, c, [[x0 - 7, y, arch - 15], [x1 + 7, y, arch - 15],
     [x1 + 7, y, arch + 9], [x0 - 7, y, arch + 9]], dark);
   worldLine(ctx, c, [x0 - 7, y, arch + 8], [x1 + 7, y, arch + 8], bright, 2);
-  // A segmented ring lies on the floor and shares the arch's perspective.
-  for (let i = 0; i < 32; i++) {
-    const a = TAU * i / 32, b = TAU * (i + 1) / 32;
-    worldLine(ctx, c, [240 + 55 * Math.cos(a), y + 30 * Math.sin(a), .5],
-      [240 + 55 * Math.cos(b), y + 30 * Math.sin(b), .5], bright, 2.5);
-  }
   if (stage === 4) {
     // A banner and a pair of small trusses stand on the approach to the arch.
     for (const x of [145, 335]) worldLine(ctx, c, [x, oy + 115, 0], [x, oy + 115, 76], "#a3b9bf", 2);
@@ -891,7 +909,7 @@ export function pedestrianFacing(actor) {
     headLean: clamp((headX - ux) * 1.8, -1.6, 1.6), headGaze: headX };
 }
 
-function protagonist(ctx, c, game, view) {
+function protagonist(ctx, c, game, view, shadowPass = false) {
   const p = screenActor(c, game.player.x, game.player.y);
   if (!p || p.depth > FAR) return;
   const s = Math.min(18, p.scale);
@@ -904,7 +922,7 @@ function protagonist(ctx, c, game, view) {
     ? Math.sin(game.stun * 24) * .07 : 0;
   const lean = protagonistLean(game, view) + (pose === "brake" ? -.05 : 0) +
     (pose === "stumble" ? .10 : 0) + wobble;
-  blobShadow(ctx, c, p.x, p.y, s, 12);
+  if (shadowPass) { blobShadow(ctx, c, p.x, p.y, s, 12); return; }
   ctx.save();
   ctx.translate(p.x, p.y - lift);
   ctx.rotate(lean);
@@ -939,7 +957,7 @@ function protagonist(ctx, c, game, view) {
   ctx.restore();
 }
 
-function person(ctx, c, actor, game, view) {
+function person(ctx, c, actor, game, view, shadowPass = false) {
   if (actor.active === false || !Number.isFinite(actor.x) || !Number.isFinite(actor.y)) return;
   const p = screenActor(c, actor.x, actor.y);
   if (!p || p.depth > FAR || p.depth < 13) return;
@@ -971,7 +989,11 @@ function person(ctx, c, actor, game, view) {
   const bow = checkingPhone ? 2.5 : actor.acknowledge
     ? actor.courtesy?.phase === "prepare" ? 1.8 : 1.2 : 0;
   const outlined = friend ? "#fff0bd" : "#30444baa";
-  blobShadow(ctx, c, px, foot, s, 13);
+  if (shadowPass) {
+    blobShadow(ctx, c, px, foot, s, 13);
+    ctx.restore();
+    return;
+  }
   if (game.callReady && game.callTargets?.includes(actor.id))
     ellipse(ctx, px, foot + .7 * s, Math.min(42, 18 * s),
       Math.min(12, Math.max(2, 4.6 * s)), "#85f0c32a", "#a5fbe0", 2);
@@ -1227,7 +1249,7 @@ function person(ctx, c, actor, game, view) {
   ctx.restore();
 }
 
-function animal(ctx, c, a, view) {
+function animal(ctx, c, a, view, shadowPass = false) {
   if (a.active === false) return;
   const p = screenActor(c, a.x, a.y);
   if (!p || p.depth > FAR || p.depth < 10 || p.x < -100 || p.x > c.width + 100) return;
@@ -1240,7 +1262,7 @@ function animal(ctx, c, a, view) {
     span > 0 ? (Math.abs(Math.cos(phase)) < .001 ? (a.x >= (a.minX + a.maxX) / 2 ? -1 : 1) : Math.sign(Math.cos(phase))) : 1;
   const time = view.reducedMotion ? 0 : (a.time || 0);
   const stride = !view.reducedMotion && !a.bracing && Math.abs(a.vx || 0) > .1 ? Math.sin(time * 12) * 3 : 0;
-  blobShadow(ctx, c, p.x, p.y, s, 12);
+  if (shadowPass) { blobShadow(ctx, c, p.x, p.y, s, 12); return; }
   ctx.save(); ctx.translate(p.x, p.y); ctx.scale(direction, 1);
   ctx.beginPath(); ctx.moveTo(-9 * s, -10 * s);
   if (dog) ctx.quadraticCurveTo(-17 * s, (-8 + Math.sin(time * 5) * 1.5) * s, -17 * s, (-15 + Math.sin(time * 5) * 1.5) * s);
@@ -1360,11 +1382,16 @@ export function renderWorld(ctx, game, view = {}) {
     : (c.stage === 2 ? 1 : 0);
   ctx.save();
   ctx.beginPath(); ctx.rect(0, 0, c.width, c.height); ctx.clip();
+  // Passes: floor, ground paint/decals, blob shadows, then y-sorted world
+  // objects and actors. Screen-space overlays retain their existing order.
   sky(ctx, c, theme, game, view);
   ground(ctx, c, theme, game);
   hallCeiling(ctx, c);
+  for (const t of game.crossings || []) crossingGround(ctx, c, t);
   routeMarks(ctx, c, game);
+  destination(ctx, c, theme, game, true);
   const items = [];
+  const shadows = [];
   const stride = c.stage === 0 ? 235 : c.stage === 4 ? 185 : 210;
   const firstRow = Math.floor((c.py - FAR) / stride) - 1;
   const lastRow = Math.ceil((c.py + 30) / stride) + 1;
@@ -1376,29 +1403,41 @@ export function renderWorld(ctx, game, view = {}) {
         side, y, stride * .71, i + (side + 1) * 4) });
       const scenery = sideScenery(game.seed, c.stage, side, i, stride);
       const objectY = y + stride * .94 + scenery.offset;
-      if (scenery.kind >= 0) items.push({ y: objectY, draw: () => streetObject(ctx, c, theme,
-        side, objectY, i, scenery.kind === 3 ? -1 : scenery.kind) });
+      if (scenery.kind >= 0) {
+        const variant = scenery.kind === 3 ? -1 : scenery.kind;
+        shadows.push(() => streetObject(ctx, c, theme, side, objectY, i, variant, true));
+        items.push({ y: objectY, draw: () => streetObject(ctx, c, theme, side, objectY, i, variant) });
+      }
     }
   }
-  for (const t of game.crossings || [])
-    items.push({ y: t.bottom + 18, draw: () => crossing(ctx, c, t, theme) });
+  for (const t of game.crossings || []) {
+    items.push({ y: t.bottom + 18, draw: () => crossing(ctx, c, t) });
+    if (t.vehicle?.active) {
+      shadows.push(() => crossingVehicle(ctx, c, t, true));
+      items.push({ y: t.vehicle.y, draw: () => crossingVehicle(ctx, c, t) });
+    }
+  }
   if (c.stage === 4)
     items.push({ y: (game.segOriginY || 0) - 24, draw: () => concertStage(ctx, c, game, view) });
   items.push({ y: (game.segOriginY || 0) + 84, draw: () => destination(ctx, c, theme, game) });
-  if (game.meetingPartner && game.meetingPartner.state !== "met")
-    items.push({ y: game.meetingPartner.y, draw: () => person(ctx, c,
-      game.meetingPartner, game, view) });
-  for (const p of game.crowd || []) if (p.active !== false)
+  const addPerson = (p) => {
+    shadows.push(() => person(ctx, c, p, game, view, true));
     items.push({ y: p.y, draw: () => person(ctx, c, p, game, view) });
-  for (const p of game.party?.members || [])
-    items.push({ y: p.y, draw: () => person(ctx, c, p, game, view) });
+  };
+  if (game.meetingPartner && game.meetingPartner.state !== "met") addPerson(game.meetingPartner);
+  for (const p of game.crowd || []) if (p.active !== false) addPerson(p);
+  for (const p of game.party?.members || []) addPerson(p);
+  shadows.push(() => protagonist(ctx, c, game, view, true));
   items.push({ y: game.player.y, draw: () => protagonist(ctx, c, game, view) });
-  for (const a of game.animals || [])
+  for (const a of game.animals || []) {
+    shadows.push(() => animal(ctx, c, a, view, true));
     items.push({ y: a.y, draw: () => animal(ctx, c, a, view) });
+  }
+  for (const draw of shadows) draw();
   items.sort((a, b) => a.y - b.y);
   for (const item of items) item.draw();
-  // High signal heads stay legible above foreground walkers. The supports and
-  // road still sort with the world, so this does not move the crossing itself.
+  // High signal heads stay legible above foreground walkers. The supports
+  // still sort with the world; road paint is in the ground pass.
   crossingSignals(ctx, c, game, view);
   rain(ctx, c, game, view);
   foreground(ctx, c, game, view);
