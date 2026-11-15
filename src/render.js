@@ -813,30 +813,77 @@ function person(ctx, c, actor, game, view) {
     ellipse(ctx, px, foot + .7 * s, Math.min(42, 18 * s),
       Math.min(12, Math.max(2, 4.6 * s)), "#85f0c32a", "#a5fbe0", 2);
   if (friend) ellipse(ctx, px, foot + .5 * s, 19 * s, Math.max(1, 5 * s), "#f6cd8251", "#ffe2a6", Math.max(1, s));
-  const sx = profile ? 2.1 * s : 3 * s;
+  const archetypeFactor = { slim: .82, regular: 1, broad: 1.22 }[look.archetype];
+  const stance = { slim: .8, regular: 1, broad: 1.2 }[look.archetype];
+  const sx = (profile ? 2.1 : 3) * stance * s;
   function limb(x1, y1, x2, y2, width, color, outline = null) {
     ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
     if (outline) { ctx.strokeStyle = outline; ctx.lineWidth = width + Math.max(1, s * 1.1); ctx.stroke(); }
     ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
   }
-  limb(px - sx, foot - 18 * s, px - (5 + stride) * s, foot - 2 * s,
+  limb(px - sx, foot - 18 * s, px - (5 * stance + stride) * s, foot - 2 * s,
     4 * s, "#344954", "#283d48");
-  limb(px + sx, foot - 18 * s, px + (5 + stride) * s, foot - 2 * s,
+  limb(px + sx, foot - 18 * s, px + (5 * stance + stride) * s, foot - 2 * s,
     4 * s, "#344954", "#283d48");
-  ellipse(ctx, px - (5 + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
-  ellipse(ctx, px + (5 + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
-  const headY = foot - (50 - bow) * s;
+  ellipse(ctx, px - (5 * stance + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
+  ellipse(ctx, px + (5 * stance + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
+  const headY = foot - (54 - bow) * s;
   const headX = px + (profile * 2.4 + facing.headLean) * s;
-  if (look.style === "long")
-    rect(ctx, headX - 7 * s, headY - 3 * s, 14 * s, 23 * s, look.hair, 5 * s);
   const bodyTop = foot - 43 * s + bow * s;
   const bodyBot = foot - 18 * s;
-  const torsoWidth = (profile ? 14 : 20) * look.width;
-  rect(ctx, px - torsoWidth * s / 2, bodyTop, torsoWidth * s,
-    bodyBot - bodyTop, outlined, 5 * s);
-  rect(ctx, px - (torsoWidth / 2 - 1) * s, bodyTop + s,
-    (torsoWidth - 2) * s, bodyBot - bodyTop - 2 * s, clothes, 4 * s);
+  const torsoWidth = (profile ? 14 * (1 + (archetypeFactor - 1) / 2)
+    : 20 * archetypeFactor) * look.width;
+  const torsoHalf = torsoWidth / 2;
+  if (look.headMass === "long")
+    rect(ctx, headX - 11.5 * s, headY - 5 * s, 23 * s,
+      bodyTop + 14 * s - (headY - 5 * s), look.hair, 5 * s);
+  let hood;
+  if (look.headMass === "hood") {
+    const hex = /^#([0-9a-f]{6})$/i.exec(clothes);
+    hood = hex ? `#${[0, 2, 4].map((i) =>
+      Math.round(parseInt(hex[1].slice(i, i + 2), 16) * .65).toString(16).padStart(2, "0")).join("")}` : "#45434a";
+    rect(ctx, headX - 12 * s, headY - 12 * s, 24 * s,
+      bodyTop - (headY - 12 * s) + 3 * s, hood, 9 * s);
+  }
+  if (look.accessory === "backpack") {
+    if (profile) {
+      rect(ctx, px - profile * (torsoHalf + 4) * s - 4 * s, bodyTop + 3 * s,
+        8 * s, 19 * s, "#59625d", 3 * s);
+    } else if (face) {
+      for (const side of [-1, 1])
+        rect(ctx, px + (side * torsoHalf - 3) * s, bodyTop + 4 * s,
+          6 * s, 17 * s, "#59625d", 3 * s);
+    } else {
+      rect(ctx, px - torsoHalf * .85 * s, bodyTop + 2 * s,
+        torsoWidth * .85 * s, 21 * s, "#59625d", 4 * s);
+    }
+  }
+  if (look.accessory === "guitarCase") {
+    const caseWidth = profile ? torsoWidth * .8 : torsoWidth * 1.12;
+    const caseX = profile ? px - profile * torsoHalf * s - caseWidth * s / 2 : px - caseWidth * s / 2;
+    rect(ctx, caseX, bodyTop - 8 * s, caseWidth * s,
+      bodyBot - bodyTop + 16 * s, "#302a2a", 6 * s);
+    rect(ctx, caseX + s, bodyTop - 7 * s, (caseWidth - 2) * s,
+      bodyBot - bodyTop + 14 * s, "#64544a", 5 * s);
+  }
+  const corner = look.archetype === "broad" ? 1.5 : 5;
+  rect(ctx, px - torsoHalf * s, bodyTop, torsoWidth * s,
+    bodyBot - bodyTop, outlined, corner * s);
+  rect(ctx, px - (torsoHalf - 1) * s, bodyTop + s,
+    (torsoWidth - 2) * s, bodyBot - bodyTop - 2 * s, clothes, Math.max(.5, corner - 1) * s);
+  if (!profile && !face && ["backpack", "guitarCase"].includes(look.accessory))
+    rect(ctx, px - torsoWidth * .3 * s, bodyTop + 2 * s, torsoWidth * .6 * s,
+      21 * s, look.accessory === "backpack" ? "#59625d" : "#302a2a", 3 * s);
+  if (!profile && face && look.accessory === "backpack")
+    for (const side of [-1, 1])
+      limb(px + side * torsoWidth * .3 * s, bodyTop + s,
+        px + side * torsoWidth * .25 * s, bodyTop + 13 * s, 1.5 * s, "#59625d");
+  if (look.accessory === "shoulderBag") {
+    limb(px - torsoHalf * .7 * s, bodyTop + 2 * s, px + torsoHalf * s,
+      bodyBot, 1.5 * s, "#665344");
+    rect(ctx, px + (torsoHalf - 2) * s, bodyBot - 4 * s, 7 * s, 9 * s, "#806650", 1.5 * s);
+  }
   if (look.outfit === "coat") {
     rect(ctx, px - torsoWidth * s / 2, bodyBot - 3 * s, torsoWidth * s,
       13 * s, outlined, 3 * s);
@@ -849,12 +896,12 @@ function person(ctx, c, actor, game, view) {
       { x: px + torsoWidth * .7 * s, y: bodyBot + 9 * s },
       { x: px - torsoWidth * .7 * s, y: bodyBot + 9 * s }], clothes, outlined, Math.max(1, s));
   } else if (look.outfit === "cardigan") {
-    polygon(ctx, [{ x: px - 5 * s, y: bodyTop + s }, { x: px + 5 * s, y: bodyTop + s },
+    polygon(ctx, [{ x: px - torsoWidth * .25 * s, y: bodyTop + s }, { x: px + torsoWidth * .25 * s, y: bodyTop + s },
       { x: px, y: bodyTop + 11 * s }], "#f5e4bd");
   } else if (look.outfit === "jacket") {
     limb(px, bodyTop + 5 * s, px, bodyBot - 2 * s, Math.max(.7, s), "#e9dfc2");
-    polygon(ctx, [{ x: px - 5 * s, y: bodyTop + s }, { x: px, y: bodyTop + 6 * s },
-      { x: px + 5 * s, y: bodyTop + s }], "#e9dfc2");
+    polygon(ctx, [{ x: px - torsoWidth * .25 * s, y: bodyTop + s }, { x: px, y: bodyTop + 6 * s },
+      { x: px + torsoWidth * .25 * s, y: bodyTop + s }], "#e9dfc2");
   }
   if (profile) {
     rect(ctx, px - profile * 1.3 * s - .65 * s, bodyTop + 5 * s,
@@ -872,8 +919,8 @@ function person(ctx, c, actor, game, view) {
   const waveOffset = wave && specialFriend && !view.reducedMotion
     ? Math.sin((game.worldTime || 0) * 5) * 1.5 : 0;
   const sleeve = look.outfit === "cardigan" ? "#ad906d" : clothes;
-  const shoulder = profile ? 5.8 : 9;
-  const hand = profile ? 8 : 13;
+  const shoulder = torsoHalf * .9;
+  const hand = torsoHalf + (profile ? 1.2 : 3);
   limb(px - shoulder * s, bodyTop + 5 * s,
     px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
     3.4 * s, sleeve, outlined);
@@ -883,6 +930,18 @@ function person(ctx, c, actor, game, view) {
   ellipse(ctx, px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
     2.4 * s, 3 * s, look.skin);
   ellipse(ctx, px + hand * s, bodyTop + 19 * s, 2.4 * s, 3 * s, look.skin);
+  if (look.accessory === "shoppingBag" || look.accessory === "toteBag") {
+    const hx = px + hand * s, hy = bodyTop + 19 * s;
+    const tote = look.accessory === "toteBag";
+    const w = tote ? 9 : 6, h = tote ? 12 : 8;
+    limb(hx - 2 * s, hy, hx - 2 * s, hy + 3 * s, s, "#806650");
+    limb(hx + 2 * s, hy, hx + 2 * s, hy + 3 * s, s, "#806650");
+    polygon(ctx, [{ x: hx - w / 2 * s, y: hy + 3 * s },
+      { x: hx + w / 2 * s, y: hy + 3 * s },
+      { x: hx + (w / 2 + 1) * s, y: hy + (3 + h) * s },
+      { x: hx - (w / 2 + 1) * s, y: hy + (3 + h) * s }],
+    tote ? "#c77d56" : "#ead9b7");
+  }
   if (specialFriend) {
     const hx = px - (hand + waveOffset) * s, hy = bodyTop + (wave ? -7 : 19) * s;
     const glow = c.stage === 4 ? ["#8ae9da", "#ffd58c", "#edabdf"][Math.abs(actor.id || 0) % 3] : "#ffd58c";
@@ -890,40 +949,55 @@ function person(ctx, c, actor, game, view) {
     ellipse(ctx, hx, hy - 9 * s, 3 * s, 3 * s, glow + "66");
     ellipse(ctx, hx, hy - 9 * s, 1.5 * s, 1.5 * s, glow);
   }
-  ellipse(ctx, headX, headY, (headProfile ? 7.1 : 7.6) * s, 9 * s,
+  ellipse(ctx, headX, headY, (headProfile ? 9.6 : 10.3) * s, 12.2 * s,
     look.skin, "#3b3f4988", Math.max(.5, .65 * s));
-  if (look.style === "bob" || look.style === "long") {
-    for (const side of [-1, 1]) {
-      if (headProfile && side === headProfile) continue;
-      rect(ctx, headX + (side < 0 ? -8 : 5) * s, headY - 4 * s,
-        3 * s, (look.style === "bob" ? 12 : 15) * s, look.hair, 1.5 * s);
-    }
-  }
-  if (look.style === "thinning") {
-    for (const side of [-1, 1]) ellipse(ctx, headX + side * 6.5 * s,
-      headY - 3 * s, 1.6 * s, 3.5 * s, look.hair);
-  } else {
+  if (!facing.headFront && !headProfile && look.headMass !== "bald")
+    ellipse(ctx, headX, headY, 10.3 * s, 12.2 * s,
+      look.headMass === "hood" ? hood : look.hair);
+  if (look.headMass === "bald") {
+    ellipse(ctx, headX - 2 * s, headY - 8 * s, 3 * s, 1.2 * s, "#ffffff55");
+    for (const side of [-1, 1]) ellipse(ctx, headX + side * 9 * s,
+      headY - 2 * s, 1.3 * s, 3.5 * s, look.hair);
+  } else if (look.headMass !== "hood") {
     ctx.fillStyle = look.hair;
     ctx.beginPath();
-    ctx.ellipse(headX, headY - (look.style === "short" ? 4 : 4.5) * s,
-      (look.style === "short" ? 7 : 8) * s, (look.style === "short" ? 3.5 : 5.5) * s, 0, Math.PI, TAU);
+    ctx.ellipse(headX, headY - 6 * s, 10.5 * s, 6 * s, 0, Math.PI, TAU);
     ctx.fill();
-    if (look.style === "bun") ellipse(ctx, headX, headY - 10 * s, 3.2 * s, 3.2 * s, look.hair);
-    if (look.style === "curls") for (const dx of [-6, -2, 2, 6])
-      ellipse(ctx, headX + dx * s, headY - 8 * s, 2.8 * s, 2.8 * s, look.hair);
+    if (look.headMass === "bun") ellipse(ctx, headX, headY - 12 * s, 3.5 * s, 3.5 * s, look.hair);
+    if (look.headMass === "cap" && (headProfile || facing.headFront)) {
+      const brimX = headProfile ? headX + headProfile * 8 * s : headX;
+      rect(ctx, brimX - (headProfile ? 4 : 10) * s, headY - 6 * s,
+        (headProfile ? 8 : 20) * s, 2.3 * s, look.hair, s);
+    }
+  }
+  if (look.star) {
+    const starX = headX + 9 * s, starY = headY - 9 * s;
+    const points = Array.from({ length: 10 }, (_, i) => {
+      const angle = -Math.PI / 2 + i * Math.PI / 5;
+      const radius = (i % 2 ? 1.8 : 4) * s;
+      return { x: starX + Math.cos(angle) * radius, y: starY + Math.sin(angle) * radius };
+    });
+    polygon(ctx, points, "#ffd66e");
   }
   if (headProfile && s > .6) {
-    ellipse(ctx, headX + headProfile * 4.1 * s, headY + .35 * s,
+    ellipse(ctx, headX + headProfile * 5.3 * s, headY + .35 * s,
       Math.max(.6, .75 * s), Math.max(.6, .75 * s), "#33434b");
-    ellipse(ctx, headX + headProfile * 7.2 * s, headY + 2.4 * s,
+    ellipse(ctx, headX + headProfile * 9.3 * s, headY + 2.4 * s,
       Math.max(.8, 1.2 * s), Math.max(.7, 1.1 * s), look.skin);
   } else if (facing.headFront && s > .6) {
     const gaze = actor.acknowledge ? 0 : clamp(facing.headGaze * 1.4, -1.2, 1.2);
-    ellipse(ctx, headX - 2.5 * s + gaze * s, headY + .4 * s, Math.max(.6, .65 * s), Math.max(.6, .65 * s), "#33434b");
-    ellipse(ctx, headX + 2.5 * s + gaze * s, headY + .4 * s, Math.max(.6, .65 * s), Math.max(.6, .65 * s), "#33434b");
-    if (actor.acknowledge) {
-      ctx.beginPath(); ctx.arc(headX, headY + 2.7 * s, 2.1 * s, .1, Math.PI - .1);
+    const surprised = (actor.reaction?.remaining || 0) > 0;
+    const eye = surprised ? .95 : .65;
+    ellipse(ctx, headX - 3.3 * s + gaze * s, headY + .4 * s, Math.max(.6, eye * s), Math.max(.6, eye * s), "#33434b");
+    ellipse(ctx, headX + 3.3 * s + gaze * s, headY + .4 * s, Math.max(.6, eye * s), Math.max(.6, eye * s), "#33434b");
+    if (surprised) {
+      ellipse(ctx, headX, headY + 4.5 * s, 1.2 * s, 1.6 * s, "#83594e");
+    } else if (actor.acknowledge || (friend && wave)) {
+      ctx.beginPath(); ctx.arc(headX, headY + 3.3 * s, 2.1 * s, .1, Math.PI - .1);
       ctx.strokeStyle = "#83594e"; ctx.lineWidth = Math.max(.8, .6 * s); ctx.stroke();
+    } else {
+      limb(headX - 1.3 * s, headY + 4.5 * s, headX + 1.3 * s, headY + 4.5 * s,
+        Math.max(.8, .6 * s), "#83594e");
     }
   }
   if (actor.umbrella && c.stage === 3) {

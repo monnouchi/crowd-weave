@@ -191,7 +191,7 @@ test("both route names remain visible on a narrow screen near the fork", () => {
 });
 
 test("hair and outfit choices change the person drawing calls", () => {
-  function callsFor(style, outfit) {
+  function callsFor(headMass, outfit) {
     const run = createRun(0, 17);
     run.player.y = 500;
     run.crowd = [{ id: 0, appearanceId: 0, x: run.player.x, y: 400,
@@ -205,20 +205,20 @@ test("hair and outfit choices change the person drawing calls", () => {
       ctx[name] = (...args) => calls.push([name, ...args]);
     }
     const look = appearanceFor({ id: 0 });
-    const saved = { style: look.style, outfit: look.outfit };
+    const saved = { headMass: look.headMass, outfit: look.outfit };
     try {
-      Object.assign(look, { style, outfit });
+      Object.assign(look, { headMass, outfit });
       renderWorld(ctx, run, { width: 390, height: 844, reducedMotion: true });
     } finally {
       Object.assign(look, saved);
     }
     return calls;
   }
-  const baseline = callsFor("crop", "shirt");
-  for (const style of ["bob", "long"])
-    assert.notDeepEqual(callsFor(style, "shirt"), baseline, style);
+  const baseline = callsFor("cap", "shirt");
+  for (const headMass of ["bun", "long"])
+    assert.notDeepEqual(callsFor(headMass, "shirt"), baseline, headMass);
   for (const outfit of ["skirt", "coat"])
-    assert.notDeepEqual(callsFor("crop", outfit), baseline, outfit);
+    assert.notDeepEqual(callsFor("cap", outfit), baseline, outfit);
 });
 
 function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true, worldTime = 1, phase = "playing" } = {}) {
@@ -299,4 +299,72 @@ test("finished audience raises glow sticks even with reduced motion", () => {
   };
   assert.ok(tip("finished", 1)[1] < tip("playing", 1)[1]);
   assert.deepEqual(tip("finished", 1), tip("finished", 8));
+});
+
+function personCalls(appearanceId, uy = 1) {
+  const run = createRun(0, 17);
+  run.player.y = 500;
+  run.crowd = [{ id: 0, appearanceId, x: run.player.x, y: 400,
+    active: true, ux: 0, uy }];
+  run.party.members = []; run.meetingPartner = null; run.animals = [];
+  const calls = [];
+  const ctx = drawingContext();
+  for (const name of ["roundRect", "ellipse", "lineTo", "fill"]) {
+    ctx[name] = (...args) => calls.push({ name, args, fill: ctx.fillStyle });
+  }
+  renderWorld(ctx, run, { width: 390, height: 844, reducedMotion: true });
+  return calls;
+}
+
+test("slim and broad archetypes have different torso widths", () => {
+  const torso = (id) => personCalls(id).find((call) =>
+    call.name === "roundRect" && call.fill === "#30444baa").args[2];
+  assert.ok(torso(1) < torso(3));
+});
+
+test("cap and bald head masses draw differently", () => {
+  const look = appearanceFor({ appearanceId: 0 });
+  const saved = look.headMass;
+  try {
+    look.headMass = "cap";
+    const cap = personCalls(0);
+    look.headMass = "bald";
+    assert.notDeepEqual(cap, personCalls(0));
+  } finally {
+    look.headMass = saved;
+  }
+});
+
+test("the dedicated friend draws a gold star", () => {
+  const friend = personCalls(12);
+  assert.ok(friend.some((call) => call.name === "fill" && call.fill === "#ffd66e"));
+  assert.ok(!personCalls(0).some((call) => call.name === "fill" && call.fill === "#ffd66e"));
+});
+
+// ellipse() assigns its fill after recording the path, immediately before fill().
+function filledEllipses(calls, color) {
+  return calls.filter((call, i) => call.name === "ellipse" &&
+    calls[i + 1]?.name === "fill" && calls[i + 1].fill === color);
+}
+
+test("back-facing heads have no eyes", () => {
+  for (const id of [2, 3])
+    assert.equal(filledEllipses(personCalls(id, -1), "#33434b").length, 0);
+});
+
+test("front-facing heads have two eyes", () => {
+  assert.ok(filledEllipses(personCalls(2, 1), "#33434b").length >= 2);
+});
+
+test("long hair covers the back of the head while bald heads retain their scalp", () => {
+  for (const id of [2, 3]) {
+    const look = appearanceFor({ appearanceId: id });
+    const calls = personCalls(id, -1);
+    const head = filledEllipses(calls, look.skin).find((call) => call.args[2] >= 9);
+    assert.ok(head);
+    const covering = filledEllipses(calls, look.hair).filter((call) =>
+      call.args[0] === head.args[0] && call.args[1] === head.args[1] &&
+      call.args[2] >= head.args[2] * .9 && call.args[3] >= head.args[3] * .9);
+    assert.equal(covering.length, id === 2 ? 1 : 0);
+  }
 });

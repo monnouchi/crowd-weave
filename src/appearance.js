@@ -7,6 +7,9 @@ const LOOKS = [
     style: "crop",
     outfit: "shirt",
     width: 1,
+    archetype: "regular",
+    headMass: "cap",
+    accessory: "backpack",
   },
   {
     skin: "#c38d69",
@@ -14,6 +17,9 @@ const LOOKS = [
     style: "bob",
     outfit: "coat",
     width: 0.96,
+    archetype: "slim",
+    headMass: "long",
+    accessory: "shoulderBag",
   },
   {
     skin: "#f5dbbc",
@@ -21,6 +27,9 @@ const LOOKS = [
     style: "long",
     outfit: "skirt",
     width: 1,
+    archetype: "regular",
+    headMass: "long",
+    accessory: "shoppingBag",
   },
   {
     skin: "#ad7357",
@@ -28,6 +37,9 @@ const LOOKS = [
     style: "short",
     outfit: "cardigan",
     width: 1.06,
+    archetype: "broad",
+    headMass: "bald",
+    accessory: "none",
     older: true,
   },
   {
@@ -36,6 +48,9 @@ const LOOKS = [
     style: "bun",
     outfit: "shirt",
     width: 0.96,
+    archetype: "slim",
+    headMass: "bun",
+    accessory: "none",
   },
   {
     skin: "#906446",
@@ -43,6 +58,9 @@ const LOOKS = [
     style: "curls",
     outfit: "jacket",
     width: 1.06,
+    archetype: "broad",
+    headMass: "hood",
+    accessory: "guitarCase",
   },
   {
     skin: "#f3d0ab",
@@ -50,6 +68,9 @@ const LOOKS = [
     style: "bob",
     outfit: "coat",
     width: 1,
+    archetype: "regular",
+    headMass: "long",
+    accessory: "shoppingBag",
     older: true,
   },
   {
@@ -58,6 +79,9 @@ const LOOKS = [
     style: "long",
     outfit: "shirt",
     width: 0.96,
+    archetype: "slim",
+    headMass: "long",
+    accessory: "shoulderBag",
   },
   {
     skin: "#e7bd95",
@@ -65,6 +89,9 @@ const LOOKS = [
     style: "thinning",
     outfit: "cardigan",
     width: 1.06,
+    archetype: "broad",
+    headMass: "bald",
+    accessory: "none",
     older: true,
   },
   {
@@ -73,6 +100,9 @@ const LOOKS = [
     style: "short",
     outfit: "skirt",
     width: 1,
+    archetype: "regular",
+    headMass: "cap",
+    accessory: "none",
   },
   {
     skin: "#f1d2b7",
@@ -80,6 +110,9 @@ const LOOKS = [
     style: "curls",
     outfit: "jacket",
     width: 0.96,
+    archetype: "slim",
+    headMass: "hood",
+    accessory: "backpack",
   },
   {
     skin: "#a87756",
@@ -87,6 +120,9 @@ const LOOKS = [
     style: "bun",
     outfit: "coat",
     width: 1.06,
+    archetype: "broad",
+    headMass: "bun",
+    accessory: "guitarCase",
   },
   {
     skin: "#eec4a0",
@@ -94,6 +130,10 @@ const LOOKS = [
     style: "long",
     outfit: "cardigan",
     width: 1,
+    archetype: "regular",
+    headMass: "long",
+    accessory: "toteBag",
+    star: true,
   },
 ];
 const CROWD_LOOK_COUNT = 12;

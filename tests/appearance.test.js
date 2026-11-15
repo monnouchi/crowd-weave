@@ -81,3 +81,32 @@ test("original looks and crowd assignments stay stable with the dedicated partne
     assert.deepEqual(appearanceFor(createGame(stage + 1).party.members.at(-1)), dedicated);
   }
 });
+
+
+test("all looks have the specified silhouette and accessory assignments", () => {
+  const expected = [
+    ["regular", "cap", "backpack"], ["slim", "long", "shoulderBag"],
+    ["regular", "long", "shoppingBag"], ["broad", "bald", "none"],
+    ["slim", "bun", "none"], ["broad", "hood", "guitarCase"],
+    ["regular", "long", "shoppingBag"], ["slim", "long", "shoulderBag"],
+    ["broad", "bald", "none"], ["regular", "cap", "none"],
+    ["slim", "hood", "backpack"], ["broad", "bun", "guitarCase"],
+    ["regular", "long", "toteBag"],
+  ];
+  for (const [id, fields] of expected.entries()) {
+    const look = appearanceFor({ appearanceId: id });
+    assert.deepEqual([look.archetype, look.headMass, look.accessory], fields);
+    assert.equal(look.archetype, look.width <= .96 ? "slim" : look.width >= 1.06 ? "broad" : "regular");
+  }
+});
+
+test("crowd silhouettes are varied and the friend is uniquely marked", () => {
+  const crowd = Array.from({ length: 12 }, (_, appearanceId) => appearanceFor({ appearanceId }));
+  assert.equal(new Set(crowd.map((look) => look.archetype)).size, 3);
+  assert.equal(new Set(crowd.map((look) => look.headMass)).size, 5);
+  assert.ok(new Set(crowd.map((look) => look.accessory)).size >= 3);
+  assert.ok(crowd.every((look) => !look.star && look.accessory !== "toteBag"));
+  const friend = appearanceFor({ appearanceId: 12 });
+  assert.equal(friend.star, true);
+  assert.equal(friend.accessory, "toteBag");
+});
