@@ -20,6 +20,12 @@ export const KIT = {
 
 // Calibrated in Chrome with a time-domain analyser after the mix bus.
 const MASTER_LEVEL = 3.2;
+// Each band has its own slow amplitude movement and loop offset.
+const MURMUR_LAYERS = [
+  { frequency: 0.7, q: 1.1, level: 0.22, rate: 0.11, depth: 0.10, offset: 0 },
+  { frequency: 1.25, q: 1.3, level: 0.16, rate: 0.17, depth: 0.08, offset: 0.31 },
+  { frequency: 2, q: 1.5, level: 0.10, rate: 0.07, depth: 0.06, offset: 0.67 },
+];
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const semitone = (root, step) => root * 2 ** (step / 12);
 
@@ -71,8 +77,8 @@ export class Soundscape {
     this.stageBuses = [];
     this.stageClocks = new Map();
     this.airBus = null;
-    this.airFilter = null;
-    this.airSource = null;
+    this.airLayers = [];
+    this.finished = false;
     this.rainBus = null;
     this.rainFilter = null;
     this.rainSource = null;
@@ -136,11 +142,6 @@ export class Soundscape {
     this.airBus = c.createGain();
     const ambience = ambienceFor(this.stage, this.pressure, this.open);
     this.airBus.gain.value = ambience.crowdGain;
-    this.airFilter = c.createBiquadFilter();
-    this.airFilter.type = "bandpass";
-    this.airFilter.frequency.value = ambience.crowdFrequency;
-    this.airFilter.Q.value = 0.55;
-    this.airFilter.connect(this.airBus);
     this.airBus.connect(this.master);
 
     this.rainBus = c.createGain();
@@ -160,11 +161,29 @@ export class Soundscape {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
       samples[i] = ((seed / 0xffffffff) * 2 - 1) * 0.55;
     }
-    this.airSource = c.createBufferSource();
-    this.airSource.buffer = this.noiseBuffer;
-    this.airSource.loop = true;
-    this.airSource.connect(this.airFilter);
-    this.airSource.start();
+    this.airLayers = MURMUR_LAYERS.map((config) => {
+      const source = c.createBufferSource();
+      const filter = c.createBiquadFilter();
+      const gain = c.createGain();
+      const lfo = c.createOscillator();
+      const depth = c.createGain();
+      source.buffer = this.noiseBuffer;
+      source.loop = true;
+      filter.type = "bandpass";
+      filter.frequency.value = ambience.crowdFrequency * config.frequency;
+      filter.Q.value = config.q;
+      gain.gain.value = config.level;
+      lfo.frequency.value = config.rate;
+      depth.gain.value = config.depth;
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.airBus);
+      lfo.connect(depth);
+      depth.connect(gain.gain);
+      source.start(0, config.offset);
+      lfo.start();
+      return { source, filter, gain, lfo, depth, config };
+    });
     this.rainSource = c.createBufferSource();
     this.rainSource.buffer = this.noiseBuffer;
     this.rainSource.loop = true;
@@ -223,9 +242,10 @@ export class Soundscape {
       const b = ambienceFor(mix.to, this.pressure, this.open);
       ambience = Object.fromEntries(Object.keys(a).map(key => [key, a[key] * mix.outgoing + b[key] * mix.incoming]));
     }
-    this.airBus.gain.setTargetAtTime(ambience.crowdGain, now, 0.19);
-    this.airFilter.frequency.setTargetAtTime(ambience.crowdFrequency, now, 0.24);
-    this.rainBus.gain.setTargetAtTime(ambience.rainGain, now, 0.08);
+    this.airBus.gain.setTargetAtTime(this.finished ? 0 : ambience.crowdGain, now, this.finished ? 0.08 : 0.19);
+    for (const layer of this.airLayers)
+      layer.filter.frequency.setTargetAtTime(ambience.crowdFrequency * layer.config.frequency, now, 0.24);
+    this.rainBus.gain.setTargetAtTime(this.finished ? 0 : ambience.rainGain, now, 0.08);
     this.rainFilter.frequency.setTargetAtTime(ambience.rainFrequency, now, 0.24);
     this.lastAtmosphere = now;
   }
@@ -233,7 +253,13 @@ export class Soundscape {
   // Called once per animation frame. Scheduling only looks a fraction of a second ahead.
   tick(run, _dt = 0, reducedMotion = false) {
     const c = this.context;
-    if (!c || c.state !== "running" || this.paused || this.muted) return;
+    if (!c || c.state === "closed") return;
+    const finished = run?.phase === "finished";
+    if (finished !== this.finished) {
+      this.finished = finished;
+      this.updateAtmosphere();
+    }
+    if (c.state !== "running" || this.paused || this.muted) return;
     if (run?.phase && run.phase !== "playing") return;
     const mix = courseMusicMix(run, reducedMotion);
     // Do not reset the independent clocks at the join: both patterns continue.
@@ -535,7 +561,10 @@ export class Soundscape {
 
   destroy() {
     this.stopVoices();
-    try { this.airSource?.stop(); } catch { /* May already have ended. */ }
+    for (const layer of this.airLayers) {
+      try { layer.source.stop(); } catch { /* May already have ended. */ }
+      try { layer.lfo.stop(); } catch { /* May already have ended. */ }
+    }
     try { this.rainSource?.stop(); } catch { /* May already have ended. */ }
     this.context?.close().catch(() => {});
     this.context = null;

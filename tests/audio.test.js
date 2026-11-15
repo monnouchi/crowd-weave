@@ -91,11 +91,55 @@ test("stage transitions immediately target the new ambience", () => {
   const param = (name) => ({ setTargetAtTime: (value) => { targets[name] = value; } });
   sound.context = { currentTime: 1, state: "running" };
   sound.airBus = { gain: param("crowdGain") };
-  sound.airFilter = { frequency: param("crowdFrequency") };
+  sound.airLayers = [{ filter: { frequency: param("crowdFrequency") }, config: { frequency: 1 } }];
   sound.rainBus = { gain: param("rainGain") };
   sound.rainFilter = { frequency: param("rainFrequency") };
   sound.setStage(3);
   assert.deepEqual(targets, ambienceFor(3));
   sound.setStage(4);
   assert.deepEqual(targets, ambienceFor(4));
+});
+
+
+test("crowd ambience layers filtered noise with independent slow modulation", () => {
+  const node = () => ({ connect() {}, stop() {}, start() {} });
+  const param = () => ({ value: 0, setTargetAtTime(value) { this.value = value; } });
+  const sound = new Soundscape();
+  sound.stage = 4;
+  sound.context = {
+    state: "running", currentTime: 1, sampleRate: 100,
+    destination: node(), createGain: () => ({ ...node(), gain: param() }),
+    createBiquadFilter: () => ({ ...node(), frequency: param(), Q: param() }),
+    createBufferSource: () => node(),
+    createOscillator: () => ({ ...node(), frequency: param() }),
+    createBuffer: () => ({ getChannelData: () => new Float32Array(100) }),
+  };
+  sound.buildGraph();
+  assert.equal(sound.airLayers.length, 3);
+  const layers = sound.airLayers;
+  assert.deepEqual(layers.map(layer => layer.filter.type), ["bandpass", "bandpass", "bandpass"]);
+  assert.deepEqual(layers.map(layer => layer.filter.frequency.value), [224, 400, 640]);
+  assert.deepEqual(layers.map(layer => layer.lfo.frequency.value), [0.11, 0.17, 0.07]);
+  assert.deepEqual(layers.map(layer => layer.depth.gain.value), [0.10, 0.08, 0.06]);
+  assert.equal(new Set(layers.map(layer => layer.source)).size, 3);
+  const maxLayerGain = layers.reduce((sum, layer) => sum + layer.gain.gain.value + layer.depth.gain.value, 0);
+  const maxCrowdGain = ambienceFor(4, 1).crowdGain * maxLayerGain;
+  assert.ok(maxCrowdGain < sound.musicBus.gain.value * 0.025);
+});
+
+test("finished phase fades ambience even while muted and playing restores it", () => {
+  const sound = new Soundscape();
+  sound.stage = 4;
+  sound.muted = true;
+  const targets = {};
+  const param = (name) => ({ setTargetAtTime: (value, time, constant) => { targets[name] = [value, time, constant]; } });
+  sound.context = { state: "running", currentTime: 3 };
+  sound.airBus = { gain: param("crowd") };
+  sound.rainBus = { gain: param("rain") };
+  sound.rainFilter = { frequency: param("rainFrequency") };
+  sound.tick({ phase: "finished", stage: 4 });
+  assert.deepEqual(targets.crowd, [0, 3, 0.08]);
+  assert.deepEqual(targets.rain, [0, 3, 0.08]);
+  sound.tick({ phase: "playing", stage: 4 });
+  assert.deepEqual(targets.crowd, [ambienceFor(4).crowdGain, 3, 0.19]);
 });
