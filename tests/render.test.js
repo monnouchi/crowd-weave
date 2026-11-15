@@ -4,7 +4,7 @@ import { createRun } from "../src/run.js";
 import { appearanceFor } from "../src/appearance.js";
 import {
   pedestrianFacing, pedestrianSignalProjections, renderWorld, reunionWave,
-  worldLabelCenterX, sideScenery,
+  worldLabelCenterX, sideScenery, finaleFraming, FINALE_CAMERA_ADVANCE, protagonistProjection,
 } from "../src/render.js";
 
 function drawingContext() {
@@ -460,4 +460,32 @@ test("long hair covers the back of the head while bald heads retain their scalp"
       call.args[2] >= head.args[2] * .9 && call.args[3] >= head.args[3] * .9);
     assert.equal(covering.length, id === 2 ? 1 : 0);
   }
+});
+
+
+test("finale camera eases from normal framing and reduced motion uses its end", () => {
+  assert.equal(FINALE_CAMERA_ADVANCE, 50);
+  const values = [0, .25, .5, .75, 1].map(t => finaleFraming(t));
+  assert.equal(values[0], 0);
+  assert.equal(values.at(-1), 1);
+  for (let i = 1; i < values.length; i++) assert.ok(values[i] > values[i - 1]);
+  assert.equal(finaleFraming(0, true), 1);
+  const run = createRun(4, 17);
+  run.player.y = 84;
+  run.phase = "playing";
+  const normal = protagonistProjection(run, { width: 390, height: 844 });
+  run.phase = "finished";
+  assert.deepEqual(protagonistProjection(run, { width: 390, height: 844, finaleProgress: 0 }), normal);
+  assert.deepEqual(protagonistProjection(run, { width: 390, height: 844, finaleProgress: 0, reducedMotion: true }),
+    protagonistProjection(run, { width: 390, height: 844, finaleProgress: 1 }));
+});
+
+test("finished arrival draws all three musicians without the foreground arch and banner", () => {
+  const calls = recordedScene(4, { playerY: 84, phase: "finished" });
+  const fills = calls.filter(c => c.name === "fill" || c.name === "fillRect").map(c => c.fill);
+  for (const color of ["#74c3bd", "#dc927f", "#817da8", "#e5aa6e", "#365a6d"])
+    assert.ok(fills.includes(color), `performer or instrument ${color}`);
+  assert.ok(calls.some(c => c.name === "fillText" && c.args[0] === "LIVE"));
+  for (const color of ["#5b4967", "#d78583", "#efbb87"])
+    assert.ok(!fills.includes(color), `foreground architecture ${color}`);
 });

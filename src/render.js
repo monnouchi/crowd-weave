@@ -10,6 +10,13 @@ const FAR = 1550;
 const EYE = 57;
 const CAMERA_BACK = 230;
 const CAMERA_UP = 98;
+export const FINALE_CAMERA_ADVANCE = 50;
+
+// Smoothly settle into the front-row view; reduced motion uses the end frame.
+export function finaleFraming(progress, reducedMotion = false) {
+  const t = reducedMotion ? 1 : clamp(Number(progress) || 0, 0, 1);
+  return t * t * (3 - 2 * t);
+}
 const TAU = Math.PI * 2;
 
 export const THEMES = [
@@ -46,13 +53,15 @@ function camera(game, view) {
   const focal = Math.min(width * 1.12, height * 0.91);
   const tall = clamp((height - 560) / 240, 0, 1);
   const frontRowView = game.stage === 4 && game.phase === "finished";
+  const finale = frontRowView ? finaleFraming(view.finaleProgress ?? 1, view.reducedMotion) : 0;
+  const back = CAMERA_BACK - FINALE_CAMERA_ADVANCE * finale;
+  const normalEye = Math.min(EYE + CAMERA_UP - 4 * (1 - tall),
+    height * .40 * Math.hypot(CAMERA_BACK, 76) / focal);
   return {
     width, height, focal, cx: width / 2,
-    horizon: height * (.415 + .015 * tall),
-    eye: Math.min(EYE + CAMERA_UP - 4 * (1 - tall),
-      height * .40 * Math.hypot(CAMERA_BACK, 76) / focal), px: game.player.x,
-    // The result camera steps closer to the rail after movement is complete.
-    py: game.player.y + CAMERA_BACK - (frontRowView ? 44 : 0),
+    horizon: height * (.415 + .015 * tall - (height > width ? .15 * finale : 0)),
+    eye: normalEye * Math.hypot(back, 76) / Math.hypot(CAMERA_BACK, 76), px: game.player.x,
+    py: game.player.y + back,
     sin: Math.sin(yaw), cos: Math.cos(yaw),
     stage: clamp(game.stage || 0, 0, 4),
   };
@@ -645,6 +654,9 @@ function worldLabel(ctx, c, x, y, z, text, fill, ink,
 
 function destination(ctx, c, theme, game) {
   const oy = game.segOriginY || 0;
+  // The arrival arch and approach banner sit between camera and band.
+  // Hide this wayfinding dressing after arrival so neither crosses the tableau.
+  if (c.stage === 4 && game.phase === "finished") return;
   if (c.py < oy + 70) return;
   const stage = c.stage;
   const x0 = stage === 4 ? 95 : 177;
@@ -794,8 +806,8 @@ function concertStage(ctx, c, game, view) {
   ];
   for (const lamp of lamps) {
     worldFace(ctx, c, [[lamp.x - 3, oy - 191, 132], [lamp.x + 3, oy - 191, 132],
-      [lamp.target + 35, oy - 100, 19], [lamp.target - 35, oy - 100, 19]],
-    lamp.hue + (game.arriving || game.phase === "finished" ? "3a" : "24"));
+      [lamp.target + 46, oy - 100, 19], [lamp.target - 46, oy - 100, 19]],
+    lamp.hue + (game.phase === "finished" ? "60" : game.arriving ? "3a" : "24"));
     const light = screenPoint(c, lamp.x, oy - 191, 132);
     if (light) ellipse(ctx, light.x, light.y,
       Math.max(1.5, 4 * light.scale), Math.max(1.5, 4 * light.scale), lamp.hue);

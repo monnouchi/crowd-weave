@@ -156,13 +156,14 @@ function spawnConfetti() {
     layer.append(piece);
   }
 }
-function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats = false, guide = false, replay = false, secondary = false, secondaryLabel = "この区間をやり直す", foot = "" }) {
+function setOverlay({ kicker, title, body, extra = "", intro = "", action, stats = false, guide = false, replay = false, secondary = false, secondaryLabel = "この区間をやり直す", foot = "", finale = false }) {
   resetVoiceEffect();
   $("confetti").replaceChildren();
   $("overlay-kicker").textContent = kicker;
   $("overlay-title").textContent = title;
   $("logo-wrap").hidden = title !== "雑踏突破";
   $("overlay").classList.toggle("with-logo", title === "雑踏突破");
+  $("overlay").classList.toggle("finale-result", finale);
   $("overlay-body").textContent = body;
   $("overlay-extra").textContent = extra;
   $("overlay-extra").hidden = !extra;
@@ -251,7 +252,7 @@ function showFinished() {
         : "同じ配置で、別のすきまを探せます。"
         : next ? `次の友だちから：${next.message || next.title}` : "",
       action: final ? "もう一度歩く" : "次の区間へ", stats: true, replay: true,
-      secondary: !final, secondaryLabel: "この区間を再挑戦",
+      finale: final, secondary: !final, secondaryLabel: "この区間を再挑戦",
     });
     if (final) spawnConfetti();
     const bestText = result.stored && result.best
@@ -509,6 +510,7 @@ function frame(now) {
   const scene = finaleReveal ? { ...run, worldTime: run.worldTime + (now - finaleStarted) / 1000 } : run;
   const renderHeld = controls.read();
   renderWorld(ctx, scene, { ...viewport, yaw: cameraYaw,
+    finaleProgress: finaleReveal ? Math.min(1, (now - finaleStarted) / 1800) : 1,
     steer: renderHeld.left === renderHeld.right ? 0 : renderHeld.left ? -1 : 1,
     braking: renderHeld.left && renderHeld.right, danger: now < dangerUntil, contactPulse: now < contactUntil ? 1 : 0 });
   requestAnimationFrame(frame);
