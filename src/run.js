@@ -448,6 +448,7 @@ export function updateRun(run, dt, controls = {}) {
   const before = {
     y: run.player.y,
     hits: run.hits,
+    contactCue: run.contactCueSerial,
     callSerial: run.callSerial,
     reunion: run.reunionSerial,
     violation: run.violationEvent?.id,
@@ -473,6 +474,8 @@ export function updateRun(run, dt, controls = {}) {
   }
   if (run.hits > before.hits) {
     run.cleanStreak = 0;
+  }
+  if (run.contactCueSerial > before.contactCue) {
     run.events.push({ kind: "contact" });
   }
   for (let i = before.nearMiss; i < run.combo.nearMissSerial; i++)

@@ -454,6 +454,8 @@ export function flowTier(flow) {
 export const PASS_ENGAGEMENT = 120;
 // Allow 14px beyond the body's safe gap, measured from the radii.
 export const NEAR_MISS_CLEARANCE = BODY_GAP + 14;
+// A cue is emitted only for a newly counted contact, and at most this often.
+export const CONTACT_CUE_INTERVAL = 2.3;
 function resetCombo(combo) {
   combo.flow = 0;
   combo.kickUntil = 0;
@@ -533,6 +535,8 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     speechSequence: 0,
     contactSpeechCount: 0,
     contactSpeechReadyAt: 0,
+    contactCueSerial: 0,
+    contactCueReadyAt: 0,
     waitSpeechReadyAt: 0,
     waitSpeechArmed: true,
     callHeld: false,
@@ -625,7 +629,8 @@ export function step(g, dt, input) {
     : null);
   const nearbyAnimals = g.animals.filter((animal) =>
     previousTeam.some((member) => Math.abs(animal.y - member.y) < 100));
-  const people = [...g.crowd.filter(visiblePerson), ...nearbyAnimals],
+  const people = [...g.crowd.filter((p) => !p.friend && visiblePerson(p)),
+    ...nearbyAnimals.filter((p) => !p.friend)],
     blockedContacts = new Map(), playerContacts = new Set();
   const previousPlayer = { ...g.player };
   g.cooldown = Math.max(0, g.cooldown - dt);
@@ -788,6 +793,7 @@ export function step(g, dt, input) {
   }
   // Remember every player-body contact, including contacts during cooldown.
   for (const p of g.crowd) {
+    if (p.friend) continue;
     if (playerContacts.has(p.id) ||
         Math.hypot(p.x - g.player.x, p.y - g.player.y) <
           p.r + g.player.r + BODY_GAP + 0.3) p.comboContacted = true;
@@ -804,6 +810,12 @@ export function step(g, dt, input) {
     g.elapsed += 2;
     g.cooldown = 1.4;
     g.stun = 0.35;
+    // touchingIds already latches each person's contact episode, including
+    // contacts that begin during the scoring cooldown.
+    if (g.worldTime >= g.contactCueReadyAt) {
+      g.contactCueSerial++;
+      g.contactCueReadyAt = g.worldTime + CONTACT_CUE_INTERVAL;
+    }
     if (contactMember.id === 0 && g.worldTime >= g.contactSpeechReadyAt) {
       if (say(g, "contact", 0,
         CONTACT_WORDS[g.contactSpeechCount % CONTACT_WORDS.length], 1.25)) {
@@ -817,7 +829,7 @@ export function step(g, dt, input) {
   // Interpolate relative positions at the crossing, including lateral motion.
   for (const p of g.crowd) {
     const before = previousCrowd.get(p);
-    if (!before || p.animal || p.comboPassed || p.comboContacted || p.yieldedToCall) continue;
+    if (!before || p.friend || p.animal || p.comboPassed || p.comboContacted || p.yieldedToCall) continue;
     const beforeDy = before.y - previousPlayer.y;
     const afterDy = p.y - g.player.y;
     if (beforeDy >= 0 || afterDy <= 0) continue;
