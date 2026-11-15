@@ -13,7 +13,7 @@ const expected = [
   "LICENSE", "bodies.js", "crowd.js", "index.html",
   "input.js", "logic.js", "logo.png", "og.png", "party.js", "style.css",
   "traffic.js", "src/appearance.js", "src/audio.js", "src/main.js",
-  "src/radar.js", "src/radar-view.js", "src/render.js", "src/replay.js", "src/run.js",
+  "src/radar.js", "src/radar-view.js", "src/render.js", "src/replay.js", "src/run.js", "src/transitions.js",
 ];
 
 async function fixture(t) {

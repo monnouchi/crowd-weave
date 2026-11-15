@@ -1,3 +1,4 @@
+import { courseMusicMix } from "./transitions.js";
 import { flowTier } from "../logic.js";
 
 // The soundtrack is synthesized at runtime. No recordings or external assets are used.
@@ -67,6 +68,8 @@ export class Soundscape {
     this.context = null;
     this.master = null;
     this.musicBus = null;
+    this.stageBuses = [];
+    this.stageClocks = new Map();
     this.airBus = null;
     this.airFilter = null;
     this.airSource = null;
@@ -123,6 +126,12 @@ export class Soundscape {
     this.musicBus = c.createGain();
     this.musicBus.gain.value = 0.8;
     this.musicBus.connect(this.master);
+    this.stageBuses = STAGES.map((_, index) => {
+      const bus = c.createGain();
+      bus.gain.value = index === this.stage ? 1 : 0;
+      bus.connect(this.musicBus);
+      return bus;
+    });
 
     this.airBus = c.createGain();
     const ambience = ambienceFor(this.stage, this.pressure, this.open);
@@ -198,16 +207,22 @@ export class Soundscape {
     if (index === this.stage) return;
     this.stage = index;
     this.beatIndex = 0;
+    this.stageClocks.clear();
     if (this.context) {
       this.nextBeat = this.context.currentTime + 0.12;
       this.updateAtmosphere();
     }
   }
 
-  updateAtmosphere() {
+  updateAtmosphere(mix = null) {
     if (!this.airBus || !this.rainBus || this.context.state === "closed") return;
     const now = this.context.currentTime;
-    const ambience = ambienceFor(this.stage, this.pressure, this.open);
+    let ambience = ambienceFor(this.stage, this.pressure, this.open);
+    if (mix) {
+      const a = ambienceFor(mix.from, this.pressure, this.open);
+      const b = ambienceFor(mix.to, this.pressure, this.open);
+      ambience = Object.fromEntries(Object.keys(a).map(key => [key, a[key] * mix.outgoing + b[key] * mix.incoming]));
+    }
     this.airBus.gain.setTargetAtTime(ambience.crowdGain, now, 0.19);
     this.airFilter.frequency.setTargetAtTime(ambience.crowdFrequency, now, 0.24);
     this.rainBus.gain.setTargetAtTime(ambience.rainGain, now, 0.08);
@@ -216,34 +231,50 @@ export class Soundscape {
   }
 
   // Called once per animation frame. Scheduling only looks a fraction of a second ahead.
-  tick(run, _dt = 0) {
+  tick(run, _dt = 0, reducedMotion = false) {
     const c = this.context;
     if (!c || c.state !== "running" || this.paused || this.muted) return;
     if (run?.phase && run.phase !== "playing") return;
-    if (Number.isFinite(run?.stage) && run.stage !== this.stage)
-      this.setStage(run.stage);
+    const mix = courseMusicMix(run, reducedMotion);
+    // Do not reset the independent clocks at the join: both patterns continue.
+    if (Number.isFinite(run?.stage) && run.stage !== this.stage) {
+      if (run.course) this.stage = run.stage;
+      else this.setStage(run.stage);
+    }
     const pressure = clamp(Number(run?.pressure) || 0, 0, 1);
     const open = clamp(Number(run?.flow?.open) || 0, 0, 1);
     this.pressure = pressure;
     this.open = open;
     const moving = !run?.braking && (run?.speed == null || run.speed > 8);
-    if (c.currentTime - this.lastAtmosphere > 0.15) {
-      this.updateAtmosphere();
-    }
-    const beat = STAGES[this.stage].beat;
-    if (this.nextBeat < c.currentTime - beat)
-      this.nextBeat = c.currentTime + 0.035;
-    let scheduled = 0;
-    while (this.nextBeat < c.currentTime + 0.13 && scheduled++ < 2) {
-      this.scoreBeat(this.nextBeat, pressure, open, moving, flowTier(run?.combo?.flow || 0));
-      this.nextBeat += beat;
-      this.beatIndex++;
+    const gains = STAGES.map((_, i) => mix
+      ? (i === mix.from ? mix.outgoing : i === mix.to ? mix.incoming : 0)
+      : (i === this.stage ? 1 : 0));
+    for (let i = 0; i < this.stageBuses.length; i++)
+      this.stageBuses[i].gain.setTargetAtTime(gains[i], c.currentTime, 0.015);
+    if (c.currentTime - this.lastAtmosphere > 0.15) this.updateAtmosphere(mix);
+    const dominant = mix && mix.incoming > mix.outgoing ? mix.to : mix ? mix.from : this.stage;
+    for (let stage = 0; stage < STAGES.length; stage++) {
+      if (gains[stage] <= 0) { this.stageClocks.delete(stage); continue; }
+      let clock = this.stageClocks.get(stage);
+      if (!clock) {
+        clock = { nextBeat: Math.max(c.currentTime + 0.035, this.nextBeat), beatIndex: 0 };
+        this.stageClocks.set(stage, clock);
+      }
+      const beat = STAGES[stage].beat;
+      if (clock.nextBeat < c.currentTime - beat) clock.nextBeat = c.currentTime + 0.035;
+      let scheduled = 0;
+      while (clock.nextBeat < c.currentTime + 0.13 && scheduled++ < 2) {
+        this.scoreBeat(clock.nextBeat, pressure, open, moving,
+          stage === dominant ? flowTier(run?.combo?.flow || 0) : 0,
+          stage, clock.beatIndex, this.stageBuses[stage] || this.musicBus);
+        clock.nextBeat += beat;
+        clock.beatIndex++;
+      }
     }
   }
 
-  scoreBeat(at, pressure, open, moving, tier = 0) {
-    const stage = this.stage;
-    const index = this.beatIndex % 8;
+  scoreBeat(at, pressure, open, moving, tier = 0, stage = this.stage, beatIndex = this.beatIndex, destination = this.musicBus) {
+    const index = beatIndex % 8;
     const config = STAGES[stage];
     const root = config.root;
     const melody = config.motif[index] + (stage === 4 ? 7 : 0);
@@ -253,51 +284,51 @@ export class Soundscape {
     // The foot pulse stops when the player brakes; the city still keeps time.
     if (moving)
       this.tone(58 + stage * 3, at, 0.11, 0.006 + pressure * 0.002,
-        "sine", this.musicBus, { endFrequency: 42 });
+        "sine", destination, { endFrequency: 42 });
     if (index % 2 === 0) {
       this.tone(semitone(root, index < 4 ? 0 : 5) / 2, at, config.beat * 1.35,
-        0.010 + high * 0.004, "triangle", this.musicBus);
+        0.010 + high * 0.004, "triangle", destination);
       this.tone(semitone(root, melody + 12), at + 0.06, config.beat * 0.73,
-        (0.016 + high * 0.003) * clear, config.voice, this.musicBus,
+        (0.016 + high * 0.003) * clear, config.voice, destination,
         { pan: index === 0 ? -0.17 : 0.17 });
     } else if (stage >= 1 && stage !== 3) {
       this.tone(semitone(root, melody + 12), at + config.beat * 0.17,
-        config.beat * 0.53, 0.009 * clear, config.voice, this.musicBus);
+        config.beat * 0.53, 0.009 * clear, config.voice, destination);
     }
     // A companion's answer enters one stage at a time, widening the melody.
     if (stage >= 2 && (index === 2 || index === 6)) {
       this.tone(semitone(root, melody + (stage === 4 ? 7 : 4) + 12),
         at + config.beat * 0.31, config.beat * 0.79, 0.008 + stage * 0.001,
-        "sine", this.musicBus, { pan: 0.3 });
+        "sine", destination, { pan: 0.3 });
     }
     if (stage === 4 && index % 4 === 0) {
       for (const interval of [0, 4, 7])
         this.tone(semitone(root, interval + 12), at, config.beat * 1.9,
-          0.006, "sine", this.musicBus);
+          0.006, "sine", destination);
     }
     if (stage === 4) {
       this.tone(semitone(root, index < 4 ? 0 : 5) / 4, at,
-        config.beat * 0.8, 0.009, "triangle", this.musicBus);
+        config.beat * 0.8, 0.009, "triangle", destination);
       for (const subBeat of [0, 1]) {
         const time = at + subBeat * config.beat / 2;
         for (const hit of drumHits(stage, index, subBeat)) {
           if (hit === "kick")
             this.tone(KIT.kick.frequency, time, KIT.kick.duration, KIT.kick.gain,
-              "sine", this.musicBus, { endFrequency: KIT.kick.endFrequency });
+              "sine", destination, { endFrequency: KIT.kick.endFrequency });
           else if (hit === "snare") {
-            this.drumNoise(time, KIT.snare);
+            this.drumNoise(time, KIT.snare, destination);
             const body = KIT.snare.body;
-            this.tone(body.frequency, time, body.duration, body.gain, body.type, this.musicBus);
-          } else this.drumNoise(time, KIT.hat);
+            this.tone(body.frequency, time, body.duration, body.gain, body.type, destination);
+          } else this.drumNoise(time, KIT.hat, destination);
         }
       }
     }
     if (flowLayerActive(tier) && index % 2 === 0)
       this.tone(semitone(root, melody + 19), at + config.beat * 0.36,
-        config.beat * 0.38, 0.005, "triangle", this.musicBus);
+        config.beat * 0.38, 0.005, "triangle", destination);
   }
 
-  drumNoise(at, config) {
+  drumNoise(at, config, destination = this.musicBus) {
     const c = this.context;
     if (!c || c.state === "closed" || !this.noiseBuffer || this.muted || this.paused) return;
     const source = c.createBufferSource();
@@ -315,7 +346,7 @@ export class Soundscape {
     gain.gain.linearRampToValueAtTime(0, end);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(this.musicBus);
+    gain.connect(destination);
     this.voices.add(source);
     source.onended = () => {
       this.voices.delete(source);

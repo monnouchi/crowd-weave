@@ -489,7 +489,7 @@ function frame(now) {
     const callPressed = callControl.take();
     updateRun(run, dt, { ...held, call: callPressed, callPulse: callPressed, hopEnabled: true });
     consumeEvents();
-    sound.tick(run, dt);
+    sound.tick(run, dt, reducedMotion.matches);
     if (run.phase !== previousPhase) {
       if (run.phase === "finished") showFinished();
       if (run.phase === "gameover") showGameOver();

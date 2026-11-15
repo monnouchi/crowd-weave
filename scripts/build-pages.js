@@ -22,6 +22,7 @@ export const PUBLIC_FILES = Object.freeze([
   "src/run.js",
   "src/render.js",
   "src/audio.js",
+  "src/transitions.js",
   "LICENSE",
 ]);
 export async function buildPages(sourceRoot, destinationRoot) {

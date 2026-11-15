@@ -1,3 +1,4 @@
+import { boundaryDip } from "./transitions.js";
 import { appearanceFor } from "./appearance.js";
 import { drawRadar } from "./radar-view.js";
 import { previewTurn } from "../crowd.js";
@@ -1482,5 +1483,10 @@ export function renderWorld(ctx, game, view = {}) {
   foreground(ctx, c, game, view);
   speedLines(ctx, c, game, view);
   drawRadar(ctx, game, { width: c.width, height: c.height });
+  const dip = boundaryDip(game, view.reducedMotion);
+  if (dip > 0) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${dip})`;
+    ctx.fillRect(0, 0, c.width, c.height);
+  }
   ctx.restore();
 }
