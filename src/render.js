@@ -1,6 +1,7 @@
 import { appearanceFor } from "./appearance.js";
 import { drawRadar } from "./radar-view.js";
 import { previewTurn } from "../crowd.js";
+import { flowTier } from "../logic.js";
 
 // A small perspective stage. World x/y and hitboxes still belong to the game;
 // z exists only here so every visible object obeys the same camera and depth.
@@ -143,6 +144,20 @@ function sky(ctx, c, theme, game, view) {
   const g = ctx.createLinearGradient(0, 0, 0, c.horizon + 110);
   g.addColorStop(0, theme.sky[0]); g.addColorStop(1, theme.sky[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, c.height);
+  if (c.stage === 2) {
+    rect(ctx, 0, 0, c.width, c.horizon, "#e8d6bb");
+    rect(ctx, 0, 0, c.width, c.horizon * .30, "#b99582");
+    for (const x of [.08, .92])
+      rect(ctx, c.width * x - 12, c.horizon * .24, 24, c.horizon * .76, "#caa994");
+    for (const x of [.25, .75]) {
+      rect(ctx, c.width * x - 2, 0, 4, c.horizon * .24, "#795f5a");
+      rect(ctx, c.width * x - 48, c.horizon * .20, 96, 29, "#745e5c", 3);
+      rect(ctx, c.width * x - 38, c.horizon * .235, 76, 3, "#f6e6c4");
+    }
+    for (const x of [.12, .42, .72])
+      rect(ctx, c.width * x, c.horizon * .08, c.width * .16, 5, "#fff4d6", 2);
+    return;
+  }
   if (c.stage === 4) {
     // Lighting points into the hall, not into the player's eyes.
     polygon(ctx, [{ x: c.width * .04, y: 0 }, { x: c.width * .51, y: c.horizon + 230 },
@@ -323,12 +338,22 @@ function sceneBlock(ctx, c, theme, side, y, length, index) {
   }
 }
 
-function streetObject(ctx, c, theme, side, y, index) {
+// Alternating disjoint groups guarantee neighbouring occupied rows differ.
+export function sideScenery(seed, stage, side, row, stride) {
+  const key = (Number(seed) || 0) * .001 + stage * 313 + side * 71;
+  const count = stage === 4 ? 3 : 5;
+  const parity = ((row % 2) + 2) % 2;
+  const random = hash(key + row * 19.17);
+  const group = parity ? 2 + Math.floor(random * (count - 2)) : Math.floor(random * 2);
+  const kind = (group + Math.floor(hash(key + 11) * count)) % count;
+  return { kind: kind === count - 1 ? -1 : kind,
+    offset: (hash(key + row * 31.73 + 7) - .5) * stride * .32 };
+}
+
+function streetObject(ctx, c, theme, side, y, index, variant) {
   const x = side < 0 ? 42 : 438;
   const base = screenPoint(c, x, y, 0);
   if (!base || base.depth > FAR || base.x < -180 || base.x > c.width + 180) return;
-  const slot = ((index % 9) + 9) % 9;
-  const variant = slot === 0 ? 0 : slot === 1 ? 1 : slot === 4 ? 2 : -1;
   const s = base.scale, bx = base.x, by = base.y;
   if (variant >= 0) {
     if (c.stage === 0 && variant === 0) {
@@ -465,12 +490,11 @@ export function pedestrianSignalProjections(game, t, view) {
   const redLit = !t.nominalGreen;
   const walkLit = !!t.nominalGreen && (!t.blinking || !!t.blinkOn);
   return [t.left + 22, (t.left + t.right) / 2, t.right - 22]
-    .map((x) => screenPoint(c, x, y, 70))
-    .filter((p) => p && p.depth >= 32 && p.depth < 650)
-    .map((p) => ({
-      x: p.x, y: p.y,
-      width: clamp(19 * p.scale, 27, 58),
-      height: clamp(31 * p.scale, 42, 86),
+    .map((x) => ({ top: screenPoint(c, x, y, 83), bottom: screenPoint(c, x, y, 52) }))
+    .filter(({ top }) => top && top.depth < 650)
+    .map(({ top, bottom }) => ({
+      x: top.x, y: (top.y + bottom.y) / 2,
+      width: 19 * top.scale, height: bottom.y - top.y,
       redLit, walkLit,
     }))
     .filter((p) => p.x + p.width / 2 >= 6 &&
@@ -572,10 +596,12 @@ function destination(ctx, c, theme, game) {
   worldFace(ctx, c, [[x0 - 7, y, arch - 15], [x1 + 7, y, arch - 15],
     [x1 + 7, y, arch + 9], [x0 - 7, y, arch + 9]], dark);
   worldLine(ctx, c, [x0 - 7, y, arch + 8], [x1 + 7, y, arch + 8], bright, 2);
-  const names = ["合 流", "駅入口", "カフェ", "会 場", "LIVE"];
-  worldLabel(ctx, c, 240, y - 1, arch - 4, names[stage],
-    dark, stage === 4 ? "#ffe1ab" : "#fff3d9", 20, 21,
-    stage === 4 ? 2300 : FAR);
+  // A segmented ring lies on the floor and shares the arch's perspective.
+  for (let i = 0; i < 32; i++) {
+    const a = TAU * i / 32, b = TAU * (i + 1) / 32;
+    worldLine(ctx, c, [240 + 55 * Math.cos(a), y + 30 * Math.sin(a), .5],
+      [240 + 55 * Math.cos(b), y + 30 * Math.sin(b), .5], bright, 2.5);
+  }
   if (stage === 4) {
     // A banner and a pair of small trusses stand on the approach to the arch.
     for (const x of [145, 335]) worldLine(ctx, c, [x, 115, 0], [x, 115, 76], "#a3b9bf", 2);
@@ -916,20 +942,23 @@ function person(ctx, c, actor, game, view) {
   const wave = (actor.acknowledge?.remaining || 0) > .56 ||
     (friend && game.reunionUntil > game.worldTime) ||
     (specialFriend && (close || game.arriving || game.phase === "finished"));
+  const audienceRaised = actor.glowStick && c.stage === 4 && game.phase === "finished";
   const waveOffset = wave && specialFriend && !view.reducedMotion
     ? Math.sin((game.worldTime || 0) * 5) * 1.5 : 0;
   const sleeve = look.outfit === "cardigan" ? "#ad906d" : clothes;
   const shoulder = torsoHalf * .9;
   const hand = torsoHalf + (profile ? 1.2 : 3);
+  const rightHandX = actor.umbrella && c.stage === 3
+    ? px + (profile || Math.sign(actor.vx || actor.ux || 0)) * 3 * s : px + hand * s;
   limb(px - shoulder * s, bodyTop + 5 * s,
     px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
     3.4 * s, sleeve, outlined);
   limb(px + shoulder * s, bodyTop + 5 * s,
-    px + hand * s, bodyTop + 19 * s,
+    rightHandX, bodyTop + (audienceRaised ? -7 : 19) * s,
     3.4 * s, sleeve, outlined);
   ellipse(ctx, px - (hand + waveOffset) * s, bodyTop + (wave ? -7 : 19) * s,
     2.4 * s, 3 * s, look.skin);
-  ellipse(ctx, px + hand * s, bodyTop + 19 * s, 2.4 * s, 3 * s, look.skin);
+  ellipse(ctx, rightHandX, bodyTop + (audienceRaised ? -7 : 19) * s, 2.4 * s, 3 * s, look.skin);
   if (look.accessory === "shoppingBag" || look.accessory === "toteBag") {
     const hx = px + hand * s, hy = bodyTop + 19 * s;
     const tote = look.accessory === "toteBag";
@@ -1002,14 +1031,12 @@ function person(ctx, c, actor, game, view) {
   }
   if (actor.umbrella && c.stage === 3) {
     const uY = foot - 68 * s;
-    const tilt = (profile || Math.sign(actor.vx || actor.ux || 0)) * 3 * s;
-    const ux = px + tilt;
-    limb(px + 14 * s, bodyTop + 19 * s, ux, uY - 8 * s, 1.3 * s, "#eff2e8");
+    const ux = rightHandX;
     const colors = ["#e6c59b", "#659aab", "#e88a75", "#9a8fc7", "#7fbfa8"];
     const id = Math.abs(actor.id || 0);
     ctx.save(); ctx.translate(ux, uY);
-    ctx.rotate((profile || Math.sign(actor.vx || actor.ux || 0)) * .08);
     ctx.translate(-ux, -uY);
+    limb(ux, bodyTop + 19 * s, ux, uY - 10 * s, 1.3 * s, "#eff2e8");
     ctx.beginPath(); ctx.moveTo(ux - 20 * s, uY + 3 * s);
     ctx.quadraticCurveTo(ux - 17 * s, uY - 10 * s, ux, uY - 10 * s);
     ctx.quadraticCurveTo(ux + 17 * s, uY - 10 * s, ux + 20 * s, uY + 3 * s);
@@ -1029,9 +1056,10 @@ function person(ctx, c, actor, game, view) {
     const finished = game.phase === "finished";
     const sway = finished && !view.reducedMotion
       ? Math.sin((game.worldTime || 0) * 2.2 + (actor.id || 0) * .7) * 2.2 : 0;
-    const tipX = px + (13.6 + stride * .3 + sway) * s;
-    const tipY = bodyTop - (finished ? 15 : 4) * s;
-    limb(px + 13.6 * s, bodyTop + (finished ? 2 : 14) * s, tipX, tipY, 3.2 * s, color);
+    const gripX = px + hand * s, gripY = bodyTop + (audienceRaised ? -7 : 19) * s;
+    const tipX = gripX + (stride * .3 + sway) * s;
+    const tipY = gripY - 18 * s;
+    limb(gripX, gripY, tipX, tipY, 3.2 * s, color);
     ellipse(ctx, tipX, tipY, 5 * s, 5 * s, color + "33");
     ellipse(ctx, tipX, tipY, 2 * s, 2 * s, color);
   }
@@ -1177,6 +1205,31 @@ function foreground(ctx, c, game, view) {
   }
 }
 
+const speedLineStates = new WeakMap();
+function speedLines(ctx, c, game, view) {
+  const tier = flowTier(game.combo?.flow || 0);
+  const target = !view.reducedMotion && game.phase === "playing" && !game.braking && tier >= 2 ? tier : 0;
+  const time = Number(game.worldTime) || 0;
+  let state = speedLineStates.get(ctx);
+  if (!state || state.game !== game || time < state.time) state = { game, time, value: 0 };
+  const dt = clamp(time - state.time, 0, .1);
+  state.value += (target - state.value) * Math.min(1, dt * 12);
+  state.time = time;
+  speedLineStates.set(ctx, state);
+  if (view.reducedMotion || state.value < .02) return;
+  const count = Math.ceil(8 + state.value * 4);
+  ctx.strokeStyle = `rgba(255,241,211,${Math.min(.32, state.value * .09)})`;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < count; i++) {
+    const a = TAU * (i + .5) / count;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(c.width / 2 + dx * c.width * .43, c.height / 2 + dy * c.height * .43);
+    ctx.lineTo(c.width / 2 + dx * c.width * .72, c.height / 2 + dy * c.height * .72);
+    ctx.stroke();
+  }
+}
+
 /** Render a stable eye-level view of the current run. The caller owns sizing. */
 export function renderWorld(ctx, game, view = {}) {
   if (!ctx || !game?.player) return;
@@ -1196,8 +1249,10 @@ export function renderWorld(ctx, game, view = {}) {
     for (const side of [-1, 1]) {
       items.push({ y: y + stride * .71, draw: () => sceneBlock(ctx, c, theme,
         side, y, stride * .71, i + (side + 1) * 4) });
-      items.push({ y: y + stride * .94, draw: () => streetObject(ctx, c, theme,
-        side, y + stride * .94, i) });
+      const scenery = sideScenery(game.seed, c.stage, side, i, stride);
+      const objectY = y + stride * .94 + scenery.offset;
+      if (scenery.kind >= 0) items.push({ y: objectY, draw: () => streetObject(ctx, c, theme,
+        side, objectY, i, scenery.kind === 3 ? -1 : scenery.kind) });
     }
   }
   for (const t of game.crossings || [])
@@ -1223,6 +1278,7 @@ export function renderWorld(ctx, game, view = {}) {
   crossingSignals(ctx, c, game, view);
   rain(ctx, c, game, view);
   foreground(ctx, c, game, view);
+  speedLines(ctx, c, game, view);
   drawRadar(ctx, game, { width: c.width, height: c.height });
   ctx.restore();
 }

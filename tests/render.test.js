@@ -4,7 +4,7 @@ import { createRun } from "../src/run.js";
 import { appearanceFor } from "../src/appearance.js";
 import {
   pedestrianFacing, pedestrianSignalProjections, renderWorld, reunionWave,
-  worldLabelCenterX,
+  worldLabelCenterX, sideScenery,
 } from "../src/render.js";
 
 function drawingContext() {
@@ -221,8 +221,8 @@ test("hair and outfit choices change the person drawing calls", () => {
     assert.notDeepEqual(callsFor("cap", outfit), baseline, outfit);
 });
 
-function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true, worldTime = 1, phase = "playing" } = {}) {
-  const run = createRun(stage, 17);
+function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true, worldTime = 1, phase = "playing", seed = 17 } = {}) {
+  const run = createRun(stage, seed);
   run.phase = phase;
   run.player.x = 240;
   run.player.y = playerY;
@@ -245,21 +245,74 @@ function recordedScene(stage, { playerY = 1800, crowd = [], reducedMotion = true
   return calls;
 }
 
-test("side scenery rotates through new objects and retains existing scenery", () => {
-  const fills = (stage) => [900, 1800, 2800].flatMap((playerY) => recordedScene(stage, { playerY }))
-    .filter((c) => c.name === "fill" || c.name === "fillRect").map((c) => c.fill);
-  const residential = fills(0);
-  for (const color of ["#b94e50", "#d6e3dc", "#6c9b75", "#669875"])
-    assert.ok(residential.includes(color), `residential ${color}`);
-  const station = fills(1);
-  for (const color of ["#f2f1db", "#e3bb79", "#a17e69"])
-    assert.ok(station.includes(color), `station ${color}`);
-  const cafe = fills(2);
-  for (const color of ["#f2d2aa", "#64494b", "#ef9a9b", "#f9e5c7"])
-    assert.ok(cafe.includes(color), `cafe ${color}`);
-  const rainy = fills(3);
-  for (const color of ["#e5c9b7", "#d98e8b", "#426f76"])
-    assert.ok(rainy.includes(color), `rain ${color}`);
+test("side scenery is seeded, varied and irregular without repeated neighbours", () => {
+  const sequence = (seed, stage, side) => Array.from({ length: 80 }, (_, row) =>
+    sideScenery(seed, stage, side, row, 210));
+  for (let stage = 0; stage < 5; stage++) for (const side of [-1, 1]) {
+    const rows = sequence(17, stage, side);
+    assert.deepEqual(rows, sequence(17, stage, side));
+    assert.notDeepEqual(rows.map(r => r.kind), sequence(18, stage, side).map(r => r.kind));
+    for (let i = 1; i < rows.length; i++)
+      assert.ok(rows[i].kind < 0 || rows[i - 1].kind < 0 || rows[i].kind !== rows[i - 1].kind);
+    assert.ok(new Set(rows.map(r => r.offset)).size > 10);
+    const kinds = new Set(Array.from({ length: 20 }, (_, seed) => sequence(seed, stage, side)).flat().map(r => r.kind));
+    for (const kind of stage === 4 ? [-1, 0, 1] : [-1, 0, 1, 2, 3]) assert.ok(kinds.has(kind));
+  }
+});
+
+test("drawn scenery kinds repeat for the same seed and vary for another", () => {
+  const colors = ["#b94e50", "#d6e3dc", "#6c9b75", "#669875"];
+  const kinds = seed => [900, 1800, 2800].flatMap(playerY => recordedScene(0, { seed, playerY }))
+    .filter(c => (c.name === "fill" || c.name === "fillRect") && colors.includes(c.fill))
+    .map(c => c.fill);
+  assert.deepEqual(kinds(17), kinds(17));
+  assert.notDeepEqual(kinds(17), kinds(18));
+});
+
+test("the station cafe has an indoor ceiling instead of a sun", () => {
+  const colors = stage => recordedScene(stage).filter(c => c.name === "fill" || c.name === "fillRect").map(c => c.fill);
+  assert.ok(colors(2).includes("#b99582"));
+  assert.ok(colors(2).includes("#fff4d6"));
+  for (const sun of ["#fff1d4b8", "#dae5dd35"]) assert.ok(!colors(2).includes(sun));
+  for (const stage of [0, 1, 3]) assert.ok(colors(stage).includes(stage === 3 ? "#dae5dd35" : "#fff1d4b8"));
+});
+
+test("the goal arch has a ground ring without a destination label", () => {
+  for (let stage = 0; stage < 5; stage++) {
+    const calls = recordedScene(stage, { playerY: 300 });
+    assert.ok(!calls.some(c => c.name === "fillText" && ["合 流", "駅入口", "カフェ", "会 場", "LIVE"].includes(c.args[0])));
+    assert.ok(calls.filter(c => c.name === "stroke" && c.stroke === (stage === 4 ? "#f1b77f" : ["#f0bd6d", "#f3bd69", "#ffd079", "#f6c97f"][stage])).length >= 32);
+  }
+});
+
+test("signal head tops attach to the projected gantry rods", () => {
+  const run = createRun(1, 17), road = run.crossings[0];
+  run.player.x = 240;
+  const view = { width: 390, height: 844 };
+  const focal = Math.min(view.width * 1.12, view.height * .91);
+  const horizon = view.height * .43;
+  for (const approach of [450, 154, 72]) {
+    run.player.y = road.bottom + approach;
+    const heads = pedestrianSignalProjections(run, road, view);
+    assert.ok(heads.length);
+    const rodTop = horizon + (57 - 83) * focal / (approach + 35);
+    for (const head of heads) assert.ok(Math.abs(head.y - head.height / 2 - rodTop) < 1e-6);
+  }
+});
+
+test("flow speed lines fade in and out and respect reduced motion", () => {
+  const run = createRun(0, 17); run.phase = "playing"; run.combo.flow = 10;
+  const ctx = drawingContext(); const strokes = [];
+  ctx.stroke = () => strokes.push(ctx.strokeStyle);
+  const draw = (time, reducedMotion = false) => {
+    run.worldTime = time; strokes.length = 0;
+    renderWorld(ctx, run, { width: 390, height: 844, reducedMotion });
+    return strokes.filter(s => typeof s === "string" && s.startsWith("rgba(255,241,211,"));
+  };
+  draw(1); assert.ok(draw(1.1).length);
+  run.braking = true; draw(1.2); assert.equal(draw(1.3).length, 0);
+  run.braking = false; draw(1.4); assert.equal(draw(1.5, true).length, 0);
+  run.combo.flow = 0; draw(1.6); assert.equal(draw(1.7).length, 0);
 });
 
 test("venue corridor draws speakers, framed posters, banner and paired light towers", () => {
