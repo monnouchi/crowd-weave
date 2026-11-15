@@ -332,6 +332,7 @@ function translateSegment(seg, dy, index) {
   };
   for (const person of seg.crowd) {
     translatePoint(person);
+    person.originY = (person.originY || 0) + dy;
     translatePoint(person.entry);
     for (const point of person.route || []) translatePoint(point);
     translatePoint(person.spot);

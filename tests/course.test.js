@@ -39,6 +39,40 @@ test("course crowd is deterministic", () => {
   assert.equal(crowdHash(createCourseRun(20261115).crowd), crowdHash(createCourseRun(20261115).crowd));
 });
 
+function stepFrames(run, frames) {
+  for (let i = 0; i < frames; i++) updateRun(run, 1 / 60, {});
+}
+
+test("course audience stays in its segment after 30 seconds", () => {
+  const run = createCourseRun(), offsets = courseOffsets();
+  beginRun(run);
+  stepFrames(run, 1800);
+  const audience = run.crowd.filter((p) => p.seg === 4);
+  const inBand = (p) => p.y >= offsets[4] - 100 &&
+    p.y <= offsets[4] + STAGES[4].startY + 300;
+  assert.equal(audience.length, 58);
+  assert.ok(audience.every(inBand));
+  assert.ok(audience.filter((p) => p.active && inBand(p)).length >= 40);
+  assert.equal(audience.filter((p) => p.y > offsets[3]).length, 0);
+});
+
+test("single-stage audience stays in its stage after 30 seconds", () => {
+  const run = createRun(4, 1402485690 + 4 * 97);
+  beginRun(run);
+  stepFrames(run, 1800);
+  assert.equal(run.crowd.length, 58);
+  assert.ok(run.crowd.every((p) => p.y >= -100 && p.y <= STAGES[4].startY + 300));
+});
+
+test("stepped course crowds are deterministic", () => {
+  const a = createCourseRun(20261115), b = createCourseRun(20261115);
+  beginRun(a);
+  beginRun(b);
+  stepFrames(a, 600);
+  stepFrames(b, 600);
+  assert.equal(crowdHash(a.crowd), crowdHash(b.crowd));
+});
+
 function cross(run, k) {
   for (const person of run.crowd) person.y = run.course.offsets[k] + 600;
   run.combo.flow = 5;

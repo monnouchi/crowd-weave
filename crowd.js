@@ -628,13 +628,14 @@ export function makeCrowd(
 export function makeRoomForFollower(p, player) {
   if (p.anchor) return;
   if (p.environment === "party" && p.state === "watching") {
+    const oy = p.originY || 0;
     // A stationary spectator makes visible room after a bump instead of
     // becoming a permanent wall across the follower's recorded route.
     let side = p.x < player.x ? -1 : 1;
     if (p.x + side * 55 < 55 || p.x + side * 55 > 425) side *= -1;
     p.route[1] = {
       x: Math.max(55, Math.min(425, p.x + side * 55)),
-      y: Math.max(54, Math.min(590, p.y + 16)),
+      y: Math.max(oy + 54, Math.min(oy + 590, p.y + 16)),
     };
     p.leg = 1;
     p.state = "walking";
@@ -727,7 +728,8 @@ function courtesyPeopleAhead(crowd, player, crossings, stage) {
     p.active && !p.animal && p.y <= player.y - 8 &&
     p.y >= player.y - 105 && Math.abs(p.x - player.x) < 68 &&
     !crossings.some((t) => p.y >= t.top - 45 && p.y <= t.bottom + 45) &&
-    !(stage === 4 && p.y >= 640 && p.y <= 885));
+    !(stage === 4 && p.y >= (p.originY || 0) + 640 &&
+      p.y <= (p.originY || 0) + 885));
 }
 
 export function availableCourtesyTargets(crowd, player, crossings = [], stage = 0) {
@@ -1273,10 +1275,11 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
     p.y += p.vy * dt;
     p.walk += Math.hypot(p.vx, p.vy) * dt;
     if (p.environment === "party") {
-      p.y = Math.max(33, p.y);
+      const oy = p.originY || 0;
+      p.y = Math.max(oy + 33, p.y);
       p.x = Math.max(
-        p.y < 600 ? 55 : -24,
-        Math.min(p.y < 600 ? 425 : 504, p.x),
+        p.y < oy + 600 ? 55 : -24,
+        Math.min(p.y < oy + 600 ? 425 : 504, p.x),
       );
     }
     const target = p.route[p.leg];
@@ -1297,7 +1300,7 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
           p.uy = -1;
           p.wait =
             p.leg === 0
-              ? (p.spot.y < 310 ? 18 : 8) + ((p.id * 7 + p.cycle * 11) % 12)
+              ? (p.spot.y < (p.originY || 0) + 310 ? 18 : 8) + ((p.id * 7 + p.cycle * 11) % 12)
               : 3 + ((p.id + p.cycle) % 5);
           p.vx = p.vy = 0;
         }
@@ -1324,10 +1327,11 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
 }
 // The concert has its own destination layout; other scene movement stays shared.
 function audienceShift(p) {
-  const rand = random(p.seed + p.id * 101 + p.cycle * 7919);
+  const rand = random(p.seed + p.id * 101 + p.cycle * 7919),
+    oy = p.originY || 0;
   p.route[1] = {
     x: Math.max(65, Math.min(415, p.spot.x + (rand() - 0.5) * 100)),
-    y: Math.max(54, Math.min(p.spot.y > 900 ? 1710 : 590,
+    y: Math.max(oy + 54, Math.min(oy + (p.spot.y > oy + 900 ? 1710 : 590),
       p.spot.y + (rand() - 0.5) * 65)),
   };
 }
@@ -1386,6 +1390,7 @@ export function makeAudience(count, speed, seed) {
       viewingRounds: 0,
       spot,
       environment: "party",
+      originY: 0,
       role: "ライブの観客",
       origin: "south",
       destination: "north",
@@ -1509,11 +1514,12 @@ export function extendJourney(crowd, stage, seed, config) {
   }
 }
 export function visiblePerson(p) {
+  const oy = p.environment === "party" ? (p.originY || 0) : 0;
   return (
     p.active &&
     p.x > 18 &&
     p.x < 462 &&
-    p.y > (p.environment === "party" ? 32 : 110) &&
-    p.y < (p.boundsH || 670)
+    p.y > oy + (p.environment === "party" ? 32 : 110) &&
+    p.y < oy + (p.boundsH || 670)
   );
 }
