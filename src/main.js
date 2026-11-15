@@ -268,7 +268,7 @@ function showFinished() {
     }));
     $("result-splits").hidden = !splits.length;
     // The race ends at the player’s arrival, before companions necessarily arrive.
-    $("result-friends").textContent = "記録なし";
+    $("result-friends").textContent = `${run.friendsArrived ?? run.party.members.length}人`;
     $("result-record").textContent = [scoreText, bestText, courseText, streakText].filter(Boolean).join("\n");
   };
   if (!final || reducedMotion.matches) return reveal();

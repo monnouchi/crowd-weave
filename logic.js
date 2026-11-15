@@ -98,7 +98,12 @@ export const STAGES = [
   { name: "会場前のにぎわい", count: 54, speed: 45, startY: 2165, baseCrowd: 30 },
   { name: "ライブの最前方へ", count: 58, speed: 50, startY: 1805, baseCrowd: 40 },
 ];
-const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3 };
+const SPEECH_PRIORITY = { wait: 1, contact: 2, call: 2.5, hazard: 3, leaving: 4 };
+export const CALL_GAUGE_PASS = 0.4, CALL_GAUGE_NEAR = 0.7, CALL_GAUGE_PASSIVE = 0.211;
+export const HATE_MAX = 1, HATE_PER_CALL = 0.4, HATE_DECAY = 0.025;
+export const HATE_CLEAN_RELIEF = 0.04, HATE_NEAR_RELIEF = 0.07;
+export const HATE_COURTESY_FLOOR = 0.35, HATE_NEGOTIATE_FLOOR = 0.4;
+export const HATE_LEAVE_THRESHOLD = 0.75, HATE_LEAVE_SUSTAIN = 3, HATE_LEAVE_COOLDOWN = 8;
 const CONTACT_WORDS = ["おおっと！", "うわっ！"];
 export const CALL_RIPPLE_SWEEP = 0.3;
 export const CALL_RIPPLE_LINGER = 0.4;
@@ -205,7 +210,7 @@ function updateCallGesture(g, input) {
   g.callHeld = !input.callPulse;
   g.callSerial++;
   g.callResponseCount = 0;
-  const unavailable = g.arriving ||
+  const unavailable = g.callGauge < 1 || g.arriving ||
     g.crossings.some((t) => g.player.y >= t.top - 55 &&
       g.player.y <= t.bottom + 65);
   // The ripple acknowledges the completed input. A quieter color distinguishes
@@ -213,8 +218,12 @@ function updateCallGesture(g, input) {
   g.callRipple = { x: g.player.x, y: g.player.y, started: g.worldTime,
     mode: unavailable ? "unavailable" : "recognized", responders: [] };
   if (unavailable) return;
+  g.callGauge = 0;
+  g.callsUsed++;
+  g.combo.score -= g.callCostScore || 0;
+  g.hate = Math.min(HATE_MAX, g.hate + HATE_PER_CALL);
   const acknowledgments = new Map(g.crowd.map((p) => [p, p.acknowledge]));
-  const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage);
+  const moved = askCrowdToMove(g.crowd, g.player, g.crossings, g.stage, 1 - (1 - HATE_COURTESY_FLOOR) * g.hate / HATE_MAX);
   g.callRipple.responders = g.crowd
     .filter((p) => p.acknowledge && p.acknowledge !== acknowledgments.get(p))
     .map((p) => ({ x: p.x, y: p.y }));
@@ -547,6 +556,9 @@ export function createGame(stage = 0, seed = 1402485690 + stage * 97) {
     contactCueReadyAt: 0,
     waitSpeechReadyAt: 0,
     waitSpeechArmed: true,
+    callGauge: 1, callsUsed: 0, callCostScore: 0, hate: 0,
+    hateSustain: 0, leaveReadyAt: 0, friendsJoined: stage, friendsLeft: 0,
+    departedFriends: [],
     callHeld: false,
     callReadyAt: 0,
     callSerial: 0,
@@ -581,6 +593,7 @@ function crossCourseBoundary(g) {
     ux: 0, uy: -1, walk: 0, state: "following", docked: false,
     docking: false, flash: 0,
   });
+  g.friendsJoined++;
   g.course.index = k + 1;
   g.stage = k + 1;
   g.scene = SCENES[k + 1];
@@ -599,6 +612,22 @@ export function step(g, dt, input) {
   const hitsBeforeStep = g.hits;
   g.elapsed += dt;
   g.worldTime += dt;
+  g.callGauge = Math.min(1, g.callGauge + CALL_GAUGE_PASSIVE * dt);
+  g.hate = Math.max(0, g.hate - HATE_DECAY * dt);
+  g.hateSustain = g.hate >= HATE_LEAVE_THRESHOLD ? g.hateSustain + dt : 0;
+  for (const m of g.departedFriends) {
+    m.leaveTime += dt;
+    if (m.leaveTime > 1) m.x += m.leaveSide * 45 * dt;
+  }
+  g.departedFriends = g.departedFriends.filter(m => m.leaveTime < 4);
+  if (g.hateSustain >= HATE_LEAVE_SUSTAIN && g.worldTime >= g.leaveReadyAt && g.party.members.length) {
+    const m = g.party.members.pop();
+    m.leaveTime = 0; m.leaveSide = m.x < 240 ? -1 : 1; m.state = "waiting";
+    g.departedFriends.push(m); g.friendsLeft++;
+    g.leaveReadyAt = g.worldTime + HATE_LEAVE_COOLDOWN;
+    g.hateSustain = 0;
+    say(g, "leaving", m.id, "もう帰るね…", 2.5);
+  }
   const combo = g.combo;
   while (combo.flow > 0 && combo.nextDecayAt !== null &&
       g.worldTime > combo.nextDecayAt + 1e-9) {
@@ -631,6 +660,7 @@ export function step(g, dt, input) {
         x: g.player.x,
         y: g.player.y,
         commitSide,
+        hateFactor: 1 - (1 - HATE_NEGOTIATE_FLOOR) * g.hate / HATE_MAX,
         braking: !!(input.left && input.right),
         still: commitSide === 0 && lateralInput === 0,
       }
@@ -849,6 +879,8 @@ export function step(g, dt, input) {
     // A reset in this step wins over all crossing credits.
     if (contacted || newViolation) continue;
     const near = Math.abs(dx) - (g.player.r + p.r) <= NEAR_MISS_CLEARANCE;
+    g.callGauge = Math.min(1, g.callGauge + (near ? CALL_GAUGE_NEAR : CALL_GAUGE_PASS));
+    g.hate = Math.max(0, g.hate - (near ? HATE_NEAR_RELIEF : HATE_CLEAN_RELIEF));
     combo.flow += near ? 2 : 1;
     combo.maxFlow = Math.max(combo.maxFlow, combo.flow);
     combo.score += (near ? 200 : 100) * (flowTier(combo.flow) + 1);
@@ -893,6 +925,7 @@ export function step(g, dt, input) {
   // The race ends when YOU reach the marked destination. Companions retain
   // their actual positions; the result never waits for their docking path.
   if (g.arriving) {
+    g.friendsArrived = g.party.members.length;
     g.phase = "finished";
     g.meetingPartner.state = "met";
   }

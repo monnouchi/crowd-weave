@@ -153,12 +153,16 @@ test("each call pulse renews a response without cumulative shoving", () => {
   assert.ok(run.events[0].count >= 1);
   const targetX = commuter.courtesy.targetX;
   const before = { x: commuter.x, y: commuter.y };
+  // Item S requires a recharged gauge for another pulse; isolate the
+  // courtesy renewal behavior from the recharge mechanic.
+  run.callGauge = 1;
   updateRun(run, 0.05, { brake: true, call: true, callPulse: true });
   assert.equal(run.events[0]?.kind, "call");
   assert.equal(commuter.courtesy.targetX, targetX);
   assert.ok(commuter.y < before.y, "giving way keeps destination progress");
   assert.ok(Math.abs(commuter.x - before.x) <= 95 * 0.05 + 1e-9);
-  assert.equal(run.callReady, true);
+  assert.equal(run.callReady, false);
+  run.callGauge = 1;
   updateRun(run, 0.05, { brake: true, call: true });
   const serial = run.callSerial;
   updateRun(run, 0.05, { brake: true, call: true });
@@ -207,7 +211,8 @@ test("the finale finishes on player arrival without waiting for followers", () =
   assert.ok(run.elapsed < 50, `finale elapsed ${run.elapsed}`);
   assert.ok(run.hits <= 4, `finale contacts ${run.hits}`);
   assert.ok(successfulCalls >= 3);
-  assert.equal(run.party.members.length, 4);
+  // Repeated calls can cause departures; the finale still need not wait.
+  assert.equal(run.party.members.length + run.friendsLeft, 4);
   assert.ok(run.party.members.some((member) => !member.docked),
     "player completion does not await every friend");
 });

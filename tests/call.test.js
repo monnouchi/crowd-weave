@@ -44,13 +44,13 @@ test('call window measures the best available position without mutating state', 
   assert.equal(courtesyCallWindow([], g.player), null);
 });
 
-test('run exposes a call window consistent with availability while playing', () => {
+test('run exposes gauge charge and gates call readiness while playing', () => {
   const run = createRun(0, 17);
   beginRun(run);
   updateRun(run, 0.025, idle);
-  assert.equal(run.callWindow === null, !run.callReady);
-  if (run.callWindow !== null)
-    assert.ok(run.callWindow >= 0 && run.callWindow <= 1);
+  assert.equal(run.callWindow, run.callGauge);
+  assert.ok(run.callWindow >= 0 && run.callWindow <= 1);
+  assert.equal(run.callReady, run.callGauge >= 1 && run.callTargets.length > 0);
 });
 
 test('one call press opens a person-only gap and confirms with a ripple', () => {
@@ -121,6 +121,8 @@ test('a held call fires once, while every released tap can renew a response', ()
   assert.equal(g.callRipple, first);
   assert.equal(g.callSerial, callSerial);
   step(g, 0.025, idle);
+  // Refill explicitly to isolate gesture renewal from Item S gauge economy.
+  g.callGauge = 1;
   pressCall(g);
   assert.equal(g.callRipple.mode, 'recognized');
   assert.ok(g.callRipple.started > first.started);
@@ -135,6 +137,8 @@ test('adjacent one-shot taps each fire even without an intervening false frame',
   step(g, 0.025, { ...idle, call: true, callPulse: true });
   assert.equal(g.callSerial, 1);
   assert.ok(g.callResponseCount >= 1);
+  // Each pulse is recognized independently when the gauge is ready.
+  g.callGauge = 1;
   step(g, 0.025, { ...idle, call: true, callPulse: true });
   assert.equal(g.callSerial, 2);
   assert.ok(g.callResponseCount >= 1);

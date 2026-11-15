@@ -219,7 +219,7 @@ export function routeInput(action) {
 
 // Track each 0.1-second segment with zero depth epsilon and a 1-unit lateral
 // deadband; the optional observer preserves per-substep checks in route tests.
-export function replayPlannedRoute(g, route, substep = 0.025, afterStep) {
+export function replayPlannedRoute(g, route, substep = 0.025, afterStep, inputPolicy) {
   // Closed-loop replay: track the planned trajectory instead of replaying
   // inputs open-loop. Under v2 the pace varies with FLOW (tier x kick), so
   // the driver predicts the forward advance of each substep and brakes
@@ -243,9 +243,10 @@ export function replayPlannedRoute(g, route, substep = 0.025, afterStep) {
       if (behind > 0.5) move = true;
       else if (g.player.y - advance >= targetY - 0.5) move = true;
       else if (Math.abs(errorX) > 4 && behind > -4) move = true;
-      step(g, dt, move
+      const input = move
         ? { left: errorX < -1, right: errorX > 1 }
-        : { left: true, right: true });
+        : { left: true, right: true };
+      step(g, dt, inputPolicy ? inputPolicy(g, input) : input);
       if (afterStep) afterStep();
     }
     x = endX;

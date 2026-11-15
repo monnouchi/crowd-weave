@@ -15,8 +15,8 @@ test("result markup places all statistics and records before the narrative and s
   assert.ok(body < share);
 });
 
-test("result rendering keeps records, splits, and an honest unavailable arrival count", () => {
-  assert.match(source, /result-friends"\)\.textContent = "記録なし"/);
+test("result rendering keeps records, splits, and the arrived-friends count", () => {
+  assert.match(source, /run\.friendsArrived/);
   assert.match(source, /run\.records : \[\]/);
   assert.match(source, /\[scoreText, bestText, courseText, streakText\]/);
   assert.match(source, /record\.elapsed/);
@@ -41,7 +41,7 @@ test("finished overlays render current totals, split rows, and records", () => {
     return elements.get(id);
   };
   const records = Array.from({ length: 5 }, (_, stage) => ({ stage, elapsed: stage + 10, hits: 1, score: 100, maxFlow: stage + 1 }));
-  const run = { stage: 4, startStage: 0, course: {}, records, runSeed: 2, combo: {}, party: { members: [{ docked: false }] } };
+  const run = { stage: 4, startStage: 0, course: {}, records, runSeed: 2, combo: {}, friendsArrived: 2, party: { members: [{ docked: false }] } };
   let overlay;
   const best = { elapsed: 60, hits: 5, score: 500 };
   const invoke = new Function("run", "$", "document", "setOverlay", "recordLocalBest", "recordCourseResults", "browserStorage", "clock", "story", "reducedMotion", "spawnConfetti", `${implementation}\nreturn showFinished();`);
@@ -53,7 +53,7 @@ test("finished overlays render current totals, split rows, and records", () => {
   assert.equal(get("result-hits").textContent, "5");
   assert.equal(get("result-score").textContent, "500");
   assert.equal(get("result-max-flow").textContent, "5");
-  assert.equal(get("result-friends").textContent, "記録なし");
+  assert.equal(get("result-friends").textContent, "2人");
   assert.deepEqual(get("result-splits").children.map(row => row.textContent), ["1区間 10", "2区間 11", "3区間 12", "4区間 13", "5区間 14"]);
   assert.match(get("result-record").textContent, /スコアベスト更新！ 500/);
   assert.match(get("result-record").textContent, /自己ベスト更新/);

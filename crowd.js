@@ -769,7 +769,7 @@ export function courtesyUnavailableReason(crowd, player, crossings = [], stage =
 }
 // A polite call changes only nearby pedestrians. The crossing, fixed walls and
 // vehicles retain their normal rules, and non-human obstacles never yield.
-export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
+export function askCrowdToMove(crowd, player, crossings = [], stage = 0, factor = 1) {
   const targets = availableCourtesyTargets(crowd, player, crossings, stage);
   for (const { person: p, targetX } of targets) {
     p.yieldedToCall = true;
@@ -777,8 +777,9 @@ export function askCrowdToMove(crowd, player, crossings = [], stage = 0) {
     else p.courtesy = {
       targetX, remaining: COURTESY.duration,
       phase: "prepare", prepareRemaining: COURTESY.prepare,
-      direction: Math.sign(targetX - p.x), ux: p.ux, uy: p.uy,
+      direction: Math.sign(targetX - p.x), ux: p.ux, uy: p.uy, factor,
     };
+    p.courtesy.factor = factor;
     const dx = player.x - p.x, dy = player.y - p.y;
     const distance = Math.hypot(dx, dy) || 1;
     p.acknowledge = {
@@ -883,7 +884,7 @@ function updateNegotiation(crowd, dt, ctx) {
       n.leanT -= dt;
       if (n.leanT <= 0) n.phase = "shift";
     } else if (n.phase === "shift") {
-      n.shifted += NEGOTIATE.lateralSpeed * dt;
+      n.shifted += NEGOTIATE.lateralSpeed * (ctx.hateFactor ?? 1) * dt;
       if (Math.abs(p.x - ctx.x) >= NEGOTIATE.clearGap ||
           n.shifted >= NEGOTIATE.maxShift) {
         n.phase = "committed";
@@ -997,7 +998,7 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
       vx += (p.crossDir || 1) * 55;
     if (p.negotiate?.phase === "shift" ||
         (p.negotiate?.phase === "committed" && p.negotiate.holdGap))
-      vx += p.negotiate.side * NEGOTIATE.lateralSpeed;
+      vx += p.negotiate.side * NEGOTIATE.lateralSpeed * (playerCtx?.hateFactor ?? 1);
     // A stopper pulls toward the nearer street edge while decelerating,
     // so the stopped body rests at the side instead of plugging the
     // corridor — and drift + slowdown together telegraph the stop.
@@ -1218,7 +1219,7 @@ export function moveCrowd(crowd, dt, traffic = null, obstacles = [],
       const travel = p.state === "walking"
         ? p.pace * COURTESY.travelFactor * dt : 0;
       let moveX = preparing ? aside.ux * travel :
-        Math.sign(dx) * Math.min(Math.abs(dx), COURTESY.lateralSpeed * dt);
+        Math.sign(dx) * Math.min(Math.abs(dx), COURTESY.lateralSpeed * (aside.factor ?? 1) * dt);
       let moveY = aside.uy * travel;
       const clear = (x, y) => crowd.every((q) => q === p || !q.active ||
         Math.hypot(q.x - x, q.y - y) >= p.r + q.r + 1);

@@ -274,8 +274,8 @@ function callUnavailableReason(run) {
 
 function updateCallAvailability(run) {
   run.callTargets = availableCallTargets(run);
-  run.callReady = run.phase === "playing" && run.callTargets.length > 0;
-  run.callWindow = availableCallWindow(run);
+  run.callReady = run.phase === "playing" && run.callGauge >= 1 && run.callTargets.length > 0;
+  run.callWindow = run.callGauge;
 }
 
 function syncTotals(run) {
@@ -541,7 +541,13 @@ export function updateRun(run, dt, controls = {}) {
 export function advanceRun(run) {
   if (run.phase !== "finished" || run.stage >= STORY_STAGES.length - 1)
     return run;
-  return createRun(run.stage + 1, run.runSeed, run.records, run.startStage);
+  const next = createRun(run.stage + 1, run.runSeed, run.records, run.startStage);
+  const present = new Set(run.party.members.map(m => m.id));
+  next.party.members = next.party.members.filter(m => present.has(m.id) || m.id === run.stage + 1);
+  next.friendsJoined = run.friendsJoined + 1;
+  next.friendsLeft = run.friendsLeft;
+  next.hate = run.hate; next.callGauge = run.callGauge; next.callsUsed = run.callsUsed;
+  return next;
 }
 
 export function retryRun(run) {

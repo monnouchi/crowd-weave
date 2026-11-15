@@ -61,6 +61,8 @@ test("the warning beat keeps forward travel and repeat taps do not restart it", 
   assert.equal(person.courtesy.phase, "prepare");
   assert.ok(person.y < start.y, "the commuter does not stop for the cue");
   const targetX = person.courtesy.targetX;
+  // Exercise renewal with a recharged gauge under the Item S economy.
+  run.callGauge = 1;
   updateRun(run, 0.05, { brake: true, call: true, callPulse: true });
   assert.equal(run.callResponseCount, 1);
   assert.equal(person.courtesy.targetX, targetX);

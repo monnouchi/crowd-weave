@@ -1598,6 +1598,7 @@ export function renderWorld(ctx, game, view = {}) {
   if (game.meetingPartner && game.meetingPartner.state !== "met") addPerson(game.meetingPartner);
   for (const p of game.crowd || []) if (p.active !== false) addPerson(p);
   for (const p of game.party?.members || []) addPerson(p);
+  for (const p of game.departedFriends || []) addPerson(p);
   shadows.push(() => protagonist(ctx, c, game, view, true));
   items.push({ y: game.player.y, draw: () => protagonist(ctx, c, game, view) });
   for (const a of game.animals || []) {
@@ -1607,6 +1608,9 @@ export function renderWorld(ctx, game, view = {}) {
   for (const draw of shadows) draw();
   items.sort((a, b) => a.y - b.y);
   for (const item of items) item.draw();
+  for (const p of game.departedFriends || []) {
+    if (p.leaveTime < 2.5) worldLabel(ctx, c, p.x, p.y, 55, "もう帰るね…", "#fff", "#4b3030");
+  }
   // High signal heads stay legible above foreground walkers. The supports
   // still sort with the world; road paint is in the ground pass.
   crossingSignals(ctx, c, game, view);
