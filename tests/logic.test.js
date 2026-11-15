@@ -353,7 +353,8 @@ test("only the contacted pedestrian reacts, cooldown prevents repeated reactions
   assert.equal(a.y, y);
   assert.equal(g.hits, 1);
   assert.ok(a.reaction.remaining < 0.7);
-  for (let i = 0; i < 5; i++) step(g, 0.05, { left: true, right: true });
+  // Item Y: this contact is from behind, so the turn lasts one second.
+  for (let i = 0; i < 11; i++) step(g, 0.05, { left: true, right: true });
   assert.equal(a.reaction, null);
   assert.equal(g.hits, 1);
   assert.ok(Math.hypot(a.vx, a.vy) > 0);
@@ -372,6 +373,20 @@ test("only the contacted pedestrian reacts, cooldown prevents repeated reactions
     profile,
   );
 });
+test("rear contact lasts long enough to turn, while oncoming contact stays brief", () => {
+  for (const awarePlayer of [false, true]) {
+    const p = { ...makeCrowd(1, 40, 9)[0], x: 100, y: 100,
+      ux: 0, uy: -1, awarePlayer };
+    reactToContact(p, { x: 100, y: 110 });
+    assert.deepEqual([p.reaction.faceX, p.reaction.faceY], [0, 1]);
+    assert.ok(p.reaction.remaining >= .8 && p.reaction.remaining <= 1.2);
+    p.reaction = null;
+    reactToContact(p, { x: 100, y: 90 });
+    assert.equal(p.reaction.remaining, awarePlayer ? .38 : .7);
+    assert.equal(p.reaction.faceY, -1);
+  }
+});
+
 test("brief anger preserves a reader's remaining pause and does not advance their route", () => {
   const p = makeCrowd(1, 40, 9)[0];
   p.state = "reading";
@@ -379,7 +394,8 @@ test("brief anger preserves a reader's remaining pause and does not advance thei
   p.vx = p.vy = 0;
   const leg = p.leg;
   reactToContact(p, { x: p.x + 5, y: p.y });
-  for (let i = 0; i < 15; i++) moveCrowd([p], 0.05);
+  // Item Y: this seeded reader is contacted from behind and turns for a second.
+  for (let i = 0; i < 21; i++) moveCrowd([p], 0.05);
   assert.equal(p.reaction, null);
   assert.equal(p.state, "reading");
   assert.equal(p.leg, leg);

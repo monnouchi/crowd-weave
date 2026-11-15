@@ -1011,6 +1011,17 @@ export function pedestrianFacing(actor) {
   // the head can briefly glance toward the person who called.
   const body = (actor.acknowledge && !actor.courtesy) || actor.state === "waiting"
     ? { profile: 0, front: true } : direction(ux, uy);
+  if (actor.reaction?.remaining > 0) {
+    const { faceX, faceY } = actor.reaction;
+    const bodyX = ux * .65 + faceX * .35;
+    const bodyY = uy * .65 + faceY * .35;
+    const headX = ux * .15 + faceX * .85;
+    const headY = uy * .15 + faceY * .85;
+    const turnedBody = direction(bodyX, bodyY);
+    const head = direction(headX, headY);
+    return { ...turnedBody, headProfile: head.profile, headFront: head.front,
+      headLean: clamp((headX - ux) * 1.8, -1.6, 1.6), headGaze: headX };
+  }
   const telegraph = actor.crossingTelegraph || actor.negotiateLean;
   if (telegraph && !actor.acknowledge) {
     const headX = telegraph;

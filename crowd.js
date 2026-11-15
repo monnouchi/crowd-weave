@@ -652,10 +652,14 @@ export function reactToContact(p, player) {
   const dx = player.x - p.x,
     dy = player.y - p.y,
     d = Math.hypot(dx, dy);
+  const faceX = d ? dx / d : -p.ux,
+    faceY = d ? dy / d : -p.uy;
+  // A person approached from behind needs time to turn and look back.
+  const fromBehind = p.ux * faceX + p.uy * faceY < 0;
   p.reaction = {
-    remaining: p.awarePlayer ? 0.38 : 0.7,
-    faceX: d ? dx / d : -p.ux,
-    faceY: d ? dy / d : -p.uy,
+    remaining: fromBehind ? 1 : p.awarePlayer ? 0.38 : 0.7,
+    faceX,
+    faceY,
   };
   if (p.awarePlayer) p.contactAvoidTarget = player;
   p.vx = 0;

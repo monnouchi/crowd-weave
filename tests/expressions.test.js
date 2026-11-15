@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { makeCrowd, reactToContact } from "../crowd.js";
+import { makeCrowd, moveCrowd, reactToContact } from "../crowd.js";
 import { createGame, step } from "../logic.js";
-import { drawPedestrianFace, pedestrianExpression } from "../src/render.js";
+import { drawPedestrianFace, pedestrianExpression, pedestrianFacing } from "../src/render.js";
 
 const tense = (expression) => ["hurried", "grim", "tired"].includes(expression);
 
@@ -26,6 +26,29 @@ test("back views never draw any face marks, including tense expressions", () => 
     drawPedestrianFace(ctx, 10, 10, 2, { headFront: false, headProfile: 0 }, expression);
     assert.equal(calls, 0, expression);
   }
+});
+
+test("a rear contact turns the head to draw the grim face until the reaction expires", () => {
+  const p = { ...makeCrowd(1, 30, 1)[0], x: 100, y: 100,
+    ux: 0, uy: -1, state: "walking", awarePlayer: false };
+  let calls = 0;
+  const ctx = new Proxy({}, { get: () => () => { calls++; }, set: () => true });
+  const draw = () => drawPedestrianFace(ctx, 10, 10, 2,
+    pedestrianFacing(p), pedestrianExpression(p));
+  assert.equal(pedestrianFacing(p).headFront, false);
+  draw();
+  assert.equal(calls, 0);
+  reactToContact(p, { x: 100, y: 110 });
+  assert.equal(pedestrianFacing(p).headFront, true);
+  assert.equal(pedestrianExpression(p), "grim");
+  draw();
+  assert.ok(calls > 0);
+  moveCrowd([p], 1);
+  assert.equal(p.reaction, null);
+  assert.equal(pedestrianFacing(p).headFront, false);
+  calls = 0;
+  draw();
+  assert.equal(calls, 0);
 });
 
 test("contact and near-miss tighten briefly then return to the base expression", () => {
