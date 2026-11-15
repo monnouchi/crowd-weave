@@ -55,6 +55,29 @@ test("themes interpolate each color channel", () => {
   assert.equal(lerpTheme(a, b, .5).haze, midpoint);
 });
 
+test("sun visibility follows each theme and its course boundary blend", () => {
+  assert.deepEqual(THEMES.map(theme => theme.sun), [1, 1, 0, 0, 0]);
+  const run = createCourseRun(17);
+  const sunAlpha = () => {
+    const ctx = drawingContext();
+    renderWorld(ctx, run, { width: 390, height: 844 });
+    return ctx.fills.find(fill => fill.style === "#fff1d4b8")?.alpha ?? 0;
+  };
+  for (let index = 0; index < THEMES.length; index++) {
+    place(run, index, run.course.offsets[index] + STAGES[index].startY / 2);
+    assert.equal(sunAlpha(), THEMES[index].sun, `segment ${index}`);
+  }
+  place(run, 1, run.course.offsets[1] + 84);
+  const blend = courseThemeBlend(run);
+  const midpoint = lerpTheme(THEMES[blend.from], THEMES[blend.to], blend.t).sun;
+  assert.ok(midpoint > THEMES[2].sun && midpoint < THEMES[1].sun);
+  assert.equal(sunAlpha(), midpoint);
+  place(run, 3, run.course.offsets[3] + STAGES[3].startY / 2);
+  const ctx = drawingContext();
+  renderWorld(ctx, run, { width: 390, height: 844 });
+  assert.ok(!ctx.fills.some(fill => ["#fff1d4b8", "#dae5dd35"].includes(fill.style)));
+});
+
 test("course renders at each segment and in boundary bands", () => {
   const run = createCourseRun(17);
   for (let index = 0; index < 5; index++) {

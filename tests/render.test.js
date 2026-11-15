@@ -313,7 +313,9 @@ test("the station cafe has an indoor ceiling instead of a sun", () => {
   assert.ok(colors(2).includes("#b99582"));
   assert.ok(colors(2).includes("#fff4d6"));
   for (const sun of ["#fff1d4b8", "#dae5dd35"]) assert.ok(!colors(2).includes(sun));
-  for (const stage of [0, 1, 3]) assert.ok(colors(stage).includes(stage === 3 ? "#dae5dd35" : "#fff1d4b8"));
+  for (const stage of [0, 1]) assert.ok(colors(stage).includes("#fff1d4b8"));
+  for (const stage of [3, 4])
+    for (const sun of ["#fff1d4b8", "#dae5dd35"]) assert.ok(!colors(stage).includes(sun));
 });
 
 test("the goal arch has a ground ring without a destination label", () => {

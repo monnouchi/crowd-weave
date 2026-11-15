@@ -21,11 +21,11 @@ export function finaleFraming(progress, reducedMotion = false) {
 const TAU = Math.PI * 2;
 
 export const THEMES = [
-  { sky: ["#f4c8a5", "#c8e5dc"], haze: "#b9d5c9", ground: "#d5cbb4", path: "#e8dfca", edge: "#b0a88f", line: "#fff6dc", wall: ["#f1d8b9", "#d4a98b", "#b97862"], roof: "#885b58", ink: "#314a4b", accent: "#f0bd6d", glass: "#90b4ae" },
-  { sky: ["#bcd8df", "#e5e1d4"], haze: "#b4c7cb", ground: "#c5cbc3", path: "#dbe3dd", edge: "#8da6a8", line: "#f2efdc", wall: ["#c9d8d6", "#a4bcbf", "#647f8b"], roof: "#54747d", ink: "#274c59", accent: "#f3bd69", glass: "#86bccb" },
-  { sky: ["#f7d2aa", "#ebdec0"], haze: "#d8bda5", ground: "#c7aa8f", path: "#ead9bd", edge: "#bb896f", line: "#fff2d1", wall: ["#e8bc96", "#c8846b", "#915f60"], roof: "#9b5f54", ink: "#533f4b", accent: "#ffd079", glass: "#90b9b1" },
-  { sky: ["#536981", "#9bb7bb"], haze: "#78939d", ground: "#71838d", path: "#869ca4", edge: "#546d7a", line: "#dceaf0", wall: ["#9faeb3", "#708690", "#536b7c"], roof: "#354e63", ink: "#173e4f", accent: "#f6c97f", glass: "#8bd3d3" },
-  { sky: ["#181d37", "#554363"], haze: "#51435f", ground: "#292c40", path: "#36364b", edge: "#252739", line: "#9a8399", wall: ["#554b64", "#373852", "#272d46"], roof: "#25253e", ink: "#1d2536", accent: "#f6b96a", glass: "#a8d7e6" },
+  { sun: 1, sky: ["#f4c8a5", "#c8e5dc"], haze: "#b9d5c9", ground: "#d5cbb4", path: "#e8dfca", edge: "#b0a88f", line: "#fff6dc", wall: ["#f1d8b9", "#d4a98b", "#b97862"], roof: "#885b58", ink: "#314a4b", accent: "#f0bd6d", glass: "#90b4ae" },
+  { sun: 1, sky: ["#bcd8df", "#e5e1d4"], haze: "#b4c7cb", ground: "#c5cbc3", path: "#dbe3dd", edge: "#8da6a8", line: "#f2efdc", wall: ["#c9d8d6", "#a4bcbf", "#647f8b"], roof: "#54747d", ink: "#274c59", accent: "#f3bd69", glass: "#86bccb" },
+  { sun: 0, sky: ["#f7d2aa", "#ebdec0"], haze: "#d8bda5", ground: "#c7aa8f", path: "#ead9bd", edge: "#bb896f", line: "#fff2d1", wall: ["#e8bc96", "#c8846b", "#915f60"], roof: "#9b5f54", ink: "#533f4b", accent: "#ffd079", glass: "#90b9b1" },
+  { sun: 0, sky: ["#536981", "#9bb7bb"], haze: "#78939d", ground: "#71838d", path: "#869ca4", edge: "#546d7a", line: "#dceaf0", wall: ["#9faeb3", "#708690", "#536b7c"], roof: "#354e63", ink: "#173e4f", accent: "#f6c97f", glass: "#8bd3d3" },
+  { sun: 0, sky: ["#181d37", "#554363"], haze: "#51435f", ground: "#292c40", path: "#36364b", edge: "#252739", line: "#9a8399", wall: ["#554b64", "#373852", "#272d46"], roof: "#25253e", ink: "#1d2536", accent: "#f6b96a", glass: "#a8d7e6" },
 ];
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -34,7 +34,8 @@ export function lerpTheme(a, b, t) {
     Math.round(parseInt(x.slice(i, i + 2), 16) * (1 - t) +
       parseInt(y.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
   return Object.fromEntries(Object.keys(a).map((key) => [key,
-    Array.isArray(a[key]) ? a[key].map((value, i) => color(value, b[key][i])) : color(a[key], b[key])]));
+    Array.isArray(a[key]) ? a[key].map((value, i) => color(value, b[key][i])) :
+      typeof a[key] === "number" ? a[key] * (1 - t) + b[key] * t : color(a[key], b[key])]));
 }
 
 export function courseThemeBlend(game) {
@@ -209,6 +210,13 @@ function sky(ctx, c, theme, game, view) {
   // Outdoor dressing and the cafe interior crossfade against each other at
   // the segment edges (V2-6); at the extremes exactly one is drawn, at full
   // strength, exactly as before.
+  // The theme already blends sun visibility across the boundary.
+  if (theme.sun > 0) {
+    ctx.save();
+    ctx.globalAlpha = theme.sun;
+    ellipse(ctx, c.width * .69, c.horizon * .48, 26, 26, "#fff1d4b8");
+    ctx.restore();
+  }
   if (interiorAlpha < .999) {
     ctx.save();
     ctx.globalAlpha = 1 - interiorAlpha;
@@ -219,10 +227,6 @@ function sky(ctx, c, theme, game, view) {
       polygon(ctx, [{ x: c.width * .96, y: 0 }, { x: c.width * .49, y: c.horizon + 230 },
         { x: c.width * .75, y: 0 }], "#82d9e419");
     } else {
-      const sunX = c.width * (c.stage === 3 ? .79 : .69);
-      const sunY = c.horizon * .48;
-      ellipse(ctx, sunX, sunY, c.stage === 3 ? 19 : 26, c.stage === 3 ? 19 : 26,
-        c.stage === 3 ? "#dae5dd35" : "#fff1d4b8");
       // Distant roofline gives scale without filling the playable gaps.
       ctx.fillStyle = theme.haze;
       for (let i = 0; i < 12; i++) {
