@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRun } from "../src/run.js";
-import { protagonistLean, protagonistPose, protagonistProjection, renderWorld } from "../src/render.js";
+import { protagonistLean, protagonistPose, protagonistProjection, renderWorld, walkCycleMotion } from "../src/render.js";
 
 function context(calls) {
   const target = { globalAlpha: 1, canvas: { width: 390, height: 700 } };
@@ -37,6 +37,50 @@ test("protagonist lean follows lateral steering", () => {
   assert.ok(protagonistLean(game, { steer: 1 }) > 0);
   assert.ok(protagonistLean(game, { steer: -1 }) < 0);
   assert.equal(protagonistLean(game, { steer: 0 }), 0);
+});
+
+test("walk cycle uses the crowd's distance phase and respects motion settings", () => {
+  for (const phase of [0, 2, Math.PI / (2 * .28), Math.PI / .28, 17]) {
+    const motion = walkCycleMotion(phase);
+    assert.ok(Math.abs(motion.stride - Math.sin(phase * .28) * 3.2) < 1e-10);
+    assert.ok(Math.abs(motion.bob - Math.abs(Math.sin(phase * .28)) * 1.2) < 1e-10);
+    assert.ok(motion.bob >= 0);
+    assert.ok(Math.abs(motion.bob - walkCycleMotion(phase + Math.PI / .28).bob) < 1e-10);
+    assert.deepEqual(walkCycleMotion(phase, { moving: false }), { stride: 0, bob: 0 });
+    assert.deepEqual(walkCycleMotion(phase, { reducedMotion: true }), { stride: 0, bob: 0 });
+  }
+});
+
+test("protagonist feet follow travelled distance and ignore teleports", () => {
+  function feetAfter(displacements) {
+    const game = createRun(0, 17);
+    game.phase = "playing"; game.player.y = 1000;
+    game.crowd = []; game.party.members = []; game.meetingPartner = null;
+    game.animals = []; game.crossings = [];
+    const drawn = [];
+    const ctx = context([]);
+    let currentEllipse;
+    ctx.ellipse = (...args) => { currentEllipse = args; };
+    ctx.fill = () => { if (ctx.fillStyle === "#293843") drawn.push(currentEllipse); };
+    const render = () => { drawn.length = 0; renderWorld(ctx, game, { width: 390, height: 700 }); return drawn.map(e => e[0]); };
+    render();
+    let feet;
+    for (const [dx, dy] of displacements) {
+      game.player.x += dx; game.player.y += dy;
+      feet = render();
+    }
+    return { feet, scale: protagonistProjection(game, { width: 390, height: 700 }).scale };
+  }
+  for (const distance of [3, 6]) {
+    const { feet, scale } = feetAfter([[distance, 0]]);
+    const offset = (5 + Math.sin(distance * .28) * 3.2) * scale;
+    assert.equal(feet.length, 2);
+    assert.ok(Math.abs(feet[0] + offset) < 1e-9);
+    assert.ok(Math.abs(feet[1] - offset) < 1e-9);
+  }
+  const before = feetAfter([[3, 4]]);
+  const after = feetAfter([[3, 4], [101, 0]]);
+  assert.deepEqual(after.feet, before.feet);
 });
 
 test("protagonist poses follow state and priority", () => {

@@ -22,6 +22,28 @@ export function finaleFraming(progress, reducedMotion = false) {
   return t * t * (3 - 2 * t);
 }
 const TAU = Math.PI * 2;
+const BOB_AMPLITUDE = 1.2;
+// More than 100 world units between frames is treated as a teleport or reset.
+const WALK_REANCHOR_DISTANCE = 100;
+
+export function walkCycleMotion(phaseDistance, { moving = true, reducedMotion = false } = {}) {
+  if (!moving || reducedMotion) return { stride: 0, bob: 0 };
+  const wave = Math.sin(phaseDistance * .28);
+  return { stride: wave * 3.2, bob: Math.abs(wave) * BOB_AMPLITUDE };
+}
+
+function updatePlayerWalk(game) {
+  const { x, y } = game.player;
+  const state = game.renderPlayerWalk;
+  if (!state) {
+    game.renderPlayerWalk = { x, y, distance: 0 };
+    return;
+  }
+  const distance = Math.hypot(x - state.x, y - state.y);
+  if (distance <= WALK_REANCHOR_DISTANCE) state.distance += distance;
+  state.x = x;
+  state.y = y;
+}
 
 export const THEMES = [
   { sun: 1, sky: ["#f4c8a5", "#c8e5dc"], haze: "#b9d5c9", ground: "#d5cbb4", path: "#e8dfca", edge: "#b0a88f", line: "#fff6dc", wall: ["#f1d8b9", "#d4a98b", "#b97862"], roof: "#885b58", ink: "#314a4b", accent: "#f0bd6d", glass: "#90b4ae" },
@@ -1075,8 +1097,8 @@ function protagonist(ctx, c, game, view, shadowPass = false) {
   if (!p || p.depth > FAR) return;
   const s = Math.min(18, p.scale);
   const pose = protagonistPose(game, view);
-  const stride = pose === "walk" && !view.reducedMotion
-    ? Math.sin((game.worldTime || 0) * 4.2) * 3.2 : 0;
+  const { stride, bob } = walkCycleMotion(game.renderPlayerWalk.distance,
+    { moving: pose === "walk", reducedMotion: view.reducedMotion });
   const lift = pose === "hop"
     ? Math.sin(Math.PI * clamp(1 - game.hop.remaining / HOP_DISTANCE, 0, 1)) * 12 * s : 0;
   const wobble = pose === "stumble" && !view.reducedMotion
@@ -1096,10 +1118,11 @@ function protagonist(ctx, c, game, view, shadowPass = false) {
   const tuck = pose === "hop" ? 5 : 0;
   const stance = pose === "brake" ? 2.5 : 5;
   for (const side of [-1, 1]) {
-    const x = side * stance + stride;
+    const x = side * (stance + stride);
     limb(side * 3, -18, x, -2 - tuck, 4, "#344954");
     ellipse(ctx, x * s, (-1.2 - tuck) * s, 4.5 * s, 2.4 * s, "#293843");
   }
+  ctx.translate(0, -bob * s);
   rect(ctx, -10 * s, -43 * s, 20 * s, 25 * s, "#30444b", 5 * s);
   rect(ctx, -9 * s, -42 * s, 18 * s, 23 * s, "#25565e", 4 * s);
   // A single orange stripe and the diagonal shoulder bag identify the player.
@@ -1144,7 +1167,8 @@ function person(ctx, c, actor, game, view, shadowPass = false) {
   const profile = facing.profile;
   const headProfile = facing.headProfile;
   const moving = Math.abs(actor.vx || 0) + Math.abs(actor.vy || 0) > 8;
-  const stride = !view.reducedMotion && moving ? Math.sin((actor.walk || game.worldTime * 15) * .28 + (actor.id || 0)) * 3.2 : 0;
+  const { stride, bob } = walkCycleMotion((actor.walk || game.worldTime * 15) + (actor.id || 0) / .28,
+    { moving, reducedMotion: view.reducedMotion });
   const checkingPhone = actor.behavior === "phone" ||
     (actor.behavior === "stopper" && actor.stopPhase === "stopped");
   const bow = (checkingPhone ? 2.5 : actor.acknowledge
@@ -1175,6 +1199,8 @@ function person(ctx, c, actor, game, view, shadowPass = false) {
     4 * s, "#344954", "#283d48");
   ellipse(ctx, px - (5 * stance + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
   ellipse(ctx, px + (5 * stance + stride) * s, foot - 1.2 * s, 4.5 * s, 2.4 * s, "#293843");
+  ctx.save();
+  ctx.translate(0, -bob * s);
   const headY = foot - (54 - bow) * s;
   const headX = px + (profile * 2.4 + facing.headLean) * s;
   const bodyTop = foot - 43 * s + bow * s;
@@ -1391,6 +1417,7 @@ function person(ctx, c, actor, game, view, shadowPass = false) {
     ellipse(ctx, tipX, tipY, 5 * s, 5 * s, color + "33");
     ellipse(ctx, tipX, tipY, 2 * s, 2 * s, color);
   }
+  ctx.restore();
   if (actor.acknowledge) {
     ellipse(ctx, px, foot + .6 * s, 21 * s, Math.max(1.5, 5 * s),
       "#75ebc82a", "#8ff3d2", Math.max(1, 1.2 * s));
@@ -1566,6 +1593,7 @@ function drawCallArea(ctx, c, game, view) {
 /** Render a third-person view of the current run. The caller owns sizing. */
 export function renderWorld(ctx, game, view = {}) {
   if (!ctx || !game?.player) return;
+  updatePlayerWalk(game);
   const c = camera(game, view);
   const blend = courseThemeBlend(game);
   const theme = blend && blend.t > 0 ? lerpTheme(THEMES[blend.from], THEMES[blend.to], blend.t) : THEMES[c.stage];
