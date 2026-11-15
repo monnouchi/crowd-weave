@@ -1,3 +1,6 @@
+// DEBUG-ONLY-BEGIN
+import { emit, observe, flush } from "./src/playlog.js";
+// DEBUG-ONLY-END
 import {
   createTraffic,
   trafficSpec,
@@ -209,6 +212,9 @@ function updateCallGesture(g, input) {
   if (!input.callPulse && g.callHeld) return;
   g.callHeld = !input.callPulse;
   g.callSerial++;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(g, "call", { stage: g.stage, position: { x: g.player.x, y: g.player.y }, gaugeBefore: g.callGauge, hateAfter: g.callGauge >= 1 && !g.arriving && !g.crossings.some(t => g.player.y >= t.top - 55 && g.player.y <= t.bottom + 65) ? Math.min(HATE_MAX, g.hate + HATE_PER_CALL) : g.hate }); });
+  // DEBUG-ONLY-END
   g.callResponseCount = 0;
   const unavailable = g.callGauge < 1 || g.arriving ||
     g.crossings.some((t) => g.player.y >= t.top - 55 &&
@@ -594,6 +600,9 @@ function crossCourseBoundary(g) {
     docking: false, flash: 0,
   });
   g.friendsJoined++;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(g, "friend_join", { stage: k, hate: g.hate }); });
+  // DEBUG-ONLY-END
   g.course.index = k + 1;
   g.stage = k + 1;
   g.scene = SCENES[k + 1];
@@ -624,6 +633,9 @@ export function step(g, dt, input) {
     const m = g.party.members.pop();
     m.leaveTime = 0; m.leaveSide = m.x < 240 ? -1 : 1; m.state = "waiting";
     g.departedFriends.push(m); g.friendsLeft++;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(g, "friend_leave", { stage: g.stage, hate: g.hate, friend: m.id }); });
+  // DEBUG-ONLY-END
     g.leaveReadyAt = g.worldTime + HATE_LEAVE_COOLDOWN;
     g.hateSustain = 0;
     say(g, "leaving", m.id, "もう帰るね…", 2.5);
@@ -787,8 +799,12 @@ export function step(g, dt, input) {
   });
   // A recovery is a relocation, not a swept movement through traffic.
   g.party.members.forEach((member, i) => {
-    if ((member.recoveryCount || 0) !== (previousTeam[i + 1]?.recoveryCount || 0))
+    if ((member.recoveryCount || 0) !== (previousTeam[i + 1]?.recoveryCount || 0)) {
+      // DEBUG-ONLY-BEGIN
+      observe(() => emit(g, "friend_stuck", { stage: g.stage, friend: member.id, position: { x: member.x, y: member.y } }));
+      // DEBUG-ONLY-END
       previousTeam[i + 1] = { ...member };
+    }
   });
   for (const [id, memberId] of blockedContacts) {
     if (!memberId) continue;
@@ -800,6 +816,9 @@ export function step(g, dt, input) {
   if (crash) {
     g.phase = "gameover";
     g.crash = crash;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(g, "contact", { stage: g.stage, position: { x: g.player.x, y: g.player.y }, other: "vehicle", vehicle: crash.vehicleKind, comboBefore: g.combo.flow }); emit(g, "game_over", { cause: "vehicle", stage: g.stage }); flush(); });
+  // DEBUG-ONLY-END
     return;
   }
   let contacted = null,
@@ -839,6 +858,9 @@ export function step(g, dt, input) {
   }
   g.touchingIds = touching;
   if (contacted) {
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(g, "contact", { stage: g.stage, position: { x: contacted.x, y: contacted.y }, other: contacted.animal ? (contacted.kind || "animal") : (contacted.behavior || contacted.habit || "person"), habit: contacted.habit, member: contactMember.id, comboBefore: combo.flow }); });
+  // DEBUG-ONLY-END
     if (!contacted.animal) reactToContact(contacted, contactMember);
     g.lastContactMember = contactMember.id;
     g.memberHits[contactMember.id]++;
@@ -864,6 +886,9 @@ export function step(g, dt, input) {
     }
   }
   const newViolation = !!g.violationEvent && g.violationEvent.id !== previousViolationId;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { if (contacted || newViolation) emit(g, "combo_reset", { cause: contacted ? "contact" : "traffic_violation" }); });
+  // DEBUG-ONLY-END
   if (contacted || newViolation) resetCombo(combo);
   // Interpolate relative positions at the crossing, including lateral motion.
   for (const p of g.crowd) {
@@ -891,6 +916,9 @@ export function step(g, dt, input) {
       p.tenseUntil = g.worldTime + 0.7;
       combo.kickUntil = g.worldTime + 0.6;
       combo.nearMissSerial++;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(g, "near_miss", { stage: g.stage, position: { x: g.player.x, y: g.player.y } }); });
+  // DEBUG-ONLY-END
     }
   }
   if (newViolation && g.violationEvent?.memberId) {

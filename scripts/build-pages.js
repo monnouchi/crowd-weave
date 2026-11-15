@@ -1,4 +1,4 @@
-import { copyFile, lstat, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +50,10 @@ export async function buildPages(sourceRoot, destinationRoot) {
   await mkdir(destination, { recursive: true });
   for (const file of PUBLIC_FILES) {
     await mkdir(dirname(resolve(destination, file)), { recursive: true });
-    await copyFile(resolve(source, file), resolve(destination, file));
+    if (file.endsWith(".js")) {
+      const code = await readFile(resolve(source, file), "utf8");
+      await writeFile(resolve(destination, file), code.replace(/^[ \t]*\/\/ DEBUG-ONLY-BEGIN\r?\n[\s\S]*?^[ \t]*\/\/ DEBUG-ONLY-END\r?\n/gm, ""));
+    } else await copyFile(resolve(source, file), resolve(destination, file));
   }
   await writeFile(resolve(destination, ".nojekyll"), "");
   return [...PUBLIC_FILES, ".nojekyll"];

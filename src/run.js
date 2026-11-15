@@ -1,3 +1,6 @@
+// DEBUG-ONLY-BEGIN
+import { emit, observe, flush } from "./playlog.js";
+// DEBUG-ONLY-END
 import { createGame, step, STAGES, SCENES } from "../logic.js";
 import { availableCourtesyTargets, courtesyCallWindow, courtesyUnavailableReason } from "../crowd.js";
 
@@ -418,6 +421,9 @@ function takeCourseSnapshot(run) {
 export function beginRun(run) {
   if (run.phase !== "ready") return false;
   run.phase = "playing";
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(run, "run_start", { seed: run.runSeed, mode: run.course ? "course" : "single", stage: run.stage }); run.crossings.forEach(t => { const v = t.vehicle; if (!v) return; const fields = { stage: run.stage, crossing: t.id, position: { x: v.x, y: v.y }, phase: !v.active ? "inactive" : v.entered ? "crossing" : "waiting", vehicle: { id: v.id, kind: v.kind, width: v.width, direction: v.direction, speed: v.speed, active: v.active, entered: v.entered }, signalGreen: t.nominalGreen }; emit(run, "vehicle_spawn", fields); emit(run, "vehicle_state", fields); }); });
+  // DEBUG-ONLY-END
   run.events = [{ kind: "start" }];
   updateCallAvailability(run);
   return true;
@@ -426,6 +432,9 @@ export function beginRun(run) {
 export function pauseRun(run) {
   if (run.phase !== "playing") return false;
   run.phase = "paused";
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(run, "pause", { stage: run.stage }); });
+  // DEBUG-ONLY-END
   run.speed = 0;
   run.events = [];
   updateCallAvailability(run);
@@ -435,6 +444,9 @@ export function pauseRun(run) {
 export function resumeRun(run) {
   if (run.phase !== "paused") return false;
   run.phase = "playing";
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(run, "resume", { stage: run.stage }); });
+  // DEBUG-ONLY-END
   run.events = [];
   updateCallAvailability(run);
   return true;
@@ -455,6 +467,10 @@ export function updateRun(run, dt, controls = {}) {
     nearMiss: run.combo.nearMissSerial,
     courseSerial: run.course ? run.course.crossedSerial : 0,
   };
+  // DEBUG-ONLY-BEGIN
+  let vehiclesBefore;
+  observe(() => { vehiclesBefore = run.crossings.map(t => ({ id: t.vehicle?.id, active: t.vehicle?.active, entered: t.vehicle?.entered, green: t.nominalGreen, x: t.vehicle?.x, moving: t.vehicle?.x !== t.vehicle?.previousX })); });
+  // DEBUG-ONLY-END
   run.braking = !!controls.brake || !!(controls.left && controls.right);
   if (run.course && run.course.index === 0 && !run.course.snapshots[0])
     takeCourseSnapshot(run);
@@ -466,6 +482,9 @@ export function updateRun(run, dt, controls = {}) {
     hopEnabled: true,
   });
   run.speed = Math.max(0, (before.y - run.player.y) / dt);
+  // DEBUG-ONLY-BEGIN
+  observe(() => { if (vehiclesBefore) run.crossings.forEach((t, i) => { const v = t.vehicle, old = vehiclesBefore[i]; if (!v) return; const spawned = old.id !== v.id; const phase = !v.active ? "inactive" : v.entered ? "crossing" : "waiting"; if (spawned || old.active !== v.active || old.entered !== v.entered || old.green !== t.nominalGreen || (v.active && old.moving !== (v.x !== old.x))) { const fields = { stage: run.stage, crossing: t.id, position: { x: v.x, y: v.y }, phase, vehicle: { id: v.id, kind: v.kind, width: v.width, direction: v.direction, speed: v.speed, active: v.active, entered: v.entered }, signalGreen: t.nominalGreen }; if (spawned) emit(run, "vehicle_spawn", fields); emit(run, "vehicle_state", fields); } }); });
+  // DEBUG-ONLY-END
   if (run.callSerial !== before.callSerial) {
     const reason = run.callResponseCount > 0 ? null : callUnavailableReason(run);
     run.events.push(run.callResponseCount > 0
@@ -514,6 +533,9 @@ export function updateRun(run, dt, controls = {}) {
     if (run.course.crossedSerial !== before.courseSerial) {
       const done = run.course.index - 1;
       const record = recordCourseSegment(run, done);
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(run, "split", { stage: done, time: record.elapsed, contacts: record.hits, score: record.score, maxCombo: record.maxFlow }); });
+  // DEBUG-ONLY-END
       run.events.push({ kind: "split", stage: done, split: record.elapsed, total: run.elapsed });
       run.story = STORY_STAGES[run.course.index];
       takeCourseSnapshot(run);
@@ -533,6 +555,9 @@ export function updateRun(run, dt, controls = {}) {
         hits: run.hits, bestStreak: run.bestStreak,
         score: run.combo.score, maxFlow: run.combo.maxFlow });
     run.events.push({ kind: run.stage === 4 ? "finale" : "stageClear" });
+  // DEBUG-ONLY-BEGIN
+  observe(() => { const record = run.records.at(-1); if (!run.course) emit(run, "split", { stage: record.stage, time: record.elapsed, contacts: record.hits, score: record.score, maxCombo: record.maxFlow }); emit(run, "clear_summary", { stages: run.records.map(r => ({ stage: r.stage, time: r.elapsed, contacts: r.hits, score: r.score, maxCombo: r.maxFlow })), callsUsed: run.callsUsed, friendsArrived: run.friendsArrived, friendsLeft: run.friendsLeft, totals: { time: run.course ? run.elapsed : run.records.reduce((n, r) => n + r.elapsed, 0), contacts: run.course ? run.hits : run.records.reduce((n, r) => n + r.hits, 0), score: run.course ? run.combo.score : run.records.reduce((n, r) => n + r.score, 0), maxCombo: Math.max(0, ...run.records.map(r => r.maxFlow || 0)) } }); flush(); });
+  // DEBUG-ONLY-END
   }
   syncTotals(run);
   return run;
@@ -545,12 +570,18 @@ export function advanceRun(run) {
   const present = new Set(run.party.members.map(m => m.id));
   next.party.members = next.party.members.filter(m => present.has(m.id) || m.id === run.stage + 1);
   next.friendsJoined = run.friendsJoined + 1;
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(run, "friend_join", { stage: next.stage, hate: run.hate }); });
+  // DEBUG-ONLY-END
   next.friendsLeft = run.friendsLeft;
   next.hate = run.hate; next.callGauge = run.callGauge; next.callsUsed = run.callsUsed;
   return next;
 }
 
 export function retryRun(run) {
+  // DEBUG-ONLY-BEGIN
+  observe(() => { emit(run, "retry", { stage: run.stage }); flush(); });
+  // DEBUG-ONLY-END
   if (run?.course) {
     const snap = run.course.snapshots[run.course.index];
     if (!snap) return createCourseRun(run.runSeed);

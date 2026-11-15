@@ -13,3 +13,5 @@ validation/browser-*.js
 /docs/development.md
 /validation/backport-check.js
 /validation/replay-check.js
+
+playlogs/

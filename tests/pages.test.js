@@ -57,11 +57,16 @@ test("Pages artifact contains only the new game and excludes private or old-vers
     /Copyright \(c\) 2026 monnouchi/);
 });
 
-test("Pages copies exact files and rejects unsafe sources or output locations", async (t) => {
+test("Pages removes development-only blocks and rejects unsafe sources or output locations", async (t) => {
   const { source, destination } = await fixture(t);
   await buildPages(source, destination);
-  for (const file of expected)
-    assert.deepEqual(await readFile(join(destination, file)), await readFile(join(root, file)));
+  for (const file of expected) {
+    const actual = await readFile(join(destination, file));
+    const original = await readFile(join(root, file));
+    if (!file.endsWith(".js")) assert.deepEqual(actual, original);
+    else assert.equal(actual.toString(), original.toString().replace(/^[ \t]*\/\/ DEBUG-ONLY-BEGIN\r?\n[\s\S]*?^[ \t]*\/\/ DEBUG-ONLY-END\r?\n/gm, ""));
+    assert.doesNotMatch(actual.toString(), /run_start|combo_reset|friend_leave|clear_summary|__playlog|playlog|デバッグモード/);
+  }
   await assert.rejects(buildPages(source, source), /must not contain/);
   await assert.rejects(buildPages(source, resolve(source, "..")), /must not contain/);
 
@@ -83,7 +88,7 @@ test("HTML assets and module imports resolve inside the Pages project path", asy
     .map((match) => [base, match[1]])
     .filter(([, ref]) => !ref.startsWith("data:"));
   for (const file of expected.filter((item) => item.endsWith(".js"))) {
-    const code = await readFile(join(root, file), "utf8");
+    const code = (await readFile(join(root, file), "utf8")).replace(/^[ \t]*\/\/ DEBUG-ONLY-BEGIN\r?\n[\s\S]*?^[ \t]*\/\/ DEBUG-ONLY-END\r?\n/gm, "");
     for (const match of code.matchAll(/from\s+["']([^"']+)["']/g))
       refs.push([new URL(file, base), match[1]]);
   }
